@@ -11,6 +11,9 @@ WORKDIR /app
 
 ARG ADC_INSTALL_PROFILE=demo
 ARG TORCH_CPU_INDEX=https://download.pytorch.org/whl/cpu
+ARG ADC_GIT_SHA=unknown
+
+ENV ADC_GIT_SHA=${ADC_GIT_SHA}
 
 RUN addgroup --system adc && adduser --system --ingroup adc --uid 10001 adc
 
@@ -37,6 +40,6 @@ USER adc
 EXPOSE 8501
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)"
+    CMD python -c "import os, urllib.request; port=os.environ.get('PORT', '8501'); urllib.request.urlopen(f'http://127.0.0.1:{port}/_stcore/health', timeout=3)"
 
 CMD ["python", "-m", "adc_evidence.deploy"]

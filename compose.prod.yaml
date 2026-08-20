@@ -1,0 +1,37 @@
+services:
+  adc-evidence:
+    build:
+      context: .
+      args:
+        ADC_INSTALL_PROFILE: demo
+        ADC_GIT_SHA: "${ADC_GIT_SHA:-unknown}"
+    image: adc-evidence:${ADC_IMAGE_TAG:-latest}
+    ports:
+      - "127.0.0.1:${ADC_HOST_PORT:-8501}:8501"
+    environment:
+      PORT: "8501"
+      ADC_BOOTSTRAP_EMBEDDING_BACKEND: hashing
+      ADC_LLM_BACKEND: extractive
+      ADC_PUBLIC_DEMO: "${ADC_PUBLIC_DEMO:-true}"
+      ADC_GIT_SHA: "${ADC_GIT_SHA:-unknown}"
+    volumes:
+      - "${ADC_DATA_DIR:-/srv/adc-evidence-data}/processed:/app/data/processed"
+      - "${ADC_DATA_DIR:-/srv/adc-evidence-data}/vector_index:/app/artifacts/vector_index"
+      - "${ADC_DATA_DIR:-/srv/adc-evidence-data}/evaluation:/app/artifacts/evaluation"
+      - "${ADC_BACKUP_DIR:-/srv/adc-evidence-backups}:/app/backups"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os, urllib.request;
+          port=os.environ.get('PORT', '8501');
+          urllib.request.urlopen(f'http://127.0.0.1:{port}/_stcore/health', timeout=3)
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3

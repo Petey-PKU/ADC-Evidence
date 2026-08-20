@@ -205,6 +205,10 @@ docker compose -f compose.yaml -f compose.full.yaml up --build
 
 默认 demo 镜像已完成实际构建和 HTTP 200 健康检查。完整说明见 `docs/deployment.md`。
 
+京东云单机部署使用独立的 `compose.prod.yaml`。默认只监听
+`127.0.0.1:8501`、启用公开只读演示模式，并将数据库、索引和备份保存在代码目录外。
+首次安装、SSH 隧道测试和持续更新命令见 `docs/server_deployment.md`。
+
 首次启动时，如果数据库不存在，页面会自动导入演示数据。
 
 ## 运行测试
