@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+.pytest_cache/
+.ruff_cache/
+.env
+.streamlit/secrets.toml
+
+# Generated data and model artifacts
+data/raw/*
+data/interim/*
+data/processed/*.db
+artifacts/vector_index/*
+artifacts/models/*
+artifacts/evaluation/*
+
+# Keep directory placeholders
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!artifacts/vector_index/.gitkeep
+!artifacts/models/.gitkeep
+!artifacts/evaluation/.gitkeep

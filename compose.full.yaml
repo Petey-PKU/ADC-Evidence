@@ -1,0 +1,9 @@
+services:
+  adc-evidence:
+    build:
+      args:
+        ADC_INSTALL_PROFILE: full
+    volumes:
+      - ./artifacts/vector_index:/app/artifacts/vector_index
+      - ./artifacts/models:/app/artifacts/models
+

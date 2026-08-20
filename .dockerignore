@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.pyo
+.env
+.streamlit/secrets.toml
+data/raw
+data/interim
+data/processed
+artifacts/vector_index
+artifacts/models
+artifacts/evaluation
+*.log

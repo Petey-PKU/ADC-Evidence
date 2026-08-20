@@ -1,0 +1,1 @@
+{"question_id":"reg_gen_profile_005","question":"Dato-DXd 的靶点、payload class 和研发状态是什么？","category":"adc_profile","should_refuse":false,"expected_document_ids":["adc_profile:adc_007"],"required_terms":["TROP2","Topoisomerase I inhibitor","approved"],"review_status":"expert_reviewed","regression_for":"gen_profile_005"}

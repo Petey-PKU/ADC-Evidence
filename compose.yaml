@@ -1,0 +1,26 @@
+services:
+  adc-evidence:
+    build:
+      context: .
+      args:
+        ADC_INSTALL_PROFILE: "${ADC_INSTALL_PROFILE:-demo}"
+    image: adc-evidence:local
+    ports:
+      - "8501:8501"
+    environment:
+      PORT: "8501"
+      ADC_BOOTSTRAP_EMBEDDING_BACKEND: "hashing"
+      ADC_LLM_BACKEND: "${ADC_LLM_BACKEND:-extractive}"
+      SILICONFLOW_API_KEY: "${SILICONFLOW_API_KEY:-}"
+      SILICONFLOW_BASE_URL: "${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}"
+      SILICONFLOW_MODEL: "${SILICONFLOW_MODEL:-deepseek-ai/DeepSeek-V4-Flash}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-5-mini}"
+    volumes:
+      - ./data/processed:/app/data/processed
+      - adc_vector_index:/app/artifacts/vector_index
+      - ./artifacts/evaluation:/app/artifacts/evaluation
+    restart: unless-stopped
+
+volumes:
+  adc_vector_index:

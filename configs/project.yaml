@@ -1,0 +1,9 @@
+project:
+  name: ADC-Evidence
+  version: 0.1.0
+  targets:
+    - HER2
+    - TROP2
+  database_path: data/processed/adc_evidence.db
+  seed_data_path: data/sample/adcs.csv
+

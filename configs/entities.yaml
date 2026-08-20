@@ -1,0 +1,24 @@
+targets:
+  HER2:
+    - HER2
+    - ERBB2
+    - CD340
+  TROP2:
+    - TROP2
+    - TROP-2
+    - TACSTD2
+
+payloads:
+  DXd:
+    - DXd
+    - deruxtecan
+  DM1:
+    - DM1
+    - emtansine
+  SN-38:
+    - SN-38
+    - govitecan
+  MMAE:
+    - MMAE
+    - vedotin
+
