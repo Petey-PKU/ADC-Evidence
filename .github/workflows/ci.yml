@@ -23,4 +23,5 @@ jobs:
         run: python -m compileall -q src tests
       - name: Run tests
         run: python -m unittest discover -s tests -v
-
+      - name: Validate production Compose
+        run: docker compose -f compose.prod.yaml config --quiet

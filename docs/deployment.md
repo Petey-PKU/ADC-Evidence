@@ -67,3 +67,7 @@ docker compose logs adc-evidence
 ## 上云时的最小改动
 
 首版适合部署到能运行 Docker 的单实例平台。需要持久化挂载 `data/processed` 和 `artifacts`，并在平台密钥管理中设置所选供应商的 Key。SQLite 适合单实例演示；如果出现多副本并发写入，应先迁移到 PostgreSQL，再增加身份验证与审计日志。
+
+京东云单机的生产配置使用独立的 `compose.prod.yaml`：端口只绑定到
+`127.0.0.1`，持久化数据位于代码目录外，公开页面关闭专家复核写入，并在每次升级前
+备份 SQLite。首次安装和持续部署步骤见 `docs/server_deployment.md`。

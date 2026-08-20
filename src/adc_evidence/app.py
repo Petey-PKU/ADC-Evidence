@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import streamlit as st
 
@@ -10,6 +11,7 @@ from adc_evidence.config import (
     GENERATION_REPORT_PATH,
     RETRIEVAL_REPORT_PATH,
     VECTOR_INDEX_PATH,
+    environment_flag,
 )
 from adc_evidence.database import (
     create_database,
@@ -44,6 +46,8 @@ st.set_page_config(
     page_icon="🧬",
     layout="wide",
 )
+
+PUBLIC_DEMO = environment_flag("ADC_PUBLIC_DEMO", default=False)
 
 
 def ensure_database() -> None:
@@ -173,7 +177,8 @@ def display_answer_result(result) -> None:
 
 
 ensure_database()
-ensure_review_queue()
+if not PUBLIC_DEMO:
+    ensure_review_queue()
 
 st.title("ADC-Evidence")
 st.caption("阶段 8：ADC 证据检索、带引用问答、人工复核与 Bad Case 闭环")
@@ -194,7 +199,12 @@ evidence_columns[2].metric("证据记录", stats["evidence_count"])
 
 st.divider()
 database_tab, retrieval_tab, answer_tab, review_tab = st.tabs(
-    ["ADC 结构化数据", "证据检索", "带引用问答", "专家复核"]
+    [
+        "ADC 结构化数据",
+        "证据检索",
+        "带引用问答",
+        "专家复核（只读）" if PUBLIC_DEMO else "专家复核",
+    ]
 )
 
 with database_tab:
@@ -327,6 +337,10 @@ with answer_tab:
         display_answer_result(result)
 
 with review_tab:
+    if PUBLIC_DEMO:
+        st.warning(
+            "公开演示模式已启用：可查看复核结构，但页面不会建立待审队列或保存人工结论。"
+        )
     st.info(
         "本页保存真实人工判断；自动评测只负责建立待审队列，不会自动写入专家结论。"
     )
@@ -341,6 +355,7 @@ with review_tab:
         "复核者标识",
         placeholder="填写姓名缩写或固定代号后保存，例如 reviewer-01",
         key="reviewer_id",
+        disabled=PUBLIC_DEMO,
     ).strip()
     filter_columns = st.columns(3)
     item_type_label = filter_columns[0].selectbox(
@@ -537,11 +552,11 @@ with review_tab:
             submitted = st.form_submit_button(
                 "保存人工复核",
                 type="primary",
-                disabled=not reviewer,
+                disabled=PUBLIC_DEMO or not reviewer,
             )
-        if not reviewer:
+        if not reviewer and not PUBLIC_DEMO:
             st.caption("填写复核者标识后才能保存；系统不会生成虚假的专家身份。")
-        if submitted:
+        if submitted and not PUBLIC_DEMO:
             save_expert_review(
                 item_id=str(item["item_id"]),
                 reviewer=reviewer,
@@ -560,5 +575,10 @@ with review_tab:
 with st.sidebar:
     st.header("当前版本")
     st.write("v0.5.0-reviewed")
+    git_sha = os.getenv("ADC_GIT_SHA", "").strip()
+    if git_sha and git_sha != "unknown":
+        st.caption(f"部署提交：{git_sha[:12]}")
+    if PUBLIC_DEMO:
+        st.caption("公开只读演示模式")
     st.write("数据源：ADC 种子数据、PubMed、ClinicalTrials.gov、ADCdb")
     st.write("当前边界：证据约束回答，不提供个体化医疗建议。")

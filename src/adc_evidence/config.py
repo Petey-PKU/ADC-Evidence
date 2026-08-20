@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -31,3 +32,23 @@ DEFAULT_SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
 # Backward-compatible alias for code or local configuration created before the
 # generation backends received provider-specific model settings.
 DEFAULT_LLM_MODEL = DEFAULT_OPENAI_MODEL
+
+
+def environment_flag(name: str, *, default: bool = False) -> bool:
+    """Read a strict boolean environment flag.
+
+    Accepted true values are ``1``, ``true``, ``yes`` and ``on``; accepted
+    false values are ``0``, ``false``, ``no`` and ``off``. Invalid values fail
+    fast so a misspelled production guard cannot silently disable itself.
+    """
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(
+        f"{name} must be one of: 1, true, yes, on, 0, false, no, off"
+    )
