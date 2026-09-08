@@ -1,0 +1,59 @@
+{
+  "schema_version": "research-freeze-v1",
+  "kind": "implementation_and_question_set_freeze",
+  "baseline_commit": "6a2fad5a09092301ac385ac27684d80b4ffe71b8",
+  "baseline_tag": "v0.6.0-research-baseline",
+  "base_main_commit": "a5376aab7938d39fa23c918ef2cba0273e024bcc",
+  "remote_sync": "not_verified_connection_reset",
+  "package_version": "0.6.0",
+  "source_tree": "4de629899d76f95327bef7e3b9b14bd0dbc5602f",
+  "hash_representation": "committed_git_blob_bytes",
+  "files": {
+    "data/annotations/retrieval_questions.jsonl": "sha256:ea26d15d789db487d665cdb01b5d66c5f26ce3695288cee7c5fa8f0ebe77f4c6",
+    "data/annotations/generation_questions.jsonl": "sha256:5a654b5dd9a0efdf3ff2cb2958fcf87868f65249188503f3497b7c2207055588",
+    "data/annotations/v0.6_frozen_test_questions.jsonl": "sha256:793e592bb9943d2ff4192a490f5b4f2c2678e0403ce6715f3b3c5b6641b2a17d",
+    "configs/evidence_policy.json": "sha256:1edc710720d5500b09bff86d83654b2cd5bb9c9b3811d529c31d8eafac10520e",
+    "src/adc_evidence/evaluation/benchmark.py": "sha256:c19aa4fbc5447f598b3d7fb28c483e3ec5e02412d60791abed6c80690586f57f",
+    "src/adc_evidence/evaluation/external_arms.py": "sha256:3b655741fa1f8d72bf2d56c6e74a7804ecd4ec9b47089391ae263cc11eb9ac53",
+    "pyproject.toml": "sha256:aabd6ce60c0c19b3ea5d14481ab4c23067eb7fe0e9f85e8f2f7cf5525da19b47"
+  },
+  "question_set": {
+    "schema_version": "v0.6-benchmark-v1",
+    "question_set_version": "v0.6-120q-2026-08-21",
+    "frozen_at": "2026-08-21T00:00:00+08:00",
+    "implementation_frozen_after": "v0.6-structured-validator-v1",
+    "question_set_hash": "sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da",
+    "question_count": 120,
+    "split_counts": {
+      "dev": 40,
+      "test": 80
+    },
+    "category_counts": {
+      "change_query": 15,
+      "comparison": 20,
+      "conflict_or_insufficient": 10,
+      "literature_evidence": 20,
+      "safety_refusal": 10,
+      "structured_fact": 25,
+      "trial_lookup": 20
+    },
+    "review_scope": {
+      "double_review_question_count": 45,
+      "high_risk_double_review_count": 20,
+      "ordinary_double_review_count": 25
+    }
+  },
+  "verification": {
+    "unit_tests": 105,
+    "unit_test_failures": 0,
+    "compileall": "passed",
+    "staged_whitespace_check": "passed",
+    "targeted_public_content_scan": "passed",
+    "test_environment": "Windows, Python 3.12; sandbox escalation required for temporary directories",
+    "linux_ci": "not_run_in_this_session"
+  },
+  "formal_evaluation": "not_started",
+  "research_data_freeze": "pending",
+  "human_review": "pending",
+  "publication_readiness": "not_established"
+}
