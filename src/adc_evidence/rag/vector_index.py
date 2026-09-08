@@ -15,6 +15,7 @@ from adc_evidence.config import (
 )
 from adc_evidence.database import connect
 from adc_evidence.rag.embeddings import Embedder, create_embedder
+from adc_evidence.rag.documents import retrieval_corpus_version
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ def build_vector_index(
         "embedding_model": embedder.model_name,
         "dimension": int(embeddings.shape[1]),
         "chunk_count": len(chunk_ids),
+        "retrieval_corpus_version": retrieval_corpus_version(database_path),
         "built_at": datetime.now(timezone.utc).isoformat(),
     }
     (index_path / "manifest.json").write_text(
@@ -78,12 +80,23 @@ def build_vector_index(
     return manifest
 
 
-def load_vector_index(index_path: Path = VECTOR_INDEX_PATH) -> VectorIndex:
+def load_vector_index(
+    index_path: Path = VECTOR_INDEX_PATH,
+    *,
+    database_path: Path | None = None,
+) -> VectorIndex:
     manifest = json.loads((index_path / "manifest.json").read_text(encoding="utf-8"))
     chunk_ids = json.loads((index_path / "chunk_ids.json").read_text(encoding="utf-8"))
     embeddings = np.load(index_path / "embeddings.npy", allow_pickle=False)
     if embeddings.shape[0] != len(chunk_ids):
         raise RuntimeError("Vector index is inconsistent: vector and chunk counts differ.")
+    if database_path is not None:
+        expected_version = retrieval_corpus_version(database_path)
+        if manifest.get("retrieval_corpus_version") != expected_version:
+            raise RuntimeError(
+                "Vector index does not match the active retrieval corpus. "
+                "Build and publish the database and index as one release."
+            )
     return VectorIndex(embeddings=embeddings, chunk_ids=chunk_ids, manifest=manifest)
 
 

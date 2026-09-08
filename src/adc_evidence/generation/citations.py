@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
-from adc_evidence.generation.models import CitationSource, CitationValidation
+from adc_evidence.generation.models import (
+    CitationSource,
+    CitationValidation,
+    ClaimSupport,
+    ClaimValidationSummary,
+)
 from adc_evidence.rag.retriever import SearchResult
 
 
@@ -71,7 +77,7 @@ def extract_citation_ids(answer: str) -> list[str]:
     return found
 
 
-def _claim_lines(answer: str) -> list[str]:
+def atomic_claim_lines(answer: str) -> list[str]:
     ignored_headings = {"答案", "回答", "依据", "结论", "answer", "evidence"}
     claims: list[str] = []
     for raw_line in answer.splitlines():
@@ -88,7 +94,7 @@ def _claim_lines(answer: str) -> list[str]:
 def validate_citations(answer: str, available_ids: set[str]) -> CitationValidation:
     cited_ids = extract_citation_ids(answer)
     invalid_ids = [citation_id for citation_id in cited_ids if citation_id not in available_ids]
-    claims = _claim_lines(answer)
+    claims = atomic_claim_lines(answer)
     cited_claim_count = sum(bool(extract_citation_ids(claim)) for claim in claims)
     coverage = cited_claim_count / len(claims) if claims else 0.0
     valid = bool(cited_ids) and not invalid_ids and bool(claims) and coverage == 1.0
@@ -99,6 +105,124 @@ def validate_citations(answer: str, available_ids: set[str]) -> CitationValidati
         claim_count=len(claims),
         cited_claim_count=cited_claim_count,
         coverage=round(coverage, 4),
+    )
+
+
+_SUPPORT_NOISE = {
+    "adc",
+    "answer",
+    "evidence",
+    "pubmed",
+    "结论",
+    "文献",
+    "研究",
+    "结果",
+    "证据",
+    "证据摘录",
+    "摘录",
+    "根据",
+    "报道",
+}
+
+_CHINESE_CONNECTORS = (
+    "的数据表明",
+    "的研究显示",
+    "研究表明",
+    "研究显示",
+    "证据显示",
+    "证据表明",
+    "可能",
+    "提示",
+    "发现",
+    "显示",
+    "表明",
+    "认为",
+    "以及",
+    "其中",
+    "用于",
+    "关于",
+    "相关",
+    "分别",
+    "当前",
+    "已经",
+    "可以",
+    "为",
+    "是",
+    "的",
+    "与",
+    "及",
+    "和",
+    "在",
+    "中",
+)
+
+
+def _support_terms(text: str) -> list[str]:
+    cleaned = re.sub(r"\[[^\]]+\]", " ", text)
+    cleaned = cleaned.strip().lstrip("-*•0123456789.、 ")
+    normalized = unicodedata.normalize("NFKC", cleaned).casefold()
+    for connector in _CHINESE_CONNECTORS:
+        normalized = normalized.replace(connector, " ")
+    tokens = re.findall(
+        r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*|\d+(?:\.\d+)?|[\u4e00-\u9fff]{2,}",
+        normalized,
+    )
+    terms: list[str] = []
+    for token in tokens:
+        token = token.strip("-")
+        if token in _SUPPORT_NOISE or len(token) < 2:
+            continue
+        if token not in terms:
+            terms.append(token)
+    return terms
+
+
+def validate_text_support(
+    answer: str,
+    sources: list[NumberedSource],
+) -> ClaimValidationSummary:
+    """Fail closed unless every material claim term occurs in its cited excerpts."""
+    source_map = {source.citation_id: source for source in sources}
+    checks: list[ClaimSupport] = []
+    for index, claim in enumerate(atomic_claim_lines(answer), start=1):
+        citation_ids = extract_citation_ids(claim)
+        cited_text = " ".join(
+            source_map[citation_id].excerpt
+            for citation_id in citation_ids
+            if citation_id in source_map
+        )
+        normalized_evidence = unicodedata.normalize("NFKC", cited_text).casefold()
+        terms = _support_terms(claim)
+        matched = [term for term in terms if term in normalized_evidence]
+        missing = [term for term in terms if term not in normalized_evidence]
+        if not citation_ids:
+            reason = "missing_citation"
+        elif any(citation_id not in source_map for citation_id in citation_ids):
+            reason = "unknown_citation"
+        elif not terms:
+            reason = "no_verifiable_terms"
+        elif missing:
+            reason = "terms_not_in_cited_evidence"
+        else:
+            reason = None
+        checks.append(
+            ClaimSupport(
+                claim_id=f"C{index}",
+                supported=reason is None,
+                citation_ids=citation_ids,
+                matched_terms=matched,
+                missing_terms=missing,
+                reason=reason,
+            )
+        )
+    supported = sum(check.supported for check in checks)
+    return ClaimValidationSummary(
+        valid=bool(checks) and supported == len(checks),
+        support_kind="text",
+        claim_count=len(checks),
+        supported_claim_count=supported,
+        unsupported_claim_count=len(checks) - supported,
+        claims=checks,
     )
 
 

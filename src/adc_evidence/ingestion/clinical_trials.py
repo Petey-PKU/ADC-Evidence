@@ -141,6 +141,7 @@ def collect_clinical_trials(
                     raw_path=path,
                     sha256=checksum,
                     dataset_version=dataset_version,
+                    source_updated_at=record.last_update_date,
                 )
             )
         next_page_token = payload.get("nextPageToken")

@@ -4,9 +4,16 @@ import csv
 import sqlite3
 from collections.abc import Iterable
 from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 
 from adc_evidence.models import ADCRecord
+
+
+FACTS_SCHEMA_VERSION = "0.6-facts-v1"
+SCHEMA_VERSION = "0.6-refresh-v1"
+REVIEW_SCHEMA_VERSION = "0.6-benchmark-review-v1"
+SCHEMA_VERSIONS = (FACTS_SCHEMA_VERSION, SCHEMA_VERSION, REVIEW_SCHEMA_VERSION)
 
 
 SCHEMA_SQL = """
@@ -48,6 +55,41 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
     summary_json TEXT,
     error_text TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ingestion_source_runs (
+    run_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    status TEXT NOT NULL CHECK (
+        status IN ('running', 'complete', 'partial', 'failed', 'skipped')
+    ),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    expected_count INTEGER CHECK (expected_count IS NULL OR expected_count >= 0),
+    collected_count INTEGER NOT NULL DEFAULT 0 CHECK (collected_count >= 0),
+    is_complete INTEGER NOT NULL DEFAULT 0 CHECK (is_complete IN (0, 1)),
+    error_text TEXT,
+    details_json TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (run_id, source),
+    FOREIGN KEY (run_id) REFERENCES ingestion_runs(run_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS source_run_records (
+    run_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_record_id TEXT NOT NULL,
+    snapshot_id TEXT,
+    PRIMARY KEY (run_id, source, source_record_id),
+    FOREIGN KEY (run_id, source)
+        REFERENCES ingestion_source_runs(run_id, source) ON DELETE CASCADE,
+    FOREIGN KEY (snapshot_id)
+        REFERENCES source_snapshots(snapshot_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_source_runs_source
+    ON ingestion_source_runs(source, finished_at, status, is_complete);
+CREATE INDEX IF NOT EXISTS idx_source_run_records_source
+    ON source_run_records(source, source_record_id, run_id);
 
 CREATE TABLE IF NOT EXISTS source_records (
     source TEXT NOT NULL,
@@ -207,7 +249,10 @@ CREATE TABLE IF NOT EXISTS expert_reviews (
     question_verdict TEXT NOT NULL,
     evidence_verdict TEXT NOT NULL,
     answer_verdict TEXT NOT NULL,
+    citation_verdict TEXT NOT NULL DEFAULT 'not_applicable',
+    completeness_verdict TEXT NOT NULL DEFAULT 'not_applicable',
     refusal_verdict TEXT NOT NULL,
+    reviewer_slot TEXT NOT NULL DEFAULT 'primary',
     severity TEXT NOT NULL,
     error_categories_json TEXT NOT NULL,
     notes TEXT NOT NULL,
@@ -221,6 +266,115 @@ CREATE INDEX IF NOT EXISTS idx_review_items_type
     ON review_items(item_type, category);
 CREATE INDEX IF NOT EXISTS idx_expert_reviews_item
     ON expert_reviews(item_id, reviewer);
+
+CREATE TABLE IF NOT EXISTS schema_versions (
+    version TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS source_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    source_record_id TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    source_updated_at TEXT,
+    source_url TEXT NOT NULL,
+    raw_path TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    dataset_version TEXT,
+    ingestion_run_id TEXT,
+    parser_version TEXT NOT NULL,
+    FOREIGN KEY (ingestion_run_id)
+        REFERENCES ingestion_runs(run_id) ON DELETE SET NULL,
+    UNIQUE (source, source_record_id, content_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_snapshots_record
+    ON source_snapshots(source, source_record_id, fetched_at);
+CREATE INDEX IF NOT EXISTS idx_source_snapshots_run
+    ON source_snapshots(ingestion_run_id);
+
+CREATE TABLE IF NOT EXISTS facts (
+    fact_id TEXT PRIMARY KEY,
+    subject_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    predicate TEXT NOT NULL,
+    normalized_value_json TEXT NOT NULL,
+    display_value TEXT NOT NULL,
+    value_type TEXT NOT NULL,
+    value_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN ('current', 'superseded', 'conflicted')
+    ),
+    valid_from TEXT NOT NULL,
+    valid_to TEXT,
+    review_status TEXT NOT NULL,
+    policy_version TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_facts_subject
+    ON facts(subject_type, subject_id, predicate, status);
+CREATE INDEX IF NOT EXISTS idx_facts_value
+    ON facts(subject_type, subject_id, predicate, value_hash);
+
+CREATE TABLE IF NOT EXISTS fact_evidence (
+    fact_evidence_id TEXT PRIMARY KEY,
+    fact_id TEXT NOT NULL,
+    snapshot_id TEXT,
+    source TEXT NOT NULL,
+    source_record_id TEXT NOT NULL,
+    source_locator TEXT NOT NULL,
+    evidence_text TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+    extractor TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    valid_to TEXT,
+    is_current INTEGER NOT NULL CHECK (is_current IN (0, 1)),
+    review_status TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    FOREIGN KEY (fact_id) REFERENCES facts(fact_id) ON DELETE CASCADE,
+    FOREIGN KEY (snapshot_id)
+        REFERENCES source_snapshots(snapshot_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_fact_evidence_fact
+    ON fact_evidence(fact_id, is_current);
+CREATE INDEX IF NOT EXISTS idx_fact_evidence_source
+    ON fact_evidence(
+        source, source_record_id, is_current
+    );
+CREATE INDEX IF NOT EXISTS idx_fact_evidence_snapshot
+    ON fact_evidence(snapshot_id);
+
+CREATE TABLE IF NOT EXISTS change_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    subject_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    predicate TEXT,
+    old_value_json TEXT NOT NULL,
+    new_value_json TEXT NOT NULL,
+    detected_at TEXT NOT NULL,
+    source TEXT,
+    source_record_id TEXT,
+    snapshot_id TEXT,
+    review_required INTEGER NOT NULL CHECK (review_required IN (0, 1)),
+    review_status TEXT NOT NULL,
+    details_json TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    FOREIGN KEY (snapshot_id)
+        REFERENCES source_snapshots(snapshot_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_change_events_subject
+    ON change_events(subject_type, subject_id, detected_at);
+CREATE INDEX IF NOT EXISTS idx_change_events_type
+    ON change_events(event_type, severity, detected_at);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS text_chunks_fts USING fts5(
     chunk_id UNINDEXED,
@@ -258,9 +412,36 @@ def create_database(database_path: Path) -> None:
                     "ALTER TABLE review_items ADD COLUMN "
                     "model_name TEXT NOT NULL DEFAULT 'unknown'"
                 )
+            review_columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(expert_reviews)")
+            }
+            if "citation_verdict" not in review_columns:
+                connection.execute(
+                    "ALTER TABLE expert_reviews ADD COLUMN "
+                    "citation_verdict TEXT NOT NULL DEFAULT 'not_applicable'"
+                )
+            if "completeness_verdict" not in review_columns:
+                connection.execute(
+                    "ALTER TABLE expert_reviews ADD COLUMN "
+                    "completeness_verdict TEXT NOT NULL DEFAULT 'not_applicable'"
+                )
+            if "reviewer_slot" not in review_columns:
+                connection.execute(
+                    "ALTER TABLE expert_reviews ADD COLUMN "
+                    "reviewer_slot TEXT NOT NULL DEFAULT 'primary'"
+                )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_review_items_run "
                 "ON review_items(evaluation_run_id, item_type)"
+            )
+            applied_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO schema_versions (version, applied_at)
+                VALUES (?, ?)
+                """,
+                [(version, applied_at) for version in SCHEMA_VERSIONS],
             )
 
 

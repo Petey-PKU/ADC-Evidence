@@ -4,7 +4,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/compose.prod.yaml"
 EXPECTED_BRANCH="${ADC_DEPLOY_BRANCH:-main}"
-HEALTH_PORT="${ADC_HOST_PORT:-8501}"
 
 cd "$REPO_ROOT"
 
@@ -35,9 +34,19 @@ export ADC_IMAGE_TAG="$ADC_GIT_SHA"
 docker compose -f "$COMPOSE_FILE" config --quiet
 docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans
 
+HEALTH_ENDPOINT="$(
+  docker compose -f "$COMPOSE_FILE" port adc-evidence 8501 | tail -n 1
+)"
+if [[ -z "$HEALTH_ENDPOINT" ]]; then
+  docker compose -f "$COMPOSE_FILE" ps
+  echo "Deployment did not publish the Streamlit health port." >&2
+  exit 1
+fi
+HEALTH_URL="http://${HEALTH_ENDPOINT}/_stcore/health"
+
 for _ in {1..30}; do
   if curl --fail --silent --show-error \
-    "http://127.0.0.1:${HEALTH_PORT}/_stcore/health" >/dev/null; then
+    "$HEALTH_URL" >/dev/null; then
     echo "Deployment healthy at commit $ADC_GIT_SHA."
     exit 0
   fi

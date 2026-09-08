@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from adc_evidence.config import DEFAULT_DATABASE_PATH, DEFAULT_SEED_PATH
-from adc_evidence.database import initialize_database
+from adc_evidence.workbench import sync_public_seed_facts
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,10 +16,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    imported = initialize_database(args.database, args.seed)
-    print(f"Initialized {args.database} with {imported} ADC records.")
+    summary = sync_public_seed_facts(args.database, args.seed)
+    print(
+        f"Initialized {args.database} with {summary['adc_count']} ADC records "
+        f"and {summary['facts_created']} new temporal facts."
+    )
 
 
 if __name__ == "__main__":
     main()
-

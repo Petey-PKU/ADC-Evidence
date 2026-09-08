@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
+from adc_evidence.config import DEFAULT_DATABASE_PATH
 from adc_evidence.generation.generators import create_generator
 from adc_evidence.generation.service import EvidenceAnsweringService
 
@@ -18,8 +20,12 @@ def main() -> None:
         "--retrieval-mode", choices=("sparse", "dense", "hybrid"), default="sparse"
     )
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE_PATH)
     args = parser.parse_args()
-    service = EvidenceAnsweringService(generator=create_generator(args.backend))
+    service = EvidenceAnsweringService(
+        database_path=args.database,
+        generator=create_generator(args.backend),
+    )
     result = service.answer(
         args.question,
         retrieval_mode=args.retrieval_mode,

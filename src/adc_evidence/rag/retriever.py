@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from contextlib import closing
@@ -48,6 +49,7 @@ class HybridRetriever:
         self.index_path = Path(index_path)
         self._vector_index = None
         self._embedder = None
+        self._loaded_asset_signature: tuple[object, ...] | None = None
         self._entity_normalizer = EntityNormalizer()
 
     @property
@@ -58,9 +60,21 @@ class HybridRetriever:
         )
 
     def _load_dense(self) -> None:
-        if self._vector_index is None:
-            self._vector_index = load_vector_index(self.index_path)
+        manifest_path = self.index_path / "manifest.json"
+        database_stat = self.database_path.stat()
+        manifest_digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        asset_signature = (
+            database_stat.st_mtime_ns,
+            database_stat.st_size,
+            manifest_digest,
+        )
+        if self._vector_index is None or asset_signature != self._loaded_asset_signature:
+            self._vector_index = load_vector_index(
+                self.index_path,
+                database_path=self.database_path,
+            )
             self._embedder = embedder_for_index(self._vector_index)
+            self._loaded_asset_signature = asset_signature
 
     def _row_to_result(self, row, score: float, rank: int) -> SearchResult:
         metadata = json.loads(row["metadata_json"])
