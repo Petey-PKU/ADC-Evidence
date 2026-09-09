@@ -31,7 +31,7 @@ from adc_evidence.generation.service import EvidenceAnsweringService
 BENCHMARK_SCHEMA_VERSION = "v0.6-benchmark-v1"
 QUESTION_SET_VERSION = "v0.6-120q-2026-08-21"
 PROMPT_VERSION = "v0.6-comparison-prompt-v1"
-IMPLEMENTATION_VERSION = "v0.6-structured-validator-v1"
+IMPLEMENTATION_VERSION = "v0.6-structured-validator-v2"
 ARM_NAMES = ("direct_model", "web_model", "adc_evidence")
 CATEGORY_TARGETS = {
     "structured_fact": 25,

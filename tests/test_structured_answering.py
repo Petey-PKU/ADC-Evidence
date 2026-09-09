@@ -111,6 +111,26 @@ class StructuredAnsweringTests(unittest.TestCase):
             with self.subTest(question=question):
                 self.assertEqual(route_question(self.database, question).route, expected)
 
+    def test_router_prioritizes_trial_and_literature_intent(self) -> None:
+        self.assertEqual(
+            route_question(self.database, "T-DXd II 期研究的注册号和状态？").route,
+            "trial_lookup",
+        )
+        self.assertEqual(
+            route_question(self.database, "T-DXd 的活性和机制有哪些研究？").route,
+            "literature_evidence",
+        )
+        self.assertEqual(
+            route_question(self.database, "PMID 38164284 的 HER2 ADC 研究结论是什么？").route,
+            "literature_evidence",
+        )
+
+    def test_router_accepts_source_collection_change_questions(self) -> None:
+        self.assertEqual(
+            route_question(self.database, "来源采集失败的变化事件有哪些？").route,
+            "change_query",
+        )
+
     def test_structured_fact_bypasses_retriever_and_generator(self) -> None:
         service, retriever, generator = self._service()
         result = service.answer("T-DXd 的靶点和 DAR 是多少？")

@@ -107,6 +107,16 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "specific_identifier_not_found")
 
+    def test_patient_action_is_refused(self) -> None:
+        decision = self.guard.check_question("患者是否应该停用 T-DXd？")
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "personalized_medical_advice")
+
+    def test_forecast_and_investment_claim_is_refused(self) -> None:
+        decision = self.guard.check_question("预测 SKB264 临床成功率和目标价")
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "future_or_unpublished_claim")
+
 
 class ServiceTests(unittest.TestCase):
     def test_valid_cited_answer_is_returned(self) -> None:

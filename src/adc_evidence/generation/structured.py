@@ -27,7 +27,7 @@ from adc_evidence.workbench import (
 )
 
 
-STRUCTURED_MODEL = "v0.6-structured-validator-v1"
+STRUCTURED_MODEL = "v0.6-structured-validator-v2"
 ADC_FIELD_LABELS = dict(ADC_FIELD_SPECS)
 DEFAULT_PROFILE_FIELDS = (
     "adc.target",
@@ -185,16 +185,22 @@ def route_question(database_path: Path, question: str) -> QuestionPlan:
         marker in lowered for marker in ("比较", "对比", "区别", "差异", " versus ", " vs ")
     )
     change = any(
-        marker in lowered for marker in ("最近", "近一", "变化", "变更", "更新", "新增", "过去")
+        marker in lowered
+        for marker in (
+            "最近", "近一", "变化", "变更", "更新", "新增", "过去",
+            "采集失败", "来源缺失", "记录缺失", "变化事件", "冲突",
+        )
     )
     trial = bool(nct_ids) or any(
         marker in lowered
-        for marker in ("临床试验", "试验", "注册号", "招募", "主要终点")
+        for marker in ("临床试验", "试验", "注册号", "招募", "主要终点", "入组", "nct")
     )
+    trial = trial or bool(re.search(r"\b(?:phase\s*)?(?:i{1,3}|iv|v)\s*期", lowered, re.I))
     literature = any(
         marker in lowered
         for marker in (
             "pubmed",
+            "pmid",
             "文献",
             "论文",
             "摘要",
@@ -204,11 +210,25 @@ def route_question(database_path: Path, question: str) -> QuestionPlan:
             "疗效",
             "安全性",
             "半衰期",
+            "活性",
+            "转运",
+            "释放",
+            "研究",
+            "提及",
         )
     )
 
     if comparison:
         if len(adc_ids) < 2:
+            if literature:
+                return QuestionPlan(
+                    route="literature_evidence",
+                    reason="literature_intent_overrides_incomplete_comparison_entities",
+                    confidence=0.9,
+                    adc_ids=adc_ids,
+                    adc_names=adc_names,
+                    targets=targets,
+                )
             return QuestionPlan(
                 route="refusal",
                 reason="comparison_requires_two_known_adcs",

@@ -26,6 +26,13 @@ DOMAIN_TERMS = {
     "癌",
     "her2",
     "trop2",
+    "文献",
+    "论文",
+    "研究",
+    "变化",
+    "冲突",
+    "来源",
+    "记录",
 }
 
 UNSAFE_PATTERNS = (
@@ -38,6 +45,12 @@ UNSAFE_PATTERNS = (
     "personalized dose",
     "prescribe",
     "diagnose this patient",
+    "患者应该停用",
+    "患者应停用",
+    "患者继续使用",
+    "患者是否应该",
+    "该不该停用",
+    "personalized treatment",
 )
 
 FUTURE_PATTERNS = (
@@ -49,7 +62,15 @@ FUTURE_PATTERNS = (
     "2040",
     "predict future",
     "not yet published",
+    "目标价",
+    "股价",
+    "投资回报",
+    "成功率",
+    "预测",
 )
+
+PERSONAL_CONTEXT_PATTERNS = ("患者", "病人", "个人")
+PERSONAL_ACTION_PATTERNS = ("停用", "继续使用", "换药", "调整用药", "治疗", "是否应该", "该不该")
 
 
 @dataclass(frozen=True)
@@ -70,6 +91,10 @@ class EvidenceGuard:
         if len(stripped) > 500:
             return GateDecision(False, "question_too_long")
         if any(pattern in lowered for pattern in UNSAFE_PATTERNS):
+            return GateDecision(False, "personalized_medical_advice")
+        if any(context in lowered for context in PERSONAL_CONTEXT_PATTERNS) and any(
+            action in lowered for action in PERSONAL_ACTION_PATTERNS
+        ):
             return GateDecision(False, "personalized_medical_advice")
         if any(pattern in lowered for pattern in FUTURE_PATTERNS):
             return GateDecision(False, "future_or_unpublished_claim")

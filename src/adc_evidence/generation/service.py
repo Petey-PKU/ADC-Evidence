@@ -169,7 +169,7 @@ class EvidenceAnsweringService:
                         answer="结构化查询发生错误；系统没有退回自由生成。",
                         refusal_reason=type(exc).__name__,
                         generator_backend="structured",
-                        model="v0.6-structured-validator-v1",
+                        model="v0.6-structured-validator-v2",
                         retrieval_mode="structured",
                         route=plan.route,
                         route_reason=plan.reason,
