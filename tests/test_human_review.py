@@ -1,6 +1,9 @@
 import unittest
 
-from adc_evidence.evaluation.human_review import summarize_human_paired_reviews
+from adc_evidence.evaluation.human_review import (
+    summarize_human_paired_reviews,
+    summarize_inter_rater_agreement,
+)
 
 
 class HumanReviewTests(unittest.TestCase):
@@ -30,3 +33,27 @@ class HumanReviewTests(unittest.TestCase):
         row = {"question_id": "q1", "review_origin": "human_independent", "system_correct": True, "baseline_correct": False}
         with self.assertRaisesRegex(ValueError, "Duplicate question_id"):
             summarize_human_paired_reviews([row, dict(row)])
+
+    def test_inter_rater_agreement_is_computed_without_reviewer_identity(self) -> None:
+        rows = [
+            {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},
+            {"question_id": "q1", "reviewer_slot": "secondary", "review_origin": "human_independent", "answer_verdict": "correct"},
+            {"question_id": "q2", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "partial"},
+            {"question_id": "q2", "reviewer_slot": "secondary", "review_origin": "human_independent", "answer_verdict": "incorrect"},
+        ]
+        summary = summarize_inter_rater_agreement(rows)
+        self.assertEqual(summary["question_count"], 2)
+        self.assertEqual(summary["observed_agreement_rate"], 0.5)
+        self.assertEqual(summary["disagreement_count"], 1)
+        self.assertNotIn("reviewer", " ".join(summary))
+
+    def test_inter_rater_agreement_rejects_adjudicated_or_incomplete_pairs(self) -> None:
+        with self.assertRaisesRegex(ValueError, "human_independent"):
+            summarize_inter_rater_agreement([
+                {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_adjudicated", "answer_verdict": "correct"},
+                {"question_id": "q1", "reviewer_slot": "secondary", "review_origin": "human_independent", "answer_verdict": "correct"},
+            ])
+        with self.assertRaisesRegex(ValueError, "exactly one primary"):
+            summarize_inter_rater_agreement([
+                {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},
+            ])
