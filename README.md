@@ -208,6 +208,8 @@ python -m adc_evidence.review.prepare_review `
 
 远程模型评测会产生 API 调用费用，只应在单题验证通过后运行。每次新评测都会自动生成 `run_id`；不同运行导入审核队列后不会互相覆盖。完整的 Key 安全、单题验证、常见错误和 OpenAI 可选配置见 `docs/api_configuration.md`；设计与指标说明见 `docs/generation_design.md` 和 `docs/generation_evaluation.md`。
 
+下面的远程模型数字是历史工程记录，不是当前离线研究的投稿结果；它们来自已暴露题集和单人复核，不能作为独立测试或系统优越性的证据。
+
 已完成的硅基流动 `deepseek-ai/DeepSeek-V4-Flash` 真实运行包含 12 次 API 调用：回答成功率、拒答召回、引用有效率与 Gold citation hit 均为 1.0000，关键事实词召回为 0.7639，合计使用 25,922 tokens。单人领域复核确认 11/12 可回答题正确、1/12 部分正确、4/4 拒答合理；唯一确认 Bad Case 是 `gen_profile_005` 遗漏两个关键事实。
 
 针对该 Bad Case，系统新增多字段回答清单和单题回归集。一次独立硅基流动回归完整输出 `TROP2`、`Topoisomerase I inhibitor` 与 `approved`，关键事实召回恢复为 1.0000；该结果只代表单题单次验证，不替代完整重评。修复记录见 `docs/bad_case_fix_gen_profile_005.md`。
