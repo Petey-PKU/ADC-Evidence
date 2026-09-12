@@ -103,18 +103,24 @@ def database_quality_provenance_check(repo_root: Path) -> tuple[str, str]:
         )
     try:
         quality_report = json.loads(quality_path.read_text(encoding="utf-8"))
+        database_metrics = data_quality_metrics(database_path)
         quality_matches = (
             quality_report.get("report_scope") == "current_committed_demo_seed"
-            and quality_report.get("database_metrics") == data_quality_metrics(database_path)
+            and quality_report.get("database_metrics") == database_metrics
         )
     except (OSError, ValueError, KeyError, sqlite3.Error):
         quality_matches = False
-    return (
-        "pass" if quality_matches else "blocker",
-        "committed quality report matches the committed demo database"
-        if quality_matches
-        else "committed quality report is missing, stale, or inconsistent with the demo database",
-    )
+    if not quality_matches:
+        return (
+            "blocker",
+            "committed quality report is missing, stale, or inconsistent with the demo database",
+        )
+    if not database_metrics.get("document_count") and not database_metrics.get("trial_count"):
+        return (
+            "warning",
+            "quality report matches the demo database, but no literature or trial records are present",
+        )
+    return "pass", "committed quality report matches the committed demo database"
 
 
 def audit_public_paper_readiness(
