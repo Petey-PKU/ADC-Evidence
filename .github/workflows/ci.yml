@@ -27,5 +27,19 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Validate public holdout separation
         run: python scripts/validate_public_holdout.py
+      - name: Validate paper readiness remains fail-closed
+        run: |
+          set +e
+          python scripts/audit_paper_readiness.py --output /tmp/paper_readiness.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/paper_readiness.json').read_text())
+          assert report['status'] == 'not_ready_for_submission'
+          assert report['blocker_count'] == 2
+          PY
       - name: Validate production Compose
         run: docker compose -f compose.prod.yaml config --quiet
