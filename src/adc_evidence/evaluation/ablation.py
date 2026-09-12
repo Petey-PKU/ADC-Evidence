@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -59,6 +60,29 @@ def run_identifier_routing_ablation(
             "automatic_diagnostics": automatic_diagnostics(outputs, questions),
             "questions": outputs,
         }
+    full = {row["question_id"]: row for row in arms["full_system"]["questions"]}
+    without = {
+        row["question_id"]: row
+        for row in arms["without_identifier_routing"]["questions"]
+    }
+    paired_status = Counter(
+        (full[question_id]["status"], without[question_id]["status"])
+        for question_id in full
+    )
+    paired_routes = Counter(
+        (full[question_id].get("route"), without[question_id].get("route"))
+        for question_id in full
+    )
+    changed_ids = sorted(
+        question_id
+        for question_id in full
+        if (
+            full[question_id]["status"], full[question_id].get("route")
+        )
+        != (
+            without[question_id]["status"], without[question_id].get("route")
+        )
+    )
     return {
         "schema_version": ABLATION_SCHEMA_VERSION,
         "ablation_component": "exact_identifier_routing",
@@ -69,5 +93,16 @@ def run_identifier_routing_ablation(
         "database_data_version": evidence_data_version(database_path),
         "network_enabled": False,
         "arms": arms,
+        "paired_status_counts": {
+            f"{full_status}->{without_status}": count
+            for (full_status, without_status), count in sorted(paired_status.items())
+        },
+        "paired_route_counts": {
+            f"{full_route}->{without_route}": count
+            for (full_route, without_route), count in sorted(
+                paired_routes.items(), key=lambda item: str(item[0])
+            )
+        },
+        "changed_question_ids": changed_ids,
         "interpretation": "Component-level engineering comparison only; semantic correctness needs review labels.",
     }

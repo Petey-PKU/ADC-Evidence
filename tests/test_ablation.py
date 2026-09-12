@@ -35,6 +35,8 @@ class AblationTests(unittest.TestCase):
         self.assertEqual(set(report["arms"]), {"full_system", "without_identifier_routing"})
         self.assertEqual(report["question_count"], 2)
         self.assertFalse(report["network_enabled"])
+        self.assertIn("paired_status_counts", report)
+        self.assertIn("changed_question_ids", report)
 
 
 if __name__ == "__main__":
