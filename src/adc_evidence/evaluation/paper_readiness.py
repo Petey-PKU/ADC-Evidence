@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from adc_evidence.evaluation.benchmark import load_benchmark_questions
@@ -18,6 +19,33 @@ from adc_evidence.evaluation.human_review import (
 
 def _check(name: str, status: str, detail: str) -> dict[str, str]:
     return {"name": name, "status": status, "detail": detail}
+
+
+def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]:
+    """Validate the minimum integrity metadata for a confirmation holdout."""
+    if not isinstance(manifest, dict):
+        raise ValueError("Independent holdout manifest must be a JSON object")
+    evaluation_use = manifest.get("evaluation_use")
+    if not isinstance(evaluation_use, dict):
+        raise ValueError("Independent holdout manifest needs evaluation_use metadata")
+    if evaluation_use.get("eligible_for_unseen_test_claim") is not True:
+        raise ValueError("Independent holdout must be eligible_for_unseen_test_claim")
+    if evaluation_use.get("status") != "unseen_holdout":
+        raise ValueError("Independent holdout must have status=unseen_holdout")
+    if manifest.get("access_controlled") is not True:
+        raise ValueError("Independent holdout must be access_controlled")
+    question_count = manifest.get("question_count")
+    if not isinstance(question_count, int) or isinstance(question_count, bool) or question_count < 1:
+        raise ValueError("Independent holdout question_count must be a positive integer")
+    question_set_hash = manifest.get("question_set_hash")
+    if not isinstance(question_set_hash, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", question_set_hash
+    ):
+        raise ValueError("Independent holdout question_set_hash must be sha256:<64 lowercase hex>")
+    for field in ("question_set_version", "evaluation_window_id"):
+        if not isinstance(manifest.get(field), str) or not manifest[field].strip():
+            raise ValueError(f"Independent holdout needs nonempty {field}")
+    return manifest
 
 
 def audit_public_paper_readiness(
@@ -84,11 +112,9 @@ def audit_public_paper_readiness(
             )
         )
     else:
-        manifest = json.loads(independent_holdout_manifest.read_text(encoding="utf-8-sig"))
-        eligible = manifest.get("evaluation_use", {}).get("eligible_for_unseen_test_claim") is True
-        access_controlled = manifest.get("access_controlled") is True
-        if not eligible or not access_controlled:
-            raise ValueError("Independent holdout must be access_controlled and eligible_for_unseen_test_claim")
+        manifest = validate_independent_holdout_manifest(
+            json.loads(independent_holdout_manifest.read_text(encoding="utf-8-sig"))
+        )
         checks.append(
             _check(
                 "independent_holdout",

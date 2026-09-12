@@ -4,7 +4,10 @@ from adc_evidence.evaluation.human_review import (
     summarize_human_paired_reviews,
     summarize_inter_rater_agreement,
 )
-from adc_evidence.evaluation.paper_readiness import audit_public_paper_readiness
+from adc_evidence.evaluation.paper_readiness import (
+    audit_public_paper_readiness,
+    validate_independent_holdout_manifest,
+)
 from pathlib import Path
 
 
@@ -67,6 +70,31 @@ class HumanReviewTests(unittest.TestCase):
             {item["name"] for item in report["checks"] if item["status"] == "blocker"},
             {"human_review_labels", "independent_holdout"},
         )
+
+    def test_independent_holdout_manifest_requires_integrity_metadata(self) -> None:
+        valid = {
+            "question_set_version": "v1",
+            "question_set_hash": "sha256:" + "a" * 64,
+            "question_count": 40,
+            "evaluation_window_id": "window-1",
+            "access_controlled": True,
+            "evaluation_use": {
+                "status": "unseen_holdout",
+                "eligible_for_unseen_test_claim": True,
+            },
+        }
+        self.assertEqual(validate_independent_holdout_manifest(valid), valid)
+        for field in ("question_set_hash", "question_count", "evaluation_window_id"):
+            invalid = dict(valid)
+            invalid[field] = (
+                "bad"
+                if field == "question_set_hash"
+                else 0
+                if field == "question_count"
+                else ""
+            )
+            with self.assertRaises(ValueError):
+                validate_independent_holdout_manifest(invalid)
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},
