@@ -61,6 +61,15 @@ def _digest(value: object) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
+def _resolve_questions(questions: list[dict[str, object]] | None) -> list[dict[str, object]]:
+    """Resolve the default set while rejecting an explicit empty evaluation set."""
+    if questions is None:
+        return load_benchmark_questions()
+    if not questions:
+        raise ValueError("Question set must not be empty")
+    return questions
+
+
 def _read_jsonl(path: Path) -> list[dict[str, object]]:
     return [
         json.loads(line)
@@ -194,7 +203,7 @@ def load_benchmark_questions(
 def question_set_manifest(
     questions: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     return {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "question_set_version": QUESTION_SET_VERSION,
@@ -268,7 +277,7 @@ def build_external_arm_request(
 ) -> dict[str, object]:
     if arm not in {"direct_model", "web_model"}:
         raise ValueError("External request arm must be direct_model or web_model")
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     manifest = question_set_manifest(rows)
     instruction = (
         "直接回答问题；不知道时明确说明，不得声称使用了未提供的外部来源。"
@@ -307,7 +316,7 @@ def build_external_arm_report(
     questions: list[dict[str, object]] | None = None,
     run_id: str | None = None,
 ) -> dict[str, object]:
-    expected = questions or load_benchmark_questions()
+    expected = _resolve_questions(questions)
     manifest = question_set_manifest(expected)
     report = {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
@@ -359,7 +368,7 @@ def run_adc_evidence_arm(
     answerer: Callable[[str], AnswerResult] | None = None,
     run_id: str | None = None,
 ) -> dict[str, object]:
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     manifest = question_set_manifest(rows)
     if answerer is None:
         service = EvidenceAnsweringService(
@@ -403,7 +412,7 @@ def run_offline_rag_baseline(
     comparison isolates the structured route and field-validation path without
     introducing a remote model or a second corpus.
     """
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     manifest = question_set_manifest(rows)
     service = EvidenceAnsweringService(
         database_path=None,
@@ -540,7 +549,7 @@ def build_blinded_review_packet(
     questions: list[dict[str, object]] | None = None,
     run_id: str | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     reports = list(reports)
     if {str(report.get("arm")) for report in reports} != set(COMPARISON_ARM_NAMES):
         raise ValueError("Comparison requires direct_model, web_model and adc_evidence arms")
@@ -864,7 +873,7 @@ def build_regression_candidates(
     questions: list[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     validate_blinded_pair(packet, identity_map)
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     by_question = {str(row["question_id"]): row for row in rows}
     effective, _ = _effective_reviews(packet, list(reviews))
     identity = {

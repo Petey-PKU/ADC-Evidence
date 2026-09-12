@@ -172,6 +172,10 @@ class BenchmarkTests(unittest.TestCase):
             "sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da",
         )
 
+    def test_explicit_empty_question_set_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            question_set_manifest([])
+
     def test_public_regression_seed_is_deidentified_and_routable(self) -> None:
         rows = [
             json.loads(line)
