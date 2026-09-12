@@ -178,7 +178,8 @@ python -m adc_evidence.rag.evaluate --modes sparse dense hybrid
 python -m adc_evidence.generation.answer "T-DXd 的靶点、载荷和 DAR 是什么？" --backend extractive
 ```
 
-首次真实模型测试推荐使用硅基流动。将 `.env.example` 复制为 `.env`，只在本地填写：
+默认研究流程使用离线抽取式后端，不需要任何模型 API。只有在明确批准远程模型实验时，才将
+`.env.example` 复制为 `.env` 并在本地填写：
 
 ```text
 ADC_LLM_BACKEND=siliconflow

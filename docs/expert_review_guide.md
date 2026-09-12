@@ -13,7 +13,8 @@ streamlit run src/adc_evidence/app.py
 
 打开“专家复核”标签页，填写固定复核者代号，并使用“评测运行”筛选器选择需要审核的检索、离线生成或远程模型运行。每位复核者对同一运行中的同一项目保留一条最新记录；不同运行和不同复核者互不覆盖。
 
-新模型报告使用独立文件并显式导入：
+当前离线研究与复核应使用确定性的 `extractive` 后端。若经批准进行远程模型实验，必须在本地
+`.env` 设置 `ADC_OFFLINE_ONLY=false`，并使用独立报告文件显式导入：
 
 ```powershell
 python -m adc_evidence.generation.evaluate_generation `
