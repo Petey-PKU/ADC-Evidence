@@ -210,11 +210,13 @@ python -m adc_evidence.review.prepare_review `
 
 下面的远程模型数字是历史工程记录，不是当前离线研究的投稿结果；它们来自已暴露题集和单人复核，不能作为独立测试或系统优越性的证据。
 
+这些历史复核记录和远程运行产物保存在私有历史快照中，原始导出、评审者标识和本机运行元数据不随公共仓库发布。公共仓库当前没有真实人工金标准；投稿前必须重新提交带 `human_independent` / `human_adjudicated` provenance 的评审文件，并通过 readiness audit。
+
 已完成的硅基流动 `deepseek-ai/DeepSeek-V4-Flash` 真实运行包含 12 次 API 调用：回答成功率、拒答召回、引用有效率与 Gold citation hit 均为 1.0000，关键事实词召回为 0.7639，合计使用 25,922 tokens。单人领域复核确认 11/12 可回答题正确、1/12 部分正确、4/4 拒答合理；唯一确认 Bad Case 是 `gen_profile_005` 遗漏两个关键事实。
 
 针对该 Bad Case，系统新增多字段回答清单和单题回归集。一次独立硅基流动回归完整输出 `TROP2`、`Topoisomerase I inhibitor` 与 `approved`，关键事实召回恢复为 1.0000；该结果只代表单题单次验证，不替代完整重评。修复记录见 `docs/bad_case_fix_gen_profile_005.md`。
 
-56条主队列现已全部完成单人复核。离线基线为10/12答案正确、2/12部分正确、4/4拒答合理；真实模型为11/12答案正确、1/12部分正确、4/4拒答合理。离线自动词面召回更高，但人工正确率更低，原因是两条答案混入错误来源。完整比较见 `docs/generation_human_comparison.md`。
+私有历史快照中的 56 条主队列曾完成单人复核。离线基线为10/12答案正确、2/12部分正确、4/4拒答合理；真实模型为11/12答案正确、1/12部分正确、4/4拒答合理。离线自动词面召回更高，但人工正确率更低，原因是两条答案混入错误来源。完整比较见 `docs/generation_human_comparison.md`；这些数字不构成公共仓库的独立测试证据。
 
 ## 专家复核与 Bad Case
 
@@ -231,7 +233,7 @@ python -m adc_evidence.review.bad_cases
 python -m adc_evidence.review.export_reviews
 ```
 
-导出命令生成 `expert_reviews.jsonl`、`expert_reviews.csv` 和带文件哈希的 manifest。详细口径见 `docs/expert_review_guide.md`。当前 24 条检索问题已完成人工复核，问题与 Gold 均通过；自动规则仍标出 3 条检索低排名和 1 条生成关键事实覆盖不足，二者继续分开记录，不把自动指标包装成专家判断。
+导出命令生成 `expert_reviews.jsonl`、`expert_reviews.csv` 和带文件哈希的 manifest。详细口径见 `docs/expert_review_guide.md`。私有历史快照中的 24 条检索问题曾完成单人复核，问题与 Gold 均通过；自动规则仍标出 3 条检索低排名和 1 条生成关键事实覆盖不足。公共版本只保留方法说明，不把这些历史结果包装成独立人工证据。
 
 ## Docker 部署
 
