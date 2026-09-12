@@ -11,6 +11,7 @@ services:
       PORT: "8501"
       ADC_BOOTSTRAP_EMBEDDING_BACKEND: "hashing"
       ADC_LLM_BACKEND: "${ADC_LLM_BACKEND:-extractive}"
+      ADC_OFFLINE_ONLY: "${ADC_OFFLINE_ONLY:-true}"
       SILICONFLOW_API_KEY: "${SILICONFLOW_API_KEY:-}"
       SILICONFLOW_BASE_URL: "${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}"
       SILICONFLOW_MODEL: "${SILICONFLOW_MODEL:-deepseek-ai/DeepSeek-V4-Flash}"
