@@ -4,6 +4,7 @@ import unittest
 
 from adc_evidence.evaluation.benchmark import build_external_arm_report
 from adc_evidence.evaluation.offline_comparison import compare_offline_reports
+from adc_evidence.evaluation.statistics import paired_binary_summary
 
 
 def questions() -> list[dict[str, object]]:
@@ -51,6 +52,23 @@ class OfflineComparisonTests(unittest.TestCase):
         baseline["database_data_version"] = {"data_version": "different-db"}
         with self.assertRaises(ValueError):
             compare_offline_reports(system, baseline, questions())
+
+    def test_paired_binary_summary_is_deterministic_and_pair_aware(self) -> None:
+        system = [True, True, False, True, False]
+        baseline = [True, False, False, True, True]
+        first = paired_binary_summary(system, baseline, bootstrap_iterations=500, seed=7)
+        second = paired_binary_summary(system, baseline, bootstrap_iterations=500, seed=7)
+
+        self.assertEqual(first, second)
+        self.assertEqual(first["system_success_count"], 3)
+        self.assertEqual(first["baseline_success_count"], 3)
+        self.assertEqual(first["system_only_discordant"], 1)
+        self.assertEqual(first["baseline_only_discordant"], 1)
+        self.assertEqual(first["mcnemar_exact_two_sided_pvalue"], 1.0)
+
+    def test_paired_binary_summary_rejects_unpaired_input(self) -> None:
+        with self.assertRaises(ValueError):
+            paired_binary_summary([True], [True, False])
 
 
 if __name__ == "__main__":
