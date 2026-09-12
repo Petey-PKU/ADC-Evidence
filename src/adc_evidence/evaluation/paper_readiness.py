@@ -17,6 +17,7 @@ from adc_evidence.evaluation.human_review import (
     load_human_paired_reviews,
     validate_human_paired_reviews,
 )
+from adc_evidence.evaluation.public_hygiene import scan_tracked_public_files
 
 
 def _check(name: str, status: str, detail: str) -> dict[str, str]:
@@ -128,6 +129,18 @@ def audit_public_paper_readiness(
             "AI-assisted and automatic labels are rejected by the human-review gate",
         ),
     ]
+    hygiene = scan_tracked_public_files(repo_root)
+    checks.append(
+        _check(
+            "public_repository_hygiene",
+            "pass" if hygiene["status"] == "clean" else "blocker",
+            (
+                f"scanned {hygiene['scanned_file_count']} tracked files with no secret/path findings"
+                if hygiene["status"] == "clean"
+                else f"found {len(hygiene['findings'])} secret/path hygiene findings"
+            ),
+        )
+    )
     if human_review_jsonl is None:
         checks.append(
             _check(
