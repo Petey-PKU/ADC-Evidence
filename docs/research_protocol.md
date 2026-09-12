@@ -215,3 +215,4 @@ python scripts/audit_paper_readiness.py --output readiness.json
 元数据格式正确，不证明题集文件未被替换。
 
 CI 还会扫描 Git 跟踪文件中的常见凭据、私钥块和本机路径模式；报告只包含文件与类别，不包含匹配值。
+公开 artifact 可用 `scripts/build_public_artifact_manifest.py` 生成，清单只记录 Git 提交、公开跟踪文件哈希和卫生审计结果，不包含文件内容、评审者身份或私有路径。
