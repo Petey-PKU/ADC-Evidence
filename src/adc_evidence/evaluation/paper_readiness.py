@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import hashlib
 import re
+import sqlite3
 from pathlib import Path
 
 from adc_evidence.evaluation.benchmark import load_benchmark_questions
@@ -18,6 +19,7 @@ from adc_evidence.evaluation.human_review import (
     validate_human_paired_reviews,
 )
 from adc_evidence.evaluation.public_hygiene import scan_tracked_public_files
+from adc_evidence.repository import data_quality_metrics
 
 
 def _check(name: str, status: str, detail: str) -> dict[str, str]:
@@ -139,6 +141,25 @@ def audit_public_paper_readiness(
                 if hygiene["status"] == "clean"
                 else f"found {len(hygiene['findings'])} secret/path hygiene findings"
             ),
+        )
+    )
+    quality_path = repo_root / "data" / "processed" / "data_quality_report.json"
+    database_path = repo_root / "data" / "processed" / "adc_evidence.db"
+    try:
+        quality_report = json.loads(quality_path.read_text(encoding="utf-8"))
+        quality_matches = (
+            quality_report.get("report_scope") == "current_committed_demo_seed"
+            and quality_report.get("database_metrics") == data_quality_metrics(database_path)
+        )
+    except (OSError, ValueError, KeyError, sqlite3.Error):
+        quality_matches = False
+    checks.append(
+        _check(
+            "database_quality_provenance",
+            "pass" if quality_matches else "blocker",
+            "committed quality report matches the committed demo database"
+            if quality_matches
+            else "committed quality report is missing, stale, or inconsistent with the demo database",
         )
     )
     if human_review_jsonl is None:
