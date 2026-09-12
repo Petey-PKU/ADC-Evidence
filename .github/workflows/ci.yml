@@ -11,13 +11,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     env:
       ADC_OFFLINE_ONLY: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install package
         run: python -m pip install -e ".[generation]"
@@ -51,17 +55,17 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paper-readiness-audit
+          name: paper-readiness-audit-${{ matrix.python-version }}
           path: /tmp/paper_readiness.json
       - name: Upload public hygiene audit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-hygiene-audit
+          name: public-hygiene-audit-${{ matrix.python-version }}
           path: /tmp/public_hygiene.json
       - name: Upload public artifact manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-artifact-manifest
+          name: public-artifact-manifest-${{ matrix.python-version }}
           path: /tmp/public_artifact_manifest.json
