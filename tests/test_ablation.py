@@ -39,6 +39,24 @@ class AblationTests(unittest.TestCase):
         self.assertIn("changed_question_ids", report)
         self.assertTrue(str(report["question_id_sha256"]).startswith("sha256:"))
 
+    def test_identifier_routing_ablation_rejects_empty_or_duplicate_questions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            run_identifier_routing_ablation(
+                database_path=PROJECT_ROOT / "data" / "processed" / "missing.db",
+                questions=[],
+                evaluation_window_id="test-ablation",
+            )
+        question = load_holdout_questions(
+            PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
+        )[0]
+        duplicate = [dict(question), dict(question)]
+        with self.assertRaisesRegex(ValueError, "unique question_id"):
+            run_identifier_routing_ablation(
+                database_path=PROJECT_ROOT / "data" / "processed" / "missing.db",
+                questions=duplicate,
+                evaluation_window_id="test-ablation",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

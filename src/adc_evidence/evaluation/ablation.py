@@ -40,6 +40,13 @@ def run_identifier_routing_ablation(
     evaluated_at: str | None = None,
 ) -> dict[str, object]:
     """Compare exact PMID/NCT routing with ranked retrieval only."""
+    if not questions:
+        raise ValueError("Ablation question set must not be empty")
+    question_ids = [str(row.get("question_id", "")) for row in questions]
+    if any(not question_id.strip() for question_id in question_ids):
+        raise ValueError("Ablation questions need nonempty question_id values")
+    if len(question_ids) != len(set(question_ids)):
+        raise ValueError("Ablation questions need unique question_id values")
     evaluated_at = evaluated_at or datetime.now(UTC).isoformat()
     services = {
         "full_system": EvidenceAnsweringService(
