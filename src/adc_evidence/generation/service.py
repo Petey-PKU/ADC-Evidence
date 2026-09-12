@@ -39,6 +39,7 @@ REFUSAL_MESSAGES = {
     "no_retrieval_results": "当前数据库中没有检索到相关证据。",
     "low_retrieval_relevance": "检索结果相关性不足，无法可靠作答。",
     "specific_identifier_not_found": "问题中的特定药物或试验编号未在证据中出现。",
+    "topic_not_supported": "检索到的证据没有直接覆盖问题所问的具体结论。",
     "citation_validation_failed": "生成内容未通过引用完整性校验，因此不展示答案。",
     "text_support_validation_failed": "生成结论没有被所引证据片段直接支持，因此不展示答案。",
     "model_refusal": "现有证据不足以直接支持该问题。",

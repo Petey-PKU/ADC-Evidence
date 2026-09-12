@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from adc_evidence.processing.normalize import EntityNormalizer, normalize_text
@@ -72,6 +73,18 @@ FUTURE_PATTERNS = (
 PERSONAL_CONTEXT_PATTERNS = ("患者", "病人", "个人")
 PERSONAL_ACTION_PATTERNS = ("停用", "继续使用", "换药", "调整用药", "治疗", "是否应该", "该不该")
 
+# These intents require an explicit lexical anchor in the retrieved evidence.
+# Without this small gate, a generally related abstract can pass citation and
+# claim-term checks while still being irrelevant to the requested conclusion.
+TOPIC_EVIDENCE_REQUIREMENTS = (
+    (("旁观者效应", "bystander effect", "bystander"),),
+    (("耐药逆转", "resistance reversal", "overcoming resistance"),),
+    (("释放速率", "release rate", "release kinetics"),),
+    (("最大耐受剂量", "maximum tolerated dose", "mtd"),),
+    (("客观缓解率", "objective response rate", "orr"),),
+    (("体内半衰期", "in vivo half-life", "half-life"),),
+)
+
 
 @dataclass(frozen=True)
 class GateDecision:
@@ -133,4 +146,18 @@ class EvidenceGuard:
             normalized_identifier = normalize_text(identifier)
             if normalized_identifier and normalized_identifier not in combined:
                 return GateDecision(False, "specific_identifier_not_found")
+        lowered_question = unicodedata.normalize("NFKC", question).casefold()
+        lowered_evidence = unicodedata.normalize("NFKC", combined).casefold()
+        for trigger_group in TOPIC_EVIDENCE_REQUIREMENTS:
+            trigger = next(
+                (term for term in trigger_group[0] if term.casefold() in lowered_question),
+                None,
+            )
+            if trigger is None:
+                continue
+            if not any(
+                term.casefold() in lowered_evidence
+                for term in trigger_group[0]
+            ):
+                return GateDecision(False, "topic_not_supported")
         return GateDecision(True)
