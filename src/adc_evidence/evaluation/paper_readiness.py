@@ -92,6 +92,31 @@ def validate_independent_holdout_file(
     }
 
 
+def database_quality_provenance_check(repo_root: Path) -> tuple[str, str]:
+    """Check the committed quality report when the runtime demo DB is available."""
+    quality_path = repo_root / "data" / "processed" / "data_quality_report.json"
+    database_path = repo_root / "data" / "processed" / "adc_evidence.db"
+    if not database_path.exists():
+        return (
+            "warning",
+            "demo database is generated or mounted at runtime; consistency check deferred",
+        )
+    try:
+        quality_report = json.loads(quality_path.read_text(encoding="utf-8"))
+        quality_matches = (
+            quality_report.get("report_scope") == "current_committed_demo_seed"
+            and quality_report.get("database_metrics") == data_quality_metrics(database_path)
+        )
+    except (OSError, ValueError, KeyError, sqlite3.Error):
+        quality_matches = False
+    return (
+        "pass" if quality_matches else "blocker",
+        "committed quality report matches the committed demo database"
+        if quality_matches
+        else "committed quality report is missing, stale, or inconsistent with the demo database",
+    )
+
+
 def audit_public_paper_readiness(
     repo_root: Path,
     *,
@@ -145,26 +170,7 @@ def audit_public_paper_readiness(
             ),
         )
     )
-    quality_path = repo_root / "data" / "processed" / "data_quality_report.json"
-    database_path = repo_root / "data" / "processed" / "adc_evidence.db"
-    if not database_path.exists():
-        quality_status = "warning"
-        quality_detail = "demo database is generated or mounted at runtime; consistency check deferred"
-    else:
-        try:
-            quality_report = json.loads(quality_path.read_text(encoding="utf-8"))
-            quality_matches = (
-                quality_report.get("report_scope") == "current_committed_demo_seed"
-                and quality_report.get("database_metrics") == data_quality_metrics(database_path)
-            )
-        except (OSError, ValueError, KeyError, sqlite3.Error):
-            quality_matches = False
-        quality_status = "pass" if quality_matches else "blocker"
-        quality_detail = (
-            "committed quality report matches the committed demo database"
-            if quality_matches
-            else "committed quality report is missing, stale, or inconsistent with the demo database"
-        )
+    quality_status, quality_detail = database_quality_provenance_check(repo_root)
     checks.append(
         _check(
             "database_quality_provenance",
