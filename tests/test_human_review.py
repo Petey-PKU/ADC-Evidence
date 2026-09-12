@@ -3,6 +3,7 @@ import hashlib
 import json
 
 from adc_evidence.evaluation.human_review import (
+    question_id_sha256,
     summarize_human_paired_reviews,
     summarize_inter_rater_agreement,
 )
@@ -82,6 +83,7 @@ class HumanReviewTests(unittest.TestCase):
         valid = {
             "question_set_version": "v1",
             "question_set_hash": "sha256:" + "a" * 64,
+            "question_id_sha256": "sha256:" + "b" * 64,
             "question_count": 40,
             "evaluation_window_id": "window-1",
             "access_controlled": True,
@@ -91,7 +93,12 @@ class HumanReviewTests(unittest.TestCase):
             },
         }
         self.assertEqual(validate_independent_holdout_manifest(valid), valid)
-        for field in ("question_set_hash", "question_count", "evaluation_window_id"):
+        for field in (
+            "question_set_hash",
+            "question_id_sha256",
+            "question_count",
+            "evaluation_window_id",
+        ):
             invalid = dict(valid)
             invalid[field] = (
                 "bad"
@@ -115,6 +122,9 @@ class HumanReviewTests(unittest.TestCase):
             "question_count": 20,
             "question_file_sha256": "sha256:" + hashlib.sha256(questions_path.read_bytes()).hexdigest(),
             "question_set_hash": "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+            "question_id_sha256": question_id_sha256(
+                str(row["question_id"]) for row in rows
+            ),
         }
         bound = validate_independent_holdout_file(questions_path, manifest)
         self.assertEqual(bound["question_count"], 20)
@@ -125,6 +135,9 @@ class HumanReviewTests(unittest.TestCase):
         invalid_set = dict(manifest, question_set_hash="sha256:" + "0" * 64)
         with self.assertRaisesRegex(ValueError, "question set hash mismatch"):
             validate_independent_holdout_file(questions_path, invalid_set)
+        invalid_ids = dict(manifest, question_id_sha256="sha256:" + "0" * 64)
+        with self.assertRaisesRegex(ValueError, "question ID hash mismatch"):
+            validate_independent_holdout_file(questions_path, invalid_ids)
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},

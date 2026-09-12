@@ -50,7 +50,7 @@ python scripts/audit_paper_readiness.py `
   --output readiness.json
 ```
 
-题集文件应通过 manifest 的 `question_file_sha256` 和 `question_count` 绑定。审计通过前，
+题集文件应通过 manifest 的 `question_file_sha256`、`question_set_hash`、`question_id_sha256` 和 `question_count` 绑定。审计通过前，
 不能把结果写成独立测试准确率、专家金标准或系统优越性。
 
 ## 公开前检查

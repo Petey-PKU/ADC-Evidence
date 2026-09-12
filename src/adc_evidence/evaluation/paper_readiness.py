@@ -16,6 +16,7 @@ from adc_evidence.evaluation.holdout import (
 )
 from adc_evidence.evaluation.human_review import (
     load_human_paired_reviews,
+    question_id_sha256,
     validate_human_paired_reviews,
 )
 from adc_evidence.evaluation.public_hygiene import scan_tracked_public_files
@@ -47,6 +48,11 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
         r"sha256:[0-9a-f]{64}", question_set_hash
     ):
         raise ValueError("Independent holdout question_set_hash must be sha256:<64 lowercase hex>")
+    question_ids_hash = manifest.get("question_id_sha256")
+    if not isinstance(question_ids_hash, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", question_ids_hash
+    ):
+        raise ValueError("Independent holdout question_id_sha256 must be sha256:<64 lowercase hex>")
     for field in ("question_set_version", "evaluation_window_id"):
         if not isinstance(manifest.get(field), str) or not manifest[field].strip():
             raise ValueError(f"Independent holdout needs nonempty {field}")
@@ -90,9 +96,15 @@ def validate_independent_holdout_file(
     expected_question_set_hash = manifest.get("question_set_hash")
     if expected_question_set_hash != actual_question_set_hash:
         raise ValueError("Independent holdout question set hash mismatch")
+    actual_question_id_hash = question_id_sha256(
+        str(row["question_id"]) for row in rows
+    )
+    if manifest.get("question_id_sha256") != actual_question_id_hash:
+        raise ValueError("Independent holdout question ID hash mismatch")
     return {
         "question_file_sha256": actual_hash,
         "question_set_hash": actual_question_set_hash,
+        "question_id_sha256": actual_question_id_hash,
         "question_count": len(rows),
         "path": questions_path.name,
     }
