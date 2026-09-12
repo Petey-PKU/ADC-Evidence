@@ -40,6 +40,9 @@
 `scripts/audit_paper_readiness.py` 提供失败即显式报告的投稿前审计；默认会阻塞在真实人工标签
 和独立封存保留集，直到用户提供这两类外部证据。
 
+论文写作骨架见 [paper_outline.md](paper_outline.md)。其中所有 `[PENDING]` 字段都必须由通过门禁的
+独立保留集和人工复核产物填充，不能用当前公开 smoke 结果替代。
+
 公共代码还提供 `run_identifier_routing_ablation.py`，固定数据库、题集、生成器和网络状态，
 只移除显式 PMID/NCT 精确路由。公开 20 题不包含 PubMed/NCT 记录，因此不能用它声称该
 组件有效；该消融应在包含这些记录的私有或经许可领域评测集上运行，并将结果留在对应边界。
