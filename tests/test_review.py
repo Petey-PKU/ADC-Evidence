@@ -219,6 +219,7 @@ class ReviewRepositoryTests(unittest.TestCase):
             severity="none",
             error_categories=[],
             notes="Checked against source.",
+            review_origin="human_independent",
             database_path=self.database,
         )
         jsonl_path = self.root / "reviews.jsonl"
@@ -237,6 +238,7 @@ class ReviewRepositoryTests(unittest.TestCase):
         self.assertEqual(manifest["review_record_count"], 1)
         self.assertEqual(manifest["pending_item_count"], 0)
         self.assertEqual(exported[0]["review_status"], "reviewed")
+        self.assertEqual(exported[0]["review_origin"], "human_independent")
         self.assertEqual(exported[0]["evaluation_run_id"], "legacy-generation-extractive")
         self.assertTrue(csv_path.read_text(encoding="utf-8-sig").startswith("answer_verdict"))
         self.assertEqual(len(manifest["files"]["jsonl"]["sha256"]), 64)
