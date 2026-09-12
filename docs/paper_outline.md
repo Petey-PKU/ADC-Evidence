@@ -124,7 +124,7 @@ between smoke diagnostics and confirmation results.
 - [ ] Independent reviewers followed the blinded packet and submitted before identity reveal.
 - [ ] Double-review agreement and adjudication report.
 - [ ] Database, corpus, question, code, and prompt hashes.
-- [ ] Public artifact manifest with commit, tracked-file hashes, and hygiene result.
+- [ ] Public artifact manifest with package version, release reference, commit, tracked-file hashes, and hygiene result.
 - [ ] Paired statistics JSON and analysis command.
 - [ ] Ablation reports with matched budgets.
 - [ ] CI log and uploaded paper-readiness audit.
