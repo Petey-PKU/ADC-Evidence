@@ -39,6 +39,13 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Validate public holdout separation
         run: python scripts/validate_public_holdout.py
+      - name: Run public offline smoke holdout
+        run: >-
+          python scripts/run_public_holdout.py
+          --database data/processed/adc_evidence.db
+          --questions data/annotations/v0.6_public_holdout_questions.jsonl
+          --window-id ci-${{ matrix.python-version }}
+          --output /tmp/public_holdout.json
       - name: Validate paper readiness remains fail-closed
         run: |
           set +e
@@ -79,3 +86,9 @@ jobs:
         with:
           name: dependency-versions-${{ matrix.python-version }}
           path: /tmp/pip-freeze.txt
+      - name: Upload public smoke holdout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-smoke-holdout-${{ matrix.python-version }}
+          path: /tmp/public_holdout.json
