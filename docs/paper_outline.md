@@ -128,6 +128,7 @@ between smoke diagnostics and confirmation results.
 - [ ] Paired statistics JSON and analysis command.
 - [ ] Ablation reports with matched budgets.
 - [ ] CI log and uploaded paper-readiness audit.
+- [ ] AI-assisted pre-review risks addressed; independent human review remains required.
 - [ ] CI offline smoke holdout report archived (diagnostic only, not an unseen-test result).
 - [ ] Dependency freeze captured for each supported Python version.
 - [ ] Public artifact excludes private source records, reviewer identities, and keys.
