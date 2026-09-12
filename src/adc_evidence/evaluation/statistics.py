@@ -5,6 +5,23 @@ import random
 from collections.abc import Sequence
 
 
+def holm_bonferroni_adjust(p_values: Sequence[float]) -> list[float]:
+    """Return Holm step-down adjusted p-values in the original order."""
+    if not p_values:
+        raise ValueError("At least one p-value is required")
+    values = [float(value) for value in p_values]
+    if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in values):
+        raise ValueError("p-values must be finite numbers in [0, 1]")
+    order = sorted(range(len(values)), key=lambda index: (values[index], index))
+    adjusted = [0.0] * len(values)
+    running_max = 0.0
+    count = len(values)
+    for rank, index in enumerate(order):
+        running_max = max(running_max, (count - rank) * values[index])
+        adjusted[index] = min(1.0, running_max)
+    return adjusted
+
+
 def _validate_pairs(system: Sequence[bool], baseline: Sequence[bool]) -> None:
     if not system or not baseline or len(system) != len(baseline):
         raise ValueError("Paired labels must be nonempty and have equal length")

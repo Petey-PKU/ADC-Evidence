@@ -121,7 +121,7 @@ def audit_public_paper_readiness(
         _check(
             "paired_statistics_tooling",
             "pass",
-            "paired bootstrap and McNemar statistics are available",
+            "paired bootstrap, exact McNemar, and Holm adjustment tools are available",
         ),
         _check(
             "review_provenance_gate",

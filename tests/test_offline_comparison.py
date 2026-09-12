@@ -4,7 +4,7 @@ import unittest
 
 from adc_evidence.evaluation.benchmark import build_external_arm_report
 from adc_evidence.evaluation.offline_comparison import compare_offline_reports
-from adc_evidence.evaluation.statistics import paired_binary_summary
+from adc_evidence.evaluation.statistics import holm_bonferroni_adjust, paired_binary_summary
 
 
 def questions() -> list[dict[str, object]]:
@@ -69,6 +69,14 @@ class OfflineComparisonTests(unittest.TestCase):
     def test_paired_binary_summary_rejects_unpaired_input(self) -> None:
         with self.assertRaises(ValueError):
             paired_binary_summary([True], [True, False])
+
+    def test_holm_adjustment_is_order_preserving_and_step_down(self) -> None:
+        self.assertEqual(
+            holm_bonferroni_adjust([0.04, 0.01, 0.2]),
+            [0.08, 0.03, 0.2],
+        )
+        with self.assertRaises(ValueError):
+            holm_bonferroni_adjust([0.1, 1.1])
 
 
 if __name__ == "__main__":
