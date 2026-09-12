@@ -11,6 +11,7 @@ from adc_evidence.evaluation.holdout import (
     holdout_manifest,
     load_holdout_questions,
     run_public_holdout,
+    validate_holdout_disjoint,
 )
 
 
@@ -26,6 +27,20 @@ class PublicHoldoutTests(unittest.TestCase):
         self.assertEqual(manifest["evaluation_use"]["status"], "unseen_holdout")
         self.assertTrue(manifest["evaluation_use"]["eligible_for_unseen_test_claim"])
         self.assertTrue(str(manifest["question_set_hash"]).startswith("sha256:"))
+
+    def test_holdout_rejects_duplicate_question_text(self) -> None:
+        holdout = [{"question_id": "h1", "question": "T-DXd 的靶点是什么？"}]
+        exposed = [{"question_id": "e1", "question": "T-DXd 的靶点是什么？"}]
+        with self.assertRaises(ValueError):
+            validate_holdout_disjoint(holdout, exposed)
+
+    def test_holdout_disjoint_check_returns_audit_record(self) -> None:
+        result = validate_holdout_disjoint(
+            [{"question_id": "h1", "question": "T-DXd 的 payload 是什么？"}],
+            [{"question_id": "e1", "question": "T-DXd 的 DAR 是多少？"}],
+        )
+        self.assertEqual(result["status"], "disjoint")
+        self.assertEqual(result["overlap_count"], 0)
 
     def test_holdout_runs_both_local_arms_without_network(self) -> None:
         path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
