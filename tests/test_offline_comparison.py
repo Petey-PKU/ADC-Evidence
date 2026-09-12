@@ -46,6 +46,13 @@ class OfflineComparisonTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             compare_offline_reports(system, baseline, questions())
 
+    def test_question_id_binding_mismatch_fails_closed(self) -> None:
+        system = report("adc_evidence", "answered", "structured_fact")
+        baseline = report("offline_rag_baseline", "refused", "literature_evidence")
+        baseline["question_id_sha256"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(ValueError, "question ID binding"):
+            compare_offline_reports(system, baseline, questions())
+
     def test_database_version_mismatch_fails_closed(self) -> None:
         system = report("adc_evidence", "answered", "structured_fact")
         baseline = report("offline_rag_baseline", "refused", "literature_evidence")
