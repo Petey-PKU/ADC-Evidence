@@ -206,6 +206,7 @@ python scripts/audit_paper_readiness.py --output readiness.json
 
 若提供人工标签，应同时传入 `--human-review-jsonl` 和 `--human-review-manifest`；后者只能包含
 哈希、题数、版本和评测窗口等无身份元数据。
+可用 `scripts/build_human_review_manifest.py` 从已验证的人工 JSONL 自动生成该 manifest；脚本只输出哈希、题数和评测元数据，不输出标签内容或评审者身份。
 
 默认结果会因缺少独立保留集和真实人工标签而返回 `not_ready_for_submission`；
 这两个阻塞项必须由项目外部产生的证据解除，代码不会用自动指标代替它们。

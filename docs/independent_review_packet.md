@@ -43,6 +43,10 @@ python scripts/summarize_inter_rater_agreement.py private_reviews.jsonl --output
 
 ```powershell
 python scripts/summarize_human_paired_reviews.py paired_labels.jsonl --output paired_summary.json
+python scripts/build_human_review_manifest.py paired_labels.jsonl `
+  --review-set-version review-v1 `
+  --evaluation-window-id holdout-window-1 `
+  --output human_review_manifest.json
 python scripts/audit_paper_readiness.py `
   --human-review-jsonl paired_labels.jsonl `
   --human-review-manifest human_review_manifest.json `

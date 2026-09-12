@@ -9,6 +9,7 @@ from adc_evidence.evaluation.human_review import (
 )
 from adc_evidence.evaluation.paper_readiness import (
     audit_public_paper_readiness,
+    build_human_review_manifest,
     validate_independent_holdout_file,
     validate_independent_holdout_manifest,
     validate_human_review_file,
@@ -194,6 +195,19 @@ class HumanReviewTests(unittest.TestCase):
             invalid = dict(manifest, review_file_sha256="sha256:" + "0" * 64)
             with self.assertRaisesRegex(ValueError, "file hash mismatch"):
                 validate_human_review_file(reviews_path, invalid)
+
+    def test_human_review_manifest_builder_is_content_free_and_verifiable(self) -> None:
+        rows = [
+            {"question_id": "q1", "review_origin": "human_independent", "system_correct": True, "baseline_correct": False},
+        ]
+        with WorkspaceTemporaryDirectory() as directory:
+            reviews_path = Path(directory) / "reviews.jsonl"
+            reviews_path.write_text(json.dumps(rows[0]) + "\n", encoding="utf-8")
+            manifest = build_human_review_manifest(
+                reviews_path, review_set_version="v1", evaluation_window_id="window-1"
+            )
+            self.assertEqual(validate_human_review_file(reviews_path, manifest)["question_count"], 1)
+            self.assertNotIn("system_correct", json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},

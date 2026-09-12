@@ -153,6 +153,27 @@ def validate_human_review_file(
     }
 
 
+def build_human_review_manifest(
+    reviews_path: Path,
+    *,
+    review_set_version: str,
+    evaluation_window_id: str,
+) -> dict[str, object]:
+    """Build content-free integrity metadata for a human review JSONL export."""
+    if not review_set_version.strip() or not evaluation_window_id.strip():
+        raise ValueError("review_set_version and evaluation_window_id must be nonempty")
+    rows = validate_human_paired_reviews(load_human_paired_reviews(reviews_path))
+    return {
+        "schema_version": "v0.6-human-review-manifest-v1",
+        "review_file_sha256": "sha256:" + hashlib.sha256(reviews_path.read_bytes()).hexdigest(),
+        "question_id_sha256": question_id_sha256(str(row["question_id"]) for row in rows),
+        "question_count": len(rows),
+        "review_set_version": review_set_version,
+        "evaluation_window_id": evaluation_window_id,
+        "privacy_note": "Only hashes, count, version, and evaluation window are included; no labels or identities.",
+    }
+
+
 def database_quality_provenance_check(repo_root: Path) -> tuple[str, str]:
     """Check the committed quality report when the runtime demo DB is available."""
     quality_path = repo_root / "data" / "processed" / "data_quality_report.json"
