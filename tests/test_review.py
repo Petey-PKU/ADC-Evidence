@@ -1,8 +1,8 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
 import sqlite3
-import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
@@ -94,7 +94,7 @@ def retrieval_report() -> dict[str, object]:
 
 class ReviewRepositoryTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = WorkspaceTemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.database = self.root / "review.db"
         self.generation_path = self.root / "generation.json"

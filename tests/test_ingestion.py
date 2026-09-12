@@ -1,4 +1,4 @@
-import tempfile
+from tests.support import WorkspaceTemporaryDirectory
 import unittest
 from pathlib import Path
 
@@ -156,7 +156,7 @@ class IngestionTests(unittest.TestCase):
         )
         trial_links, trial_evidence = trial_links_and_evidence(trials, normalizer)
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             database_path = Path(temporary_directory) / "test.db"
             initialize_database(database_path, DEFAULT_SEED_PATH)
             upsert_documents(database_path, documents)

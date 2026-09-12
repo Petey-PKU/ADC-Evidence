@@ -1,6 +1,6 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -22,7 +22,7 @@ class AblationTests(unittest.TestCase):
         questions = load_holdout_questions(
             PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
         )[:2]
-        with tempfile.TemporaryDirectory() as tmp:
+        with WorkspaceTemporaryDirectory() as tmp:
             database = Path(tmp) / "ablation.db"
             initialize_database(database, PROJECT_ROOT / "data" / "sample" / "adcs.csv")
             documents = build_retrieval_documents(database)

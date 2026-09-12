@@ -1,7 +1,7 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -144,7 +144,7 @@ def verdict(candidate_id: str, slot: str = "primary", **changes: object) -> dict
 class BenchmarkTests(unittest.TestCase):
     def test_offline_baseline_uses_same_window_and_never_networks(self) -> None:
         questions = small_questions()
-        with tempfile.TemporaryDirectory() as directory:
+        with WorkspaceTemporaryDirectory() as directory:
             database_path = Path(directory) / "baseline.db"
             initialize_database(database_path, Path(__file__).resolve().parents[1] / "data" / "sample" / "adcs.csv")
             documents = build_retrieval_documents(database_path)
@@ -442,7 +442,7 @@ class BenchmarkTests(unittest.TestCase):
         packet, _ = build_blinded_review_packet(
             reports(questions), questions=questions, run_id="cmp-1"
         )
-        with tempfile.TemporaryDirectory() as temporary:
+        with WorkspaceTemporaryDirectory() as temporary:
             root = Path(temporary)
             packet_path = root / "packet.json"
             database_path = root / "review.db"

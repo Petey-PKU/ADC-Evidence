@@ -1,7 +1,7 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -45,7 +45,7 @@ class PublicHoldoutTests(unittest.TestCase):
     def test_holdout_runs_both_local_arms_without_network(self) -> None:
         path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
         questions = load_holdout_questions(path)
-        with tempfile.TemporaryDirectory() as tmp:
+        with WorkspaceTemporaryDirectory() as tmp:
             database = Path(tmp) / "holdout.db"
             initialize_database(database, PROJECT_ROOT / "data" / "sample" / "adcs.csv")
             from adc_evidence.rag.documents import build_retrieval_documents, chunk_documents, persist_retrieval_corpus

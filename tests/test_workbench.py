@@ -1,8 +1,8 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import csv
 import io
-import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,7 +30,7 @@ from adc_evidence.workbench import (
 
 class EvidenceWorkbenchTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.temporary_directory = WorkspaceTemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
         self.database = self.root / "adc.db"
         sync_public_seed_facts(

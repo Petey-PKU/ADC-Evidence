@@ -1,8 +1,8 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import copy
 import json
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -18,7 +18,7 @@ from adc_evidence.generation.models import AnswerResult
 
 class QuestionFileAuditTests(unittest.TestCase):
     def _inspect(self, raw: bytes) -> dict[str, object]:
-        with tempfile.TemporaryDirectory() as directory:
+        with WorkspaceTemporaryDirectory() as directory:
             path = Path(directory) / "questions.jsonl"
             path.write_bytes(raw)
             return inspect_question_file(path)

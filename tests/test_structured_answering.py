@@ -1,6 +1,6 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
-import tempfile
 import unittest
 from contextlib import closing
 from datetime import UTC, datetime
@@ -72,7 +72,7 @@ class StaticGenerator:
 
 class StructuredAnsweringTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.temporary_directory = WorkspaceTemporaryDirectory()
         self.database = Path(self.temporary_directory.name) / "adc.db"
         sync_public_seed_facts(
             self.database,

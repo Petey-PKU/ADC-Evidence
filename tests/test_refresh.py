@@ -1,9 +1,9 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
 import os
 import sqlite3
-import tempfile
 import unittest
 from unittest import mock
 from contextlib import closing
@@ -34,7 +34,7 @@ from adc_evidence.repository import (
 
 class RefreshOperationTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.temporary_directory = WorkspaceTemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
         self.database = self.root / "adc.db"
         create_database(self.database)
@@ -204,7 +204,7 @@ class RefreshOperationTests(unittest.TestCase):
 
 class IncrementalCorpusTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.temporary_directory = WorkspaceTemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
         self.database = self.root / "adc.db"
         initialize_database(self.database, DEFAULT_SEED_PATH)
@@ -262,7 +262,7 @@ class IncrementalCorpusTests(unittest.TestCase):
 
 class RefreshReleaseTests(unittest.TestCase):
     def test_offline_staged_release_publishes_database_index_and_manifest(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             database = root / "live" / "adc.db"
             index = root / "live" / "index"
@@ -292,7 +292,7 @@ class RefreshReleaseTests(unittest.TestCase):
             load_vector_index(index, database_path=database)
 
     def test_rejected_stage_does_not_change_live_assets(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             database = root / "live" / "adc.db"
             index = root / "live" / "index"
@@ -353,7 +353,7 @@ class RefreshReleaseTests(unittest.TestCase):
             self.assertFalse((root / "backups").exists())
 
     def test_publish_failure_restores_previous_database_and_index(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             live_database = root / "live" / "adc.db"
             live_index = root / "live" / "index"
