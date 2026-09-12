@@ -13,6 +13,7 @@ from adc_evidence.evaluation.paper_readiness import (
     validate_independent_holdout_manifest,
 )
 from pathlib import Path
+from tests.support import WorkspaceTemporaryDirectory
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -140,6 +141,32 @@ class HumanReviewTests(unittest.TestCase):
         invalid_ids = dict(manifest, question_id_sha256="sha256:" + "0" * 64)
         with self.assertRaisesRegex(ValueError, "question ID hash mismatch"):
             validate_independent_holdout_file(questions_path, invalid_ids)
+
+    def test_readiness_does_not_pass_manifest_without_question_file(self) -> None:
+        manifest = {
+            "question_set_version": "v1",
+            "question_set_hash": "sha256:" + "a" * 64,
+            "question_id_sha256": "sha256:" + "b" * 64,
+            "question_file_sha256": "sha256:" + "c" * 64,
+            "question_count": 1,
+            "evaluation_window_id": "window-1",
+            "access_controlled": True,
+            "evaluation_use": {
+                "status": "unseen_holdout",
+                "eligible_for_unseen_test_claim": True,
+            },
+        }
+        with WorkspaceTemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "holdout_manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = audit_public_paper_readiness(
+                PROJECT_ROOT,
+                independent_holdout_manifest=manifest_path,
+            )
+        holdout_check = next(
+            item for item in report["checks"] if item["name"] == "independent_holdout"
+        )
+        self.assertEqual(holdout_check["status"], "blocker")
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},

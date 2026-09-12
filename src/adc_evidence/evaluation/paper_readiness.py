@@ -236,19 +236,23 @@ def audit_public_paper_readiness(
         manifest = validate_independent_holdout_manifest(
             json.loads(independent_holdout_manifest.read_text(encoding="utf-8-sig"))
         )
-        binding_detail = "manifest declares an access-controlled holdout eligible for an unseen-test claim"
-        if independent_holdout_questions is not None:
+        if independent_holdout_questions is None:
+            checks.append(
+                _check(
+                    "independent_holdout",
+                    "blocker",
+                    "supply the holdout question file so its file, content, and question-ID hashes can be verified",
+                )
+            )
+        else:
             bound = validate_independent_holdout_file(independent_holdout_questions, manifest)
-            binding_detail = (
-                f"manifest and question file hash/count validated ({bound['question_count']} questions)"
+            checks.append(
+                _check(
+                    "independent_holdout",
+                    "pass",
+                    f"manifest and question file hashes/count validated ({bound['question_count']} questions)",
+                )
             )
-        checks.append(
-            _check(
-                "independent_holdout",
-                "pass",
-                binding_detail,
-            )
-        )
     blockers = [item for item in checks if item["status"] == "blocker"]
     warnings = [item for item in checks if item["status"] == "warning"]
     return {
