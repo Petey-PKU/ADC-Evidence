@@ -150,7 +150,7 @@ class ReviewRepositoryTests(unittest.TestCase):
                 row[0] for row in connection.execute("SELECT version FROM schema_versions")
             }
         self.assertTrue(
-            {"citation_verdict", "completeness_verdict", "reviewer_slot"}
+            {"citation_verdict", "completeness_verdict", "reviewer_slot", "review_origin"}
             <= columns
         )
         self.assertIn(REVIEW_SCHEMA_VERSION, versions)

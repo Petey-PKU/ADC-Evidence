@@ -489,6 +489,7 @@ def list_review_items(
         SELECT i.*, r.review_id, r.reviewer, r.question_verdict,
                r.evidence_verdict, r.answer_verdict, r.citation_verdict,
                r.completeness_verdict, r.refusal_verdict, r.reviewer_slot,
+               r.review_origin,
                r.severity, r.error_categories_json, r.notes,
                r.item_content_hash, r.reviewed_at
         FROM review_items i
@@ -574,6 +575,7 @@ def save_expert_review(
     citation_verdict: str = "not_applicable",
     completeness_verdict: str = "not_applicable",
     reviewer_slot: str = "primary",
+    review_origin: str | None = None,
     database_path: Path = DEFAULT_DATABASE_PATH,
 ) -> int:
     reviewer = reviewer.strip()
@@ -598,6 +600,14 @@ def save_expert_review(
     unknown_categories = sorted(set(error_categories) - set(ERROR_CATEGORIES))
     if unknown_categories:
         raise ValueError(f"Unknown error categories: {unknown_categories}")
+    if review_origin not in {
+        None,
+        "human_independent",
+        "human_adjudicated",
+        "ai_assisted_primary",
+        "automatic",
+    }:
+        raise ValueError(f"Invalid review_origin: {review_origin}")
 
     create_database(database_path)
     with closing(connect(database_path)) as connection:
@@ -612,9 +622,9 @@ def save_expert_review(
                 INSERT INTO expert_reviews (
                     item_id, reviewer, question_verdict, evidence_verdict,
                     answer_verdict, citation_verdict, completeness_verdict,
-                    refusal_verdict, reviewer_slot, severity,
+                    refusal_verdict, reviewer_slot, review_origin, severity,
                     error_categories_json, notes, item_content_hash, reviewed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(item_id, reviewer) DO UPDATE SET
                     question_verdict = excluded.question_verdict,
                     evidence_verdict = excluded.evidence_verdict,
@@ -623,6 +633,7 @@ def save_expert_review(
                     completeness_verdict = excluded.completeness_verdict,
                     refusal_verdict = excluded.refusal_verdict,
                     reviewer_slot = excluded.reviewer_slot,
+                    review_origin = excluded.review_origin,
                     severity = excluded.severity,
                     error_categories_json = excluded.error_categories_json,
                     notes = excluded.notes,
@@ -639,6 +650,7 @@ def save_expert_review(
                     completeness_verdict,
                     refusal_verdict,
                     reviewer_slot,
+                    review_origin,
                     severity,
                     _json(sorted(set(error_categories))),
                     notes.strip(),
@@ -717,6 +729,7 @@ def review_export_rows(
             SELECT i.*, r.review_id, r.reviewer, r.question_verdict,
                    r.evidence_verdict, r.answer_verdict, r.citation_verdict,
                    r.completeness_verdict, r.refusal_verdict, r.reviewer_slot,
+                   r.review_origin,
                    r.severity, r.error_categories_json, r.notes,
                    r.item_content_hash, r.reviewed_at
             FROM review_items i
@@ -756,6 +769,7 @@ def benchmark_reviews_from_database(
             {
                 "candidate_id": metadata["candidate_id"],
                 "reviewer_slot": row.get("reviewer_slot", "primary"),
+                "review_origin": row.get("review_origin"),
                 "answer_verdict": row["answer_verdict"],
                 "evidence_verdict": row["evidence_verdict"],
                 "citation_verdict": row.get(
