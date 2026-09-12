@@ -98,7 +98,7 @@ class SystemReportAuditTests(unittest.TestCase):
     def test_manifest_preserves_original_freeze_and_discloses_exposure(self) -> None:
         manifest = question_set_manifest()
         self.assertEqual(manifest["implementation_frozen_after"], "v0.6-structured-validator-v1")
-        self.assertEqual(manifest["current_implementation"], "v0.6-structured-validator-v3")
+        self.assertEqual(manifest["current_implementation"], "v0.6-structured-validator-v4")
         self.assertFalse(manifest["evaluation_use"]["eligible_for_unseen_test_claim"])
         self.assertFalse(self.report["evaluation_use"]["eligible_for_unseen_test_claim"])
 
