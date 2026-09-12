@@ -263,6 +263,17 @@ python -m unittest discover -s tests -v
 
 项目测试使用 Python 标准库 `unittest`，因此即使没有安装 pytest 也能运行。
 
+## 投稿前审计
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_paper_readiness.py --output artifacts/evaluation/paper_readiness.json
+python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/public_artifact_manifest.json
+```
+
+默认审计应返回 `not_ready_for_submission`，直到真实独立人工标签和访问受控的未见 holdout
+同时通过；公开 smoke holdout、自动指标和 AI 辅助复核不能替代这两项证据。
+
 ## 数据说明
 
 `data/sample/adcs.csv` 是项目范围与实体别名的种子数据。`aliases` 字段使用竖线 `|` 分隔多个别名。自动采集证据仍统一标记为 `needs_review`；只有人工复核后才能改为 `reviewed`。
