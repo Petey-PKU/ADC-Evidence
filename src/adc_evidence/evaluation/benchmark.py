@@ -378,6 +378,7 @@ def run_adc_evidence_arm(
         "model": IMPLEMENTATION_VERSION,
         "network_enabled": False,
         "prompt_version": PROMPT_VERSION,
+        "database_data_version": evidence_data_version(database_path),
         "question_count": len(outputs),
         "automatic_diagnostics": automatic_diagnostics(outputs, rows),
         "questions": outputs,

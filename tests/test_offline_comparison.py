@@ -18,11 +18,13 @@ def questions() -> list[dict[str, object]]:
 
 def report(arm: str, status: str, route: str) -> dict[str, object]:
     rows = questions()
-    return build_external_arm_report(
+    result = build_external_arm_report(
         arm, [{"question_id": "q1", "status": status, "answer": "synthetic", "route": route}],
         model="test", evaluated_at="2026-09-12T00:00:00Z", evaluation_window_id="window",
         questions=rows,
     )
+    result["database_data_version"] = {"data_version": "test-db-v1"}
+    return result
 
 
 class OfflineComparisonTests(unittest.TestCase):
@@ -40,6 +42,13 @@ class OfflineComparisonTests(unittest.TestCase):
         system = report("adc_evidence", "answered", "structured_fact")
         baseline = report("offline_rag_baseline", "refused", "literature_evidence")
         baseline["evaluation_window_id"] = "different"
+        with self.assertRaises(ValueError):
+            compare_offline_reports(system, baseline, questions())
+
+    def test_database_version_mismatch_fails_closed(self) -> None:
+        system = report("adc_evidence", "answered", "structured_fact")
+        baseline = report("offline_rag_baseline", "refused", "literature_evidence")
+        baseline["database_data_version"] = {"data_version": "different-db"}
         with self.assertRaises(ValueError):
             compare_offline_reports(system, baseline, questions())
 

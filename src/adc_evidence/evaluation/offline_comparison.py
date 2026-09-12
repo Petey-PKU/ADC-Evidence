@@ -26,6 +26,12 @@ def compare_offline_reports(
     for key in ("question_set_hash", "evaluation_window_id", "prompt_version"):
         if system_report.get(key) != baseline_report.get(key):
             raise ValueError(f"Offline reports disagree on {key}")
+    system_data = system_report.get("database_data_version")
+    baseline_data = baseline_report.get("database_data_version")
+    if not system_data or not baseline_data:
+        raise ValueError("Offline reports must record database_data_version")
+    if system_data != baseline_data:
+        raise ValueError("Offline reports disagree on database_data_version")
     expected = {str(row["question_id"]): row for row in questions}
     system = {str(row["question_id"]): row for row in system_report["questions"]}
     baseline = {str(row["question_id"]): row for row in baseline_report["questions"]}
@@ -63,6 +69,7 @@ def compare_offline_reports(
         "baseline_model": OFFLINE_BASELINE_VERSION,
         "question_set_hash": system_report["question_set_hash"],
         "evaluation_window_id": system_report["evaluation_window_id"],
+        "database_data_version": system_data,
         "question_count": len(questions),
         "system_diagnostics": system_report.get("automatic_diagnostics"),
         "baseline_diagnostics": baseline_report.get("automatic_diagnostics"),
