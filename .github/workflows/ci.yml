@@ -25,6 +25,8 @@ jobs:
           cache: pip
       - name: Install package
         run: python -m pip install -e ".[generation]"
+      - name: Record dependency versions
+        run: python -m pip freeze > /tmp/pip-freeze.txt
       - name: Compile package
         run: python -m compileall -q src tests
       - name: Audit public repository hygiene
@@ -69,3 +71,9 @@ jobs:
         with:
           name: public-artifact-manifest-${{ matrix.python-version }}
           path: /tmp/public_artifact_manifest.json
+      - name: Upload dependency versions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-versions-${{ matrix.python-version }}
+          path: /tmp/pip-freeze.txt

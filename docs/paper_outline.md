@@ -124,6 +124,7 @@ between smoke diagnostics and confirmation results.
 - [ ] Paired statistics JSON and analysis command.
 - [ ] Ablation reports with matched budgets.
 - [ ] CI log and uploaded paper-readiness audit.
+- [ ] Dependency freeze captured for each supported Python version.
 - [ ] Public artifact excludes private source records, reviewer identities, and keys.
 
 Until every unchecked item is complete, describe the work as an engineering
