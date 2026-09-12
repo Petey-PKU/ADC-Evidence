@@ -182,6 +182,7 @@ python -m adc_evidence.generation.answer "T-DXd 的靶点、载荷和 DAR 是什
 
 ```text
 ADC_LLM_BACKEND=siliconflow
+ADC_OFFLINE_ONLY=false
 SILICONFLOW_API_KEY=your_key_here
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash

@@ -50,7 +50,9 @@ SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash
 ```
 
-OpenAI 后端仍可通过 `OPENAI_API_KEY` 与 `OPENAI_MODEL` 启用。密钥只通过容器环境变量注入，不写入镜像。不要提交 `.env`。完整步骤见 `docs/api_configuration.md`。
+生产 Compose 默认设置 `ADC_OFFLINE_ONLY=true`，保证部署不会调用网络模型。若要进行经批准的远程模型实验，
+必须显式设置 `ADC_OFFLINE_ONLY=false`，再注入对应 Key；密钥只通过容器环境变量注入，不写入镜像。不要提交 `.env`。
+完整步骤见 `docs/api_configuration.md`。
 
 ## 验证与健康检查
 
