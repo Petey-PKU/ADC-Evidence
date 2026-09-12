@@ -64,10 +64,17 @@ def _digest(value: object) -> str:
 def _resolve_questions(questions: list[dict[str, object]] | None) -> list[dict[str, object]]:
     """Resolve the default set while rejecting an explicit empty evaluation set."""
     if questions is None:
-        return load_benchmark_questions()
-    if not questions:
+        rows = load_benchmark_questions()
+    else:
+        rows = questions
+    if not rows:
         raise ValueError("Question set must not be empty")
-    return questions
+    question_ids = [str(row.get("question_id", "")) for row in rows]
+    if any(not question_id.strip() for question_id in question_ids):
+        raise ValueError("Question set needs nonempty question_id values")
+    if len(question_ids) != len(set(question_ids)):
+        raise ValueError("Question set needs unique question_id values")
+    return rows
 
 
 def _read_jsonl(path: Path) -> list[dict[str, object]]:

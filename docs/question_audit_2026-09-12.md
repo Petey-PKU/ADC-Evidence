@@ -71,7 +71,7 @@ $env:PYTHONPATH='src'
 本次在项目现有 Python 3.12 虚拟环境中通过全部 122 项单元测试与 `compileall`。
 原先 4 项 SDK 导入失败来自使用了另一个系统 Python；项目环境已具备依赖，SDK 单元
 测试只使用伪客户端，没有调用远程模型。后续测试夹具改用仓库内的工作区临时目录适配器，
-因此本报告生成时公开分支的完整测试套件通过 156/156；随后增加空题集、题号绑定、offline comparison 绑定、identifier ablation 输入边界、holdout ID 隔离、manifest 文件绑定、人工标签 manifest 和 manifest 构建器测试，当前公开分支通过 164/164。这不改变本报告记录的历史题集状态。
+因此本报告生成时公开分支的完整测试套件通过 156/156；随后增加空题集、题号绑定、offline comparison 绑定、identifier ablation 输入边界、holdout ID 隔离、manifest 文件绑定、人工标签 manifest、manifest 构建器和题号唯一性测试，当前公开分支通过 165/165。这不改变本报告记录的历史题集状态。
 
 ## 接续工作
 

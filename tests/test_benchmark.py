@@ -176,6 +176,11 @@ class BenchmarkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must not be empty"):
             question_set_manifest([])
 
+    def test_explicit_duplicate_question_ids_are_rejected(self) -> None:
+        questions = small_questions()
+        with self.assertRaisesRegex(ValueError, "unique question_id"):
+            question_set_manifest([dict(questions[0]), dict(questions[0])])
+
     def test_public_regression_seed_is_deidentified_and_routable(self) -> None:
         rows = [
             json.loads(line)
