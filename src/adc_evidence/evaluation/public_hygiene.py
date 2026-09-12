@@ -9,7 +9,7 @@ _SENSITIVE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("api_key", re.compile(r"(?i)(?:sk-[A-Za-z0-9]{20,}|AIza[A-Za-z0-9_-]{20,})")),
     ("bearer_token", re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/=-]{24,}")),
     ("private_key_block", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
-    ("local_path", re.compile(r"(?i)(?:[A-Z]:\\Users\\|/home/[A-Za-z0-9_.-]+/)")),
+    ("local_path", re.compile(r"(?i)(?:[A-Z]:\\Users\\|/home/[A-Za-z0-9_.-]+/|/Users/[A-Za-z0-9_.-]+/)")),
 )
 
 
@@ -29,8 +29,15 @@ def scan_tracked_public_files(repo_root: Path) -> dict[str, object]:
     findings: list[dict[str, str]] = []
     for path in paths:
         absolute = repo_root / path
-        if absolute.is_file():
-            findings.extend(scan_public_text(path.as_posix(), absolute.read_text(encoding="utf-8", errors="ignore")))
+        if absolute.is_symlink():
+            findings.append({"path": path.as_posix(), "kind": "symlink"})
+        elif absolute.is_file():
+            findings.extend(
+                scan_public_text(
+                    path.as_posix(),
+                    absolute.read_text(encoding="utf-8", errors="ignore"),
+                )
+            )
     return {
         "schema_version": "v0.6-public-hygiene-v1",
         "status": "clean" if not findings else "findings",
