@@ -24,7 +24,7 @@ jobs:
       - name: Compile package
         run: python -m compileall -q src tests
       - name: Audit public repository hygiene
-        run: python scripts/audit_public_hygiene.py
+        run: python scripts/audit_public_hygiene.py --output /tmp/public_hygiene.json
       - name: Run tests
         run: python -m unittest discover -s tests -v
       - name: Validate public holdout separation
@@ -51,3 +51,9 @@ jobs:
         with:
           name: paper-readiness-audit
           path: /tmp/paper_readiness.json
+      - name: Upload public hygiene audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-hygiene-audit
+          path: /tmp/public_hygiene.json
