@@ -10,7 +10,7 @@ class PublicHygieneTests(unittest.TestCase):
         self.assertEqual(scan_public_text("README.md", "offline evaluation only"), [])
 
     def test_reports_categories_without_secret_values(self) -> None:
-        secret = "sk-abcdefghijklmnopqrstuvwxyz"
+        secret = "sk-" + "abcdefghijklmnopqrstuvwxyz"
         findings = scan_public_text("example.txt", f"{secret} C:\\Users\\alice\\secret.txt")
         self.assertEqual({item["kind"] for item in findings}, {"api_key", "local_path"})
         self.assertNotIn(secret, str(findings))
