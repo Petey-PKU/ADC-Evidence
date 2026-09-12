@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from adc_evidence.evaluation.benchmark import load_benchmark_questions
+from adc_evidence.evaluation.benchmark import validate_question_text
 from adc_evidence.evaluation.holdout import (
     load_holdout_questions,
     validate_holdout_disjoint,
@@ -71,6 +72,16 @@ def validate_independent_holdout_file(
         raise ValueError("Independent holdout question file count mismatch")
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError("Independent holdout question file rows must be objects")
+    question_ids = [str(row.get("question_id", "")) for row in rows]
+    if any(not question_id.strip() for question_id in question_ids):
+        raise ValueError("Independent holdout question IDs must be nonempty")
+    if len(question_ids) != len(set(question_ids)):
+        raise ValueError("Independent holdout question IDs must be unique")
+    for row in rows:
+        try:
+            validate_question_text(row.get("question"))
+        except ValueError as exc:
+            raise ValueError("Independent holdout contains invalid question text") from exc
     return {
         "question_file_sha256": actual_hash,
         "question_count": len(rows),
