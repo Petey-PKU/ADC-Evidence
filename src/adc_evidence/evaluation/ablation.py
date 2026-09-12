@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from adc_evidence.evaluation.benchmark import _system_row, automatic_diagnostics
+from adc_evidence.evaluation.human_review import question_id_sha256
 from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.service import EvidenceAnsweringService
 from adc_evidence.rag.retriever import HybridRetriever
@@ -87,6 +88,9 @@ def run_identifier_routing_ablation(
         "schema_version": ABLATION_SCHEMA_VERSION,
         "ablation_component": "exact_identifier_routing",
         "question_set_hash": f"sha256:{_digest(questions)}",
+        "question_id_sha256": question_id_sha256(
+            str(row["question_id"]) for row in questions
+        ),
         "question_count": len(questions),
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at,

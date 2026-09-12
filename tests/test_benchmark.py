@@ -288,6 +288,13 @@ class BenchmarkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly one output"):
             validate_arm_report(report, questions)
 
+    def test_arm_validation_rejects_question_id_binding_drift(self) -> None:
+        questions = small_questions()
+        report = reports(questions)[0]
+        report["question_id_sha256"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(ValueError, "question ID binding"):
+            validate_arm_report(report, questions)
+
     def test_system_arm_records_claims_citations_and_data_version(self) -> None:
         questions = small_questions()
 

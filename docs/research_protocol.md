@@ -217,4 +217,5 @@ python scripts/audit_paper_readiness.py --output readiness.json
 CI 还会扫描 Git 跟踪文件中的常见凭据、私钥块和本机路径模式；报告只包含文件与类别，不包含匹配值。
 公开 artifact 可用 `scripts/build_public_artifact_manifest.py` 生成，清单记录包版本、Git 提交、可解析的发布引用、公开跟踪文件哈希和卫生审计结果，不包含文件内容、评审者身份或私有路径。包版本仍对应冻结的研究策略版本；Git 提交和发布引用用于定位具体实现快照。
 人工配对汇总、benchmark manifest 和 holdout manifest 都会输出 `question_count` 和不含题目内容的 `question_id_sha256`；此外 `question_set_hash` 仍绑定完整题目行。两种摘要都应与冻结题集对照，防止误用题集或只挑选部分标签。
+每个 benchmark arm 报告和盲评 packet 也必须携带并校验 `question_id_sha256`；任一 arm 的题号集合发生漂移时，比较流程会失败，而不会回退到默认题集。
 CI 会从 `data/sample/adcs.csv` 生成未提交的 demo SQLite，再执行质量报告一致性测试；这一步不代表正式评测语料已经存在。

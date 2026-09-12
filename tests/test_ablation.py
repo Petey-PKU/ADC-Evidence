@@ -37,6 +37,7 @@ class AblationTests(unittest.TestCase):
         self.assertFalse(report["network_enabled"])
         self.assertIn("paired_status_counts", report)
         self.assertIn("changed_question_ids", report)
+        self.assertTrue(str(report["question_id_sha256"]).startswith("sha256:"))
 
 
 if __name__ == "__main__":

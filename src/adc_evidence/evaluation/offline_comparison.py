@@ -68,6 +68,7 @@ def compare_offline_reports(
         "system_model": IMPLEMENTATION_VERSION,
         "baseline_model": OFFLINE_BASELINE_VERSION,
         "question_set_hash": system_report["question_set_hash"],
+        "question_id_sha256": system_report["question_id_sha256"],
         "evaluation_window_id": system_report["evaluation_window_id"],
         "database_data_version": system_data,
         "question_count": len(questions),

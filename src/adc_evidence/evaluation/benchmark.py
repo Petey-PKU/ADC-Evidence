@@ -288,6 +288,7 @@ def build_external_arm_request(
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "arm": arm,
@@ -323,6 +324,7 @@ def build_external_arm_report(
         "run_id": run_id or f"{arm}-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at,
@@ -382,6 +384,7 @@ def run_adc_evidence_arm(
         "run_id": run_id or f"adc-evidence-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at or datetime.now(UTC).isoformat(),
@@ -425,6 +428,7 @@ def run_offline_rag_baseline(
         "run_id": run_id or f"offline-rag-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at or datetime.now(UTC).isoformat(),
@@ -453,6 +457,8 @@ def validate_arm_report(
     manifest = question_set_manifest(questions)
     if report.get("question_set_hash") != manifest["question_set_hash"]:
         raise ValueError("Arm report question set hash mismatch")
+    if report.get("question_id_sha256") != manifest["question_id_sha256"]:
+        raise ValueError("Arm report question ID binding mismatch")
     if not str(report.get("model", "")).strip():
         raise ValueError("Arm report must record model identity")
     if not str(report.get("evaluated_at", "")).strip():
@@ -557,7 +563,8 @@ def build_blinded_review_packet(
         validate_arm_report(report, rows)
     windows = {str(report["evaluation_window_id"]) for report in reports}
     hashes = {str(report["question_set_hash"]) for report in reports}
-    if len(windows) != 1 or len(hashes) != 1:
+    id_hashes = {str(report["question_id_sha256"]) for report in reports}
+    if len(windows) != 1 or len(hashes) != 1 or len(id_hashes) != 1:
         raise ValueError("All comparison arms must use one evaluation window and question set")
     comparison_run_id = run_id or f"cmp-{uuid4().hex[:12]}"
     by_arm = {
@@ -624,6 +631,7 @@ def build_blinded_review_packet(
         "comparison_run_id": comparison_run_id,
         "evaluation_window_id": next(iter(windows)),
         "question_set_hash": next(iter(hashes)),
+        "question_id_sha256": next(iter(id_hashes)),
         "mapping": mapping_rows,
     }
     mapping_hash = f"sha256:{_digest(identity_map)}"
@@ -633,6 +641,7 @@ def build_blinded_review_packet(
         "evaluation_window_id": next(iter(windows)),
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": next(iter(hashes)),
+        "question_id_sha256": next(iter(id_hashes)),
         "blind_mapping_hash": mapping_hash,
         "blinded": True,
         "identity_disclosure_rule": "Reveal mapping only after answer and evidence verdicts are saved.",
@@ -650,7 +659,12 @@ def validate_blinded_pair(
     """Validate the separately stored blind packet and post-review identity map."""
     if packet.get("blinded") is not True:
         raise ValueError("Review packet must be marked as blinded")
-    for field in ("comparison_run_id", "evaluation_window_id", "question_set_hash"):
+    for field in (
+        "comparison_run_id",
+        "evaluation_window_id",
+        "question_set_hash",
+        "question_id_sha256",
+    ):
         if packet.get(field) != identity_map.get(field):
             raise ValueError(f"Blind packet and identity map disagree on {field}")
     if packet.get("blind_mapping_hash") != f"sha256:{_digest(identity_map)}":
