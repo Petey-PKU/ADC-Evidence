@@ -45,6 +45,7 @@ python scripts/summarize_inter_rater_agreement.py private_reviews.jsonl --output
 python scripts/summarize_human_paired_reviews.py paired_labels.jsonl --output paired_summary.json
 python scripts/audit_paper_readiness.py `
   --human-review-jsonl paired_labels.jsonl `
+  --human-review-manifest human_review_manifest.json `
   --independent-holdout-manifest holdout_manifest.json `
   --independent-holdout-questions holdout_questions.jsonl `
   --output readiness.json

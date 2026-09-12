@@ -115,6 +115,44 @@ def validate_independent_holdout_file(
     }
 
 
+def validate_human_review_manifest(manifest: object) -> dict[str, object]:
+    """Validate content-free integrity metadata for a human-label export."""
+    if not isinstance(manifest, dict):
+        raise ValueError("Human review manifest must be a JSON object")
+    for field in ("review_file_sha256", "question_id_sha256"):
+        value = manifest.get(field)
+        if not isinstance(value, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", value):
+            raise ValueError(f"Human review {field} must be sha256:<64 lowercase hex>")
+    count = manifest.get("question_count")
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise ValueError("Human review question_count must be a positive integer")
+    for field in ("review_set_version", "evaluation_window_id"):
+        if not isinstance(manifest.get(field), str) or not manifest[field].strip():
+            raise ValueError(f"Human review manifest needs nonempty {field}")
+    return manifest
+
+
+def validate_human_review_file(
+    reviews_path: Path, manifest: dict[str, object]
+) -> dict[str, object]:
+    """Bind a human review JSONL export to its content-free manifest."""
+    rows = validate_human_paired_reviews(load_human_paired_reviews(reviews_path))
+    actual_file_hash = "sha256:" + hashlib.sha256(reviews_path.read_bytes()).hexdigest()
+    if manifest["review_file_sha256"] != actual_file_hash:
+        raise ValueError("Human review file hash mismatch")
+    actual_id_hash = question_id_sha256(str(row["question_id"]) for row in rows)
+    if manifest["question_id_sha256"] != actual_id_hash:
+        raise ValueError("Human review question ID hash mismatch")
+    if manifest["question_count"] != len(rows):
+        raise ValueError("Human review question count mismatch")
+    return {
+        "review_file_sha256": actual_file_hash,
+        "question_id_sha256": actual_id_hash,
+        "question_count": len(rows),
+        "path": reviews_path.name,
+    }
+
+
 def database_quality_provenance_check(repo_root: Path) -> tuple[str, str]:
     """Check the committed quality report when the runtime demo DB is available."""
     quality_path = repo_root / "data" / "processed" / "data_quality_report.json"
@@ -150,6 +188,7 @@ def audit_public_paper_readiness(
     repo_root: Path,
     *,
     human_review_jsonl: Path | None = None,
+    human_review_manifest: Path | None = None,
     independent_holdout_manifest: Path | None = None,
     independent_holdout_questions: Path | None = None,
 ) -> dict[str, object]:
@@ -217,13 +256,26 @@ def audit_public_paper_readiness(
         )
     else:
         labels = validate_human_paired_reviews(load_human_paired_reviews(human_review_jsonl))
-        checks.append(
-            _check(
-                "human_review_labels",
-                "pass",
-                f"validated {len(labels)} human paired labels",
+        if human_review_manifest is None:
+            checks.append(
+                _check(
+                    "human_review_labels",
+                    "blocker",
+                    "supply a content-free manifest binding the human review file hash, question-ID hash, count, and evaluation window",
+                )
             )
-        )
+        else:
+            manifest = validate_human_review_manifest(
+                json.loads(human_review_manifest.read_text(encoding="utf-8-sig"))
+            )
+            bound = validate_human_review_file(human_review_jsonl, manifest)
+            checks.append(
+                _check(
+                    "human_review_labels",
+                    "pass",
+                    f"validated {bound['question_count']} human paired labels with file and question-set binding",
+                )
+            )
     if independent_holdout_manifest is None:
         checks.append(
             _check(

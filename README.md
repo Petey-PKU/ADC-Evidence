@@ -276,6 +276,8 @@ python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/p
 默认审计应返回 `not_ready_for_submission`，直到真实独立人工标签和访问受控的未见 holdout
 同时通过；公开 smoke holdout、自动指标和 AI 辅助复核不能替代这两项证据。
 
+若提供真实人工标签，必须同时传入 `--human-review-manifest`；审计会校验标签文件哈希、题号集合哈希、题数、版本和评测窗口。
+
 ## 数据说明
 
 `data/sample/adcs.csv` 是项目范围与实体别名的种子数据。`aliases` 字段使用竖线 `|` 分隔多个别名。自动采集证据仍统一标记为 `needs_review`；只有人工复核后才能改为 `reviewed`。

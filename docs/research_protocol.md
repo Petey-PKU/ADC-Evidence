@@ -176,7 +176,7 @@ JSONL 每行至少包含以下字段：
 {"question_id":"q001","review_origin":"human_independent","system_correct":true,"baseline_correct":false}
 ```
 
-没有真实人工或人工仲裁标签时，只能报告自动诊断和 AI 辅助初审结果，不能将其写成论文的人工金标准。
+没有真实人工或人工仲裁标签时，只能报告自动诊断和 AI 辅助初审结果，不能将其写成论文的人工金标准。人工标签文件还必须配套无身份 manifest，绑定文件字节哈希、题号集合哈希、题数、版本和评测窗口；只提供 JSONL 而没有 manifest 时，投稿审计保持阻塞。
 
 命令行入口为：
 
@@ -203,6 +203,9 @@ python scripts/summarize_inter_rater_agreement.py reviews.jsonl --output agreeme
 $env:PYTHONPATH="src"
 python scripts/audit_paper_readiness.py --output readiness.json
 ```
+
+若提供人工标签，应同时传入 `--human-review-jsonl` 和 `--human-review-manifest`；后者只能包含
+哈希、题数、版本和评测窗口等无身份元数据。
 
 默认结果会因缺少独立保留集和真实人工标签而返回 `not_ready_for_submission`；
 这两个阻塞项必须由项目外部产生的证据解除，代码不会用自动指标代替它们。

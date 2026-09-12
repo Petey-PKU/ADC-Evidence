@@ -11,6 +11,8 @@ from adc_evidence.evaluation.paper_readiness import (
     audit_public_paper_readiness,
     validate_independent_holdout_file,
     validate_independent_holdout_manifest,
+    validate_human_review_file,
+    validate_human_review_manifest,
 )
 from pathlib import Path
 from tests.support import WorkspaceTemporaryDirectory
@@ -167,6 +169,31 @@ class HumanReviewTests(unittest.TestCase):
             item for item in report["checks"] if item["name"] == "independent_holdout"
         )
         self.assertEqual(holdout_check["status"], "blocker")
+
+    def test_human_review_manifest_binds_file_and_question_set(self) -> None:
+        rows = [
+            {"question_id": "q1", "review_origin": "human_independent", "system_correct": True, "baseline_correct": False},
+            {"question_id": "q2", "review_origin": "human_adjudicated", "system_correct": True, "baseline_correct": True},
+        ]
+        with WorkspaceTemporaryDirectory() as directory:
+            reviews_path = Path(directory) / "reviews.jsonl"
+            reviews_path.write_text(
+                "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            manifest = {
+                "review_file_sha256": "sha256:" + hashlib.sha256(reviews_path.read_bytes()).hexdigest(),
+                "question_id_sha256": question_id_sha256(row["question_id"] for row in rows),
+                "question_count": 2,
+                "review_set_version": "v1",
+                "evaluation_window_id": "window-1",
+            }
+            self.assertEqual(validate_human_review_manifest(manifest), manifest)
+            bound = validate_human_review_file(reviews_path, manifest)
+            self.assertEqual(bound["question_count"], 2)
+            invalid = dict(manifest, review_file_sha256="sha256:" + "0" * 64)
+            with self.assertRaisesRegex(ValueError, "file hash mismatch"):
+                validate_human_review_file(reviews_path, invalid)
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},
