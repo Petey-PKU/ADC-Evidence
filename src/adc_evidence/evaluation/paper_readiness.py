@@ -132,6 +132,8 @@ def audit_public_paper_readiness(
         ),
     ]
     hygiene = scan_tracked_public_files(repo_root)
+    hygiene_findings = hygiene.get("findings", [])
+    hygiene_finding_count = len(hygiene_findings) if isinstance(hygiene_findings, list) else 0
     checks.append(
         _check(
             "public_repository_hygiene",
@@ -139,7 +141,7 @@ def audit_public_paper_readiness(
             (
                 f"scanned {hygiene['scanned_file_count']} tracked files with no secret/path findings"
                 if hygiene["status"] == "clean"
-                else f"found {len(hygiene['findings'])} secret/path hygiene findings"
+                else f"found {hygiene_finding_count} secret/path hygiene findings"
             ),
         )
     )
