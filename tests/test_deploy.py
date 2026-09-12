@@ -33,8 +33,11 @@ class DeploymentBootstrapTests(unittest.TestCase):
             self.assertFalse(second["corpus_built"])
             self.assertFalse(second["index_built"])
             self.assertEqual(second["embedding_backend"], "hashing")
+            self.assertEqual(first["seed_fact_sync"]["facts_created"], 98)
+            self.assertEqual(first["seed_fact_sync"]["evidence_created"], 98)
+            self.assertEqual(second["seed_fact_sync"]["facts_created"], 0)
+            self.assertEqual(second["seed_fact_sync"]["idempotent_groups"], 100)
 
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -6,6 +6,7 @@ import os
 import streamlit as st
 
 from adc_evidence.config import (
+    BENCHMARK_REVIEW_PACKET_PATH,
     DEFAULT_DATABASE_PATH,
     DEFAULT_SEED_PATH,
     GENERATION_REPORT_PATH,
@@ -14,9 +15,7 @@ from adc_evidence.config import (
     environment_flag,
 )
 from adc_evidence.database import (
-    create_database,
     database_stats,
-    initialize_database,
     search_adcs,
 )
 from adc_evidence.generation.generators import (
@@ -24,13 +23,18 @@ from adc_evidence.generation.generators import (
     create_generator,
 )
 from adc_evidence.generation.service import EvidenceAnsweringService
+from adc_evidence.evidence_policy import load_evidence_policy
 from adc_evidence.rag.retriever import HybridRetriever
+from adc_evidence.repository import data_quality_metrics
 from adc_evidence.review.repository import (
     ANSWER_VERDICTS,
+    CITATION_VERDICTS,
+    COMPLETENESS_VERDICTS,
     ERROR_CATEGORIES,
     EVIDENCE_VERDICTS,
     QUESTION_VERDICTS,
     REFUSAL_VERDICTS,
+    REVIEWER_SLOTS,
     SEVERITIES,
     get_review_documents,
     list_review_items,
@@ -38,6 +42,18 @@ from adc_evidence.review.repository import (
     prepare_review_queue,
     review_stats,
     save_expert_review,
+)
+from adc_evidence.workbench import (
+    build_evidence_brief,
+    compare_adcs,
+    comparison_to_csv,
+    comparison_to_markdown,
+    evidence_brief_to_json,
+    evidence_brief_to_markdown,
+    evidence_data_version,
+    get_adc_evidence_card,
+    list_changes,
+    sync_public_seed_facts,
 )
 
 
@@ -51,9 +67,7 @@ PUBLIC_DEMO = environment_flag("ADC_PUBLIC_DEMO", default=False)
 
 
 def ensure_database() -> None:
-    create_database(DEFAULT_DATABASE_PATH)
-    if database_stats(DEFAULT_DATABASE_PATH)["adc_count"] == 0:
-        initialize_database(DEFAULT_DATABASE_PATH, DEFAULT_SEED_PATH)
+    sync_public_seed_facts(DEFAULT_DATABASE_PATH, DEFAULT_SEED_PATH)
 
 
 def ensure_review_queue() -> None:
@@ -61,41 +75,111 @@ def ensure_review_queue() -> None:
         database_path=DEFAULT_DATABASE_PATH,
         generation_report_path=GENERATION_REPORT_PATH,
         retrieval_report_path=RETRIEVAL_REPORT_PATH,
+        benchmark_packet_path=BENCHMARK_REVIEW_PACKET_PATH,
         retrieval_mode="sparse",
     )
 
 
-def display_record(record: dict[str, object]) -> None:
-    title = str(record["adc_name"])
-    aliases = str(record.get("aliases") or "")
-    if aliases:
-        title = f"{title}（{aliases}）"
+FIELD_STATUS_LABELS = {
+    "current": "当前",
+    "conflicted": "来源冲突",
+    "missing": "未记录",
+}
 
-    with st.expander(title, expanded=True):
-        left, middle, right = st.columns(3)
-        left.metric("靶点", str(record["target"]))
-        middle.metric("Payload", str(record.get("payload_name") or "未记录"))
-        dar_value = record.get("dar")
-        right.metric("DAR", str(dar_value) if dar_value is not None else "未记录")
+FRESHNESS_LABELS = {
+    "current": "在新鲜度范围内",
+    "stale": "可能过期",
+    "unknown": "新鲜度未知",
+    "demo_source": "公开演示种子",
+    "mixed": "多来源混合",
+}
 
-        details = {
-            "抗体": record.get("antibody") or "未记录",
-            "Linker": record.get("linker_name") or "未记录",
-            "Linker 类型": record.get("linker_type") or "未记录",
-            "Payload 类型": record.get("payload_class") or "未记录",
-            "适应证": record.get("indication") or "未记录",
-            "研发状态": record.get("development_status") or "未记录",
-            "企业": record.get("company") or "未记录",
-            "数据审核状态": record.get("data_review_status") or "未记录",
-        }
-        for label, value in details.items():
-            label_column, value_column = st.columns([1, 3])
-            label_column.markdown(f"**{label}**")
-            value_column.write(str(value))
 
-        source_url = record.get("source_url")
-        if source_url:
-            st.link_button("查看当前参考入口", str(source_url))
+def _display_field_evidence(field: dict[str, object]) -> None:
+    status = FIELD_STATUS_LABELS.get(str(field["status"]), str(field["status"]))
+    freshness = FRESHNESS_LABELS.get(
+        str(field["freshness_status"]),
+        str(field["freshness_status"]),
+    )
+    prefix = "⚠️ " if field["is_conflicted"] or field["is_stale"] else ""
+    with st.expander(
+        f"{prefix}{field['label']}：{field['display_value']}",
+        expanded=bool(field["is_conflicted"]),
+    ):
+        st.caption(
+            f"字段：{field['predicate']} · 状态：{status} · 新鲜度：{freshness} · "
+            f"审核：{field['review_status']} · 当前证据：{field['evidence_count']} 条"
+        )
+        if field["is_missing"]:
+            st.info("当前事实层没有该字段的直接证据，系统不会使用模型常识补齐。")
+            return
+        if field["is_conflicted"]:
+            st.warning("多个来源给出了不同值；冲突值全部保留，尚未静默裁决。")
+        for value in field["values"]:
+            st.markdown(
+                f"**规范值：{value['display_value']}** · 事实状态：{value['status']} · "
+                f"有效起点：{value['valid_from']}"
+            )
+            for evidence in value["evidence"]:
+                st.markdown(
+                    f"- **{evidence['source_display_name']}** / "
+                    f"`{evidence['source_record_id']}`"
+                )
+                st.caption(
+                    f"观测时间：{evidence['observed_at']} · "
+                    f"来源更新时间：{evidence['source_updated_at'] or '未提供'} · "
+                    f"快照：{evidence['snapshot_id'] or '公开种子无快照'} · "
+                    f"审核：{evidence['review_status']}"
+                )
+                st.write(evidence["evidence_text"])
+                if evidence["source_url"]:
+                    st.markdown(
+                        f"[打开这一条原始来源]({evidence['source_url']})"
+                    )
+        if field["history"]:
+            st.markdown("**历史或已被替代的值**")
+            for historical in field["history"]:
+                st.write(
+                    f"- {historical['display_value']} · {historical['status']} · "
+                    f"{historical['valid_from']} → {historical['valid_to'] or '未关闭'}"
+                )
+
+
+def display_evidence_card(card: dict[str, object]) -> None:
+    aliases = "、".join(card["aliases"])
+    st.subheader(str(card["adc_name"]))
+    st.caption(
+        f"ADC ID：{card['adc_id']} · 别名：{aliases or '无'} · "
+        f"数据版本：{card['data_version']['data_version'][:21]}…"
+    )
+    field_map = dict(card["field_map"])
+    summary_columns = st.columns(4)
+    summary_columns[0].metric("靶点", field_map["adc.target"]["display_value"])
+    summary_columns[1].metric(
+        "Payload", field_map["adc.payload_name"]["display_value"]
+    )
+    summary_columns[2].metric("DAR", field_map["adc.dar"]["display_value"])
+    summary_columns[3].metric(
+        "研发状态", field_map["adc.development_status"]["display_value"]
+    )
+    if card["conflicted_fields"]:
+        st.warning(
+            "存在未解决冲突：" + "、".join(card["conflicted_fields"])
+        )
+    if card["stale_fields"]:
+        st.warning("可能过期字段：" + "、".join(card["stale_fields"]))
+    if not card["traceability_complete"]:
+        st.error("至少一个非空字段缺少完整来源、时间或审核状态，不应作为可发布核查结果。")
+    for field in card["fields"]:
+        _display_field_evidence(field)
+
+
+def _event_value(value: object) -> str:
+    if value in (None, [], {}):
+        return "无"
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
 @st.cache_resource
@@ -106,6 +190,7 @@ def retrieval_engine() -> HybridRetriever:
 @st.cache_resource
 def answering_service(backend: str) -> EvidenceAnsweringService:
     return EvidenceAnsweringService(
+        database_path=DEFAULT_DATABASE_PATH,
         retriever=retrieval_engine(),
         generator=create_generator(backend),
     )
@@ -138,17 +223,43 @@ def display_search_result(result) -> None:
 
 
 def display_answer_result(result) -> None:
-    if result.status == "answered":
-        st.success("回答已通过引用完整性校验")
+    route_labels = {
+        "structured_fact": "结构化事实",
+        "comparison": "结构化比较",
+        "change_query": "变化事件",
+        "trial_lookup": "临床试验字段",
+        "literature_evidence": "文献证据",
+        "refusal": "拒答",
+    }
+    if result.status in {"answered", "partial"}:
+        if result.status == "answered":
+            st.success("回答中的原子结论已通过证据支持校验")
+        else:
+            st.warning("部分回答：仅展示已通过校验的结论，未回答项已明确列出")
         st.markdown(result.answer)
         validation = result.validation
-        metric_columns = st.columns(3)
-        metric_columns[0].metric("引用来源", len(result.citations))
+        claim_validation = result.claim_validation
+        metric_columns = st.columns(4)
+        metric_columns[0].metric("问题路由", route_labels.get(result.route, result.route))
         metric_columns[1].metric(
-            "引用覆盖率",
-            f"{validation.coverage:.0%}" if validation else "未校验",
+            "已支持结论",
+            claim_validation.supported_claim_count if claim_validation else len(result.claims),
         )
-        metric_columns[2].metric("耗时", f"{result.latency_ms} ms")
+        metric_columns[2].metric("引用来源", len(result.citations))
+        metric_columns[3].metric("耗时", f"{result.latency_ms} ms")
+        if validation:
+            st.caption(f"引用完整性覆盖率：{validation.coverage:.0%}")
+        if result.data_version:
+            st.caption(
+                "数据版本："
+                f"{str(result.data_version['data_version'])[:21]}… · "
+                f"策略：{result.data_version['policy_version']} · "
+                f"路由依据：{result.route_reason}"
+            )
+        if result.unanswered:
+            with st.expander("查看未回答项", expanded=True):
+                for gap in result.unanswered:
+                    st.write(f"- {gap.item}：{gap.detail}（{gap.reason}）")
         st.subheader("引用证据")
         for citation in result.citations:
             with st.expander(
@@ -160,16 +271,25 @@ def display_answer_result(result) -> None:
                 )
                 st.write(citation.excerpt)
                 if citation.source_url:
-                    st.link_button("打开原始来源", citation.source_url)
+                    st.markdown(f"[打开原始来源]({citation.source_url})")
         if result.usage:
             st.caption(f"模型 token 用量：{result.usage}")
     elif result.status == "refused":
         st.warning(f"系统拒答：{result.answer}")
-        st.caption(f"拒答原因代码：{result.refusal_reason}")
+        st.caption(
+            f"问题路由：{route_labels.get(result.route, result.route)} · "
+            f"拒答原因代码：{result.refusal_reason}"
+        )
         if result.validation and not result.validation.valid:
             st.caption(
                 f"引用校验：覆盖率 {result.validation.coverage:.0%}；"
                 f"无效引用 {', '.join(result.validation.invalid_ids) or '无'}"
+            )
+        if result.claim_validation:
+            st.caption(
+                "结论支持校验："
+                f"{result.claim_validation.supported_claim_count}/"
+                f"{result.claim_validation.claim_count} 通过"
             )
     else:
         st.error(result.answer)
@@ -181,12 +301,16 @@ if not PUBLIC_DEMO:
     ensure_review_queue()
 
 st.title("ADC-Evidence")
-st.caption("阶段 8：ADC 证据检索、带引用问答、人工复核与 Bad Case 闭环")
+st.caption("v0.6 阶段 5：冻结题集、三组盲评、原子结论复核与 Bad Case 回归")
 st.warning(
     "自动采集数据与检索结果尚未经过系统人工审核，不能用于科研结论、临床或投资决策。"
 )
 
 stats = database_stats(DEFAULT_DATABASE_PATH)
+quality_metrics = data_quality_metrics(DEFAULT_DATABASE_PATH)
+active_fact_count = int(quality_metrics["current_fact_count"]) + int(
+    quality_metrics["conflicted_fact_count"]
+)
 stat_columns = st.columns(3)
 stat_columns[0].metric("ADC 记录", stats["adc_count"])
 stat_columns[1].metric("靶点数量", stats["target_count"])
@@ -195,31 +319,260 @@ stat_columns[2].metric("标记为已批准", stats["approved_count"])
 evidence_columns = st.columns(3)
 evidence_columns[0].metric("PubMed 文献", stats["document_count"])
 evidence_columns[1].metric("临床试验", stats["trial_count"])
-evidence_columns[2].metric("证据记录", stats["evidence_count"])
+evidence_columns[2].metric("当前原子事实", active_fact_count)
+active_version = evidence_data_version(DEFAULT_DATABASE_PATH)
+st.caption(
+    f"数据版本：{active_version['data_version'][:21]}… · "
+    f"模式：{active_version['schema_version']} · "
+    f"策略：{active_version['policy_version']}"
+)
 
 st.divider()
-database_tab, retrieval_tab, answer_tab, review_tab = st.tabs(
+(
+    evidence_card_tab,
+    comparison_tab,
+    change_tab,
+    retrieval_tab,
+    answer_tab,
+    review_tab,
+) = st.tabs(
     [
-        "ADC 结构化数据",
+        "ADC 证据卡",
+        "ADC 比较",
+        "变化中心",
         "证据检索",
-        "带引用问答",
+        "证据问答",
         "专家复核（只读）" if PUBLIC_DEMO else "专家复核",
     ]
 )
 
-with database_tab:
-    query = st.text_input(
-        "查询 ADC",
-        placeholder="输入标准名称、别名、靶点或 payload，例如 T-DXd、HER2、DXd",
+adc_options = search_adcs(DEFAULT_DATABASE_PATH, "")
+adc_labels = {
+    str(record["adc_id"]): (
+        f"{record['adc_name']} · {record['target']} · {record['adc_id']}"
     )
-    records = search_adcs(DEFAULT_DATABASE_PATH, query)
-    st.write(f"找到 {len(records)} 条记录")
+    for record in adc_options
+}
 
-    if not records:
-        st.info("没有找到匹配记录。可以尝试 HER2、TROP2、T-DXd、Trodelvy 或 DXd。")
+with evidence_card_tab:
+    st.info("所有非空字段均来自结构化事实层；可展开查看来源、时间、快照和审核状态。")
+    selected_adc_id = st.selectbox(
+        "选择或搜索 ADC",
+        list(adc_labels),
+        format_func=lambda adc_id: adc_labels[adc_id],
+        key="evidence_card_adc",
+    )
+    card = get_adc_evidence_card(DEFAULT_DATABASE_PATH, selected_adc_id)
+    display_evidence_card(card)
+    card_brief = build_evidence_brief(DEFAULT_DATABASE_PATH, [selected_adc_id])
+    brief_columns = st.columns(2)
+    brief_columns[0].download_button(
+        "下载 Evidence Brief（Markdown）",
+        data=evidence_brief_to_markdown(card_brief),
+        file_name=f"{selected_adc_id}_evidence_brief.md",
+        mime="text/markdown",
+        use_container_width=True,
+    )
+    brief_columns[1].download_button(
+        "下载 Evidence Brief（JSON）",
+        data=evidence_brief_to_json(card_brief),
+        file_name=f"{selected_adc_id}_evidence_brief.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    st.caption(card["disclaimer"])
+
+with comparison_tab:
+    st.info("选择 2～10 个 ADC。缺失和冲突会显式显示，比较值不会由模型补齐。")
+    default_comparison = list(adc_labels)[:2]
+    selected_comparison_ids = st.multiselect(
+        "选择 ADC",
+        list(adc_labels),
+        default=default_comparison,
+        format_func=lambda adc_id: adc_labels[adc_id],
+        key="comparison_adc_ids",
+    )
+    if len(selected_comparison_ids) < 2:
+        st.info("至少选择 2 个 ADC 才能比较。")
+    elif len(selected_comparison_ids) > 10:
+        st.error("一次最多比较 10 个 ADC。")
     else:
-        for adc_record in records:
-            display_record(adc_record)
+        comparison = compare_adcs(
+            DEFAULT_DATABASE_PATH,
+            selected_comparison_ids,
+        )
+        comparison_rows = []
+        comparison_names = {
+            str(adc["adc_id"]): str(adc["adc_name"])
+            for adc in comparison["adcs"]
+        }
+        for row in comparison["rows"]:
+            display_row = {"字段": row["label"]}
+            for adc_id, adc_name in comparison_names.items():
+                cell = row["cells"][adc_id]
+                suffixes = []
+                if cell["status"] == "conflicted":
+                    suffixes.append("冲突")
+                if cell["freshness_status"] == "stale":
+                    suffixes.append("可能过期")
+                suffix = f" [{' / '.join(suffixes)}]" if suffixes else ""
+                display_row[adc_name] = f"{cell['display_value']}{suffix}"
+            comparison_rows.append(display_row)
+        st.dataframe(
+            comparison_rows,
+            use_container_width=True,
+            hide_index=True,
+        )
+        if not comparison["traceability_complete"]:
+            st.error("比较中存在缺少追溯信息的非空单元格，不能作为正式核查输出。")
+
+        export_columns = st.columns(3)
+        export_columns[0].download_button(
+            "下载比较 CSV",
+            data=comparison_to_csv(comparison),
+            file_name="adc_evidence_comparison.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        export_columns[1].download_button(
+            "下载比较 Markdown",
+            data=comparison_to_markdown(comparison),
+            file_name="adc_evidence_comparison.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+        comparison_brief = build_evidence_brief(
+            DEFAULT_DATABASE_PATH,
+            selected_comparison_ids,
+        )
+        export_columns[2].download_button(
+            "下载 Evidence Brief",
+            data=evidence_brief_to_markdown(comparison_brief),
+            file_name="adc_comparison_evidence_brief.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+
+        evidence_row_labels = {
+            str(row["predicate"]): str(row["label"])
+            for row in comparison["rows"]
+        }
+        evidence_predicate = st.selectbox(
+            "展开一个比较字段的单元格证据",
+            list(evidence_row_labels),
+            format_func=lambda predicate: evidence_row_labels[predicate],
+            key="comparison_evidence_predicate",
+        )
+        selected_row = next(
+            row
+            for row in comparison["rows"]
+            if row["predicate"] == evidence_predicate
+        )
+        for adc_id, adc_name in comparison_names.items():
+            cell = selected_row["cells"][adc_id]
+            with st.expander(
+                f"{adc_name}：{cell['display_value']} · {cell['status']}",
+                expanded=False,
+            ):
+                if cell["status"] == "missing":
+                    st.info("该单元格没有直接事实证据。")
+                for value in cell["values"]:
+                    for evidence in value["evidence"]:
+                        st.markdown(
+                            f"- **{evidence['source_display_name']}** / "
+                            f"`{evidence['source_record_id']}` · "
+                            f"{evidence['observed_at']} · {evidence['review_status']}"
+                        )
+                        if evidence["source_url"]:
+                            st.markdown(
+                                f"[打开单元格原始来源]({evidence['source_url']})"
+                            )
+
+with change_tab:
+    st.info("变化事件由事实版本差异产生，不由生成模型猜测；默认按检测时间倒序展示。")
+    change_policy = load_evidence_policy()
+    change_filter_columns = st.columns(2)
+    change_days = change_filter_columns[0].radio(
+        "时间范围",
+        [1, 7, 30],
+        index=1,
+        format_func=lambda days: f"最近 {days} 天",
+        horizontal=True,
+        key="change_days",
+    )
+    selected_change_adc_ids = change_filter_columns[1].multiselect(
+        "ADC",
+        list(adc_labels),
+        format_func=lambda adc_id: adc_labels[adc_id],
+        key="change_adc_ids",
+    )
+    target_options = sorted({str(record["target"]) for record in adc_options})
+    detailed_filter_columns = st.columns(3)
+    selected_targets = detailed_filter_columns[0].multiselect(
+        "靶点",
+        target_options,
+        key="change_targets",
+    )
+    source_options = list(change_policy.sources)
+    selected_sources = detailed_filter_columns[1].multiselect(
+        "来源",
+        source_options,
+        format_func=lambda source: change_policy.sources[source].display_name,
+        key="change_sources",
+    )
+    event_type_options = list(change_policy.change_types)
+    selected_event_types = detailed_filter_columns[2].multiselect(
+        "事件类型",
+        event_type_options,
+        key="change_event_types",
+    )
+    change_rows = list_changes(
+        DEFAULT_DATABASE_PATH,
+        days=change_days,
+        adc_ids=selected_change_adc_ids,
+        targets=selected_targets,
+        sources=selected_sources,
+        event_types=selected_event_types,
+    )
+    change_metrics = st.columns(3)
+    change_metrics[0].metric("变化事件", len(change_rows))
+    change_metrics[1].metric(
+        "高严重度",
+        sum(1 for event in change_rows if event["severity"] == "high"),
+    )
+    change_metrics[2].metric(
+        "待审核",
+        sum(1 for event in change_rows if event["review_required"]),
+    )
+    if not change_rows:
+        st.info("当前时间范围和筛选条件下没有变化事件。")
+    for event in change_rows:
+        entity_text = "、".join(event["entities"]["adc_names"]) or str(
+            event["subject_id"]
+        )
+        with st.expander(
+            f"{event['detected_at']} · {event['event_type']} · {entity_text}",
+            expanded=event["severity"] == "high",
+        ):
+            st.caption(
+                f"严重度：{event['severity']} · 来源：{event['source'] or '系统'} · "
+                f"审核：{event['review_status']} · 事件 ID：{event['event_id']}"
+            )
+            value_columns = st.columns(2)
+            value_columns[0].markdown("**变化前**")
+            value_columns[0].code(_event_value(event["old_value"]))
+            value_columns[1].markdown("**变化后**")
+            value_columns[1].code(_event_value(event["new_value"]))
+            st.write(
+                f"关联 ADC：{'、'.join(event['entities']['adc_names']) or '无'}；"
+                f"靶点：{'、'.join(event['entities']['targets']) or '无'}；"
+                f"来源记录：{event['source_record_id'] or '无'}；"
+                f"快照：{event['snapshot_id'] or '无'}"
+            )
+            if event["snapshot"] and event["snapshot"].get("source_url"):
+                st.markdown(
+                    f"[打开事件来源快照]({event['snapshot']['source_url']})"
+                )
 
 with retrieval_tab:
     st.info("本页只返回可追溯的原始切片，不调用大模型，也不生成总结性答案。")
@@ -285,7 +638,8 @@ with retrieval_tab:
 
 with answer_tab:
     st.info(
-        "回答只能使用当前数据库检索到的证据；证据不足、问题越界或引用校验失败时会拒答。"
+        "系统先路由问题：ADC 字段、比较、变化和试验直接查询结构化数据；"
+        "文献结论才进入检索生成。缺失、冲突或不受支持的内容不会由模型常识补齐。"
     )
     backend_options = configured_generation_backends()
     answer_query = st.text_input(
@@ -293,37 +647,39 @@ with answer_tab:
         placeholder="例如：T-DXd 的靶点、payload 和 DAR 分别是什么？",
         key="answer_query",
     )
-    answer_controls = st.columns(3)
-    backend = answer_controls[0].selectbox(
-        "生成后端",
-        backend_options,
-        format_func={
-            "extractive": "离线证据摘录（无 LLM）",
-            "siliconflow": "硅基流动 Chat Completions",
-            "openai": "OpenAI Responses API",
-        }.get,
-    )
-    answer_mode = answer_controls[1].selectbox(
-        "检索方式",
-        ["sparse", "hybrid", "dense"],
-        format_func={
-            "hybrid": "混合检索",
-            "dense": "语义向量",
-            "sparse": "BM25 关键词",
-        }.get,
-        key="answer_retrieval_mode",
-    )
-    answer_top_k = answer_controls[2].slider(
-        "证据条数", 3, 8, 5, key="answer_top_k"
-    )
-    if len(backend_options) == 1:
-        st.caption(
-            "当前未检测到 SILICONFLOW_API_KEY 或 OPENAI_API_KEY，因此只启用"
-            "确定性离线摘录后端。配置任一 key 并重启页面后会出现对应选项。"
+    with st.expander("高级诊断设置", expanded=False):
+        st.caption("这些参数仅影响文献证据路由；结构化查询不会调用生成模型。")
+        answer_controls = st.columns(3)
+        backend = answer_controls[0].selectbox(
+            "文献生成后端",
+            backend_options,
+            format_func={
+                "extractive": "离线证据摘录（无 LLM）",
+                "siliconflow": "硅基流动 Chat Completions",
+                "openai": "OpenAI Responses API",
+            }.get,
         )
+        answer_mode = answer_controls[1].selectbox(
+            "文献检索方式",
+            ["sparse", "hybrid", "dense"],
+            format_func={
+                "hybrid": "混合检索",
+                "dense": "语义向量",
+                "sparse": "BM25 关键词",
+            }.get,
+            key="answer_retrieval_mode",
+        )
+        answer_top_k = answer_controls[2].slider(
+            "证据条数", 3, 8, 5, key="answer_top_k"
+        )
+        if len(backend_options) == 1:
+            st.caption(
+                "当前未检测到 SILICONFLOW_API_KEY 或 OPENAI_API_KEY，因此文献路由只启用"
+                "确定性离线摘录后端。"
+            )
 
     if st.button(
-        "生成带引用回答",
+        "核查并回答",
         type="primary",
         disabled=not answer_query.strip(),
         key="answer_button",
@@ -357,10 +713,27 @@ with review_tab:
         key="reviewer_id",
         disabled=PUBLIC_DEMO,
     ).strip()
+    reviewer_slot = st.selectbox(
+        "本轮复核角色",
+        REVIEWER_SLOTS,
+        format_func={
+            "primary": "第一复核",
+            "secondary": "第二独立复核",
+            "adjudicator": "分歧裁决",
+        }.get,
+        key="reviewer_slot",
+        disabled=PUBLIC_DEMO,
+    )
     filter_columns = st.columns(3)
     item_type_label = filter_columns[0].selectbox(
         "复核对象",
-        ["全部", "检索问题与 gold 文档", "生成/拒答结果"],
+        [
+            "全部",
+            "检索问题与 gold 文档",
+            "生成/拒答结果",
+            "三组盲评答案",
+            "原子结论",
+        ],
         key="review_item_type",
     )
     status_label = filter_columns[1].selectbox(
@@ -372,6 +745,8 @@ with review_tab:
         "全部": None,
         "检索问题与 gold 文档": "retrieval",
         "生成/拒答结果": "generation",
+        "三组盲评答案": "benchmark_answer",
+        "原子结论": "answer_claim",
     }
     status_map = {
         "全部": "all",
@@ -425,6 +800,14 @@ with review_tab:
             key="review_item_id",
         )
         item = next(row for row in queue if row["item_id"] == selected_item_id)
+        identity_hidden = bool(item["metadata"].get("identity_hidden"))
+        if identity_hidden:
+            st.info(
+                "当前为身份盲化评审：请先独立保存答案与证据判断；"
+                "真实系统和模型只在汇总裁决阶段通过独立身份映射揭示。"
+            )
+            if item["metadata"].get("second_review_required"):
+                st.caption("此题属于双人复核范围，第一、第二复核必须相互独立。")
         if item.get("is_stale"):
             st.warning("系统输出已变化，这条旧人工结论需要重新确认。")
         st.markdown(f"**问题：** {item['question']}")
@@ -442,8 +825,12 @@ with review_tab:
             f"运行：{item['evaluation_run_id']} · 后端：{item['backend']} · "
             f"模型：{item['model_name']} · 状态：{item['system_status']}"
         )
-        if item["item_type"] == "generation":
-            st.markdown("**系统回答**")
+        if item["item_type"] != "retrieval":
+            st.markdown(
+                "**待审原子结论**"
+                if item["item_type"] == "answer_claim"
+                else "**系统回答**"
+            )
             st.markdown(str(item["system_output"]))
         else:
             st.caption("检索结果按从上到下的顺序排列；请同时判断问题表述和 gold 文档。")
@@ -451,8 +838,9 @@ with review_tab:
             list(dict.fromkeys([*expected_documents, *system_documents])),
             DEFAULT_DATABASE_PATH,
         )
+        external_citations = list(item["metadata"].get("external_citations", []))
         with st.expander("展开核对原始证据", expanded=False):
-            if not review_documents:
+            if not review_documents and not external_citations:
                 st.warning("当前项目数据库中没有找到这些文档。")
             for document in review_documents:
                 st.markdown(
@@ -460,25 +848,75 @@ with review_tab:
                 )
                 st.write(document["content"])
                 if document["source_url"]:
-                    st.link_button(
-                        f"打开来源：{document['retrieval_document_id']}",
-                        str(document["source_url"]),
+                    st.markdown(
+                        f"[打开来源：{document['retrieval_document_id']}]"
+                        f"({document['source_url']})"
+                    )
+                st.divider()
+            for citation in external_citations:
+                st.markdown(
+                    f"**{citation.get('citation_id') or '网页来源'} · "
+                    f"{citation.get('title') or '未命名来源'}**"
+                )
+                st.write(citation.get("excerpt") or "（没有可显示的网页摘录）")
+                if citation.get("source_url"):
+                    st.markdown(
+                        f"[打开网页来源]({citation['source_url']})"
                     )
                 st.divider()
         with st.expander("查看自动评测信号", expanded=False):
             st.json(item["metadata"])
 
-        current_question = str(item.get("question_verdict") or "valid")
-        current_evidence = str(item.get("evidence_verdict") or "correct")
+        require_explicit_verdict = identity_hidden and item.get("review_id") is None
+        current_question = (
+            None
+            if require_explicit_verdict
+            else str(item.get("question_verdict") or "valid")
+        )
+        current_evidence = (
+            None
+            if require_explicit_verdict
+            else str(item.get("evidence_verdict") or "correct")
+        )
         default_answer = (
             "not_applicable"
             if item["item_type"] == "retrieval" or item["expected_refusal"]
             else "correct"
         )
-        current_answer = str(item.get("answer_verdict") or default_answer)
+        current_answer = (
+            None
+            if require_explicit_verdict
+            else str(item.get("answer_verdict") or default_answer)
+        )
+        default_citation = (
+            "correct"
+            if item["item_type"] in {"benchmark_answer", "answer_claim"}
+            else "not_applicable"
+        )
+        current_citation = (
+            None
+            if require_explicit_verdict
+            else str(item.get("citation_verdict") or default_citation)
+        )
+        default_completeness = (
+            "correct" if item["item_type"] == "benchmark_answer" else "not_applicable"
+        )
+        current_completeness = (
+            None
+            if require_explicit_verdict
+            else str(item.get("completeness_verdict") or default_completeness)
+        )
         default_refusal = "correct" if item["expected_refusal"] else "not_applicable"
-        current_refusal = str(item.get("refusal_verdict") or default_refusal)
-        current_severity = str(item.get("severity") or "none")
+        current_refusal = (
+            None
+            if require_explicit_verdict
+            else str(item.get("refusal_verdict") or default_refusal)
+        )
+        current_severity = (
+            None
+            if require_explicit_verdict
+            else str(item.get("severity") or "none")
+        )
         current_categories = list(item.get("error_categories") or [])
         current_notes = str(item.get("notes") or "")
 
@@ -487,7 +925,12 @@ with review_tab:
             question_verdict = verdict_columns[0].selectbox(
                 "问题表述",
                 QUESTION_VERDICTS,
-                index=QUESTION_VERDICTS.index(current_question),
+                index=(
+                    None
+                    if current_question is None
+                    else QUESTION_VERDICTS.index(current_question)
+                ),
+                placeholder="请选择",
                 format_func={
                     "valid": "有效",
                     "needs_edit": "需修改",
@@ -497,7 +940,12 @@ with review_tab:
             evidence_verdict = verdict_columns[1].selectbox(
                 "gold / 引用证据",
                 EVIDENCE_VERDICTS,
-                index=EVIDENCE_VERDICTS.index(current_evidence),
+                index=(
+                    None
+                    if current_evidence is None
+                    else EVIDENCE_VERDICTS.index(current_evidence)
+                ),
+                placeholder="请选择",
                 format_func={
                     "correct": "正确",
                     "partial": "部分正确",
@@ -509,7 +957,12 @@ with review_tab:
             answer_verdict = answer_columns[0].selectbox(
                 "答案质量",
                 ANSWER_VERDICTS,
-                index=ANSWER_VERDICTS.index(current_answer),
+                index=(
+                    None
+                    if current_answer is None
+                    else ANSWER_VERDICTS.index(current_answer)
+                ),
+                placeholder="请选择",
                 format_func={
                     "correct": "正确",
                     "partial": "部分正确",
@@ -520,17 +973,60 @@ with review_tab:
             refusal_verdict = answer_columns[1].selectbox(
                 "拒答是否合理",
                 REFUSAL_VERDICTS,
-                index=REFUSAL_VERDICTS.index(current_refusal),
+                index=(
+                    None
+                    if current_refusal is None
+                    else REFUSAL_VERDICTS.index(current_refusal)
+                ),
+                placeholder="请选择",
                 format_func={
                     "correct": "合理",
                     "incorrect": "不合理",
                     "not_applicable": "不适用",
                 }.get,
             )
+            benchmark_columns = st.columns(2)
+            citation_verdict = benchmark_columns[0].selectbox(
+                "引用对应关系",
+                CITATION_VERDICTS,
+                index=(
+                    None
+                    if current_citation is None
+                    else CITATION_VERDICTS.index(current_citation)
+                ),
+                placeholder="请选择",
+                format_func={
+                    "correct": "正确",
+                    "partial": "部分正确",
+                    "incorrect": "错误",
+                    "not_applicable": "不适用",
+                }.get,
+            )
+            completeness_verdict = benchmark_columns[1].selectbox(
+                "多要点完整性",
+                COMPLETENESS_VERDICTS,
+                index=(
+                    None
+                    if current_completeness is None
+                    else COMPLETENESS_VERDICTS.index(current_completeness)
+                ),
+                placeholder="请选择",
+                format_func={
+                    "correct": "完整",
+                    "partial": "部分完整",
+                    "incorrect": "不完整",
+                    "not_applicable": "不适用",
+                }.get,
+            )
             severity = st.selectbox(
                 "问题严重度",
                 SEVERITIES,
-                index=SEVERITIES.index(current_severity),
+                index=(
+                    None
+                    if current_severity is None
+                    else SEVERITIES.index(current_severity)
+                ),
+                placeholder="请选择",
                 format_func={
                     "none": "无问题",
                     "low": "低",
@@ -556,14 +1052,30 @@ with review_tab:
             )
         if not reviewer and not PUBLIC_DEMO:
             st.caption("填写复核者标识后才能保存；系统不会生成虚假的专家身份。")
-        if submitted and not PUBLIC_DEMO:
+        required_verdicts = (
+            question_verdict,
+            evidence_verdict,
+            answer_verdict,
+            citation_verdict,
+            completeness_verdict,
+            refusal_verdict,
+            severity,
+        )
+        if submitted and not PUBLIC_DEMO and any(
+            verdict is None for verdict in required_verdicts
+        ):
+            st.error("请先完成全部判断字段，再保存本轮复核。")
+        elif submitted and not PUBLIC_DEMO:
             save_expert_review(
                 item_id=str(item["item_id"]),
                 reviewer=reviewer,
                 question_verdict=question_verdict,
                 evidence_verdict=evidence_verdict,
                 answer_verdict=answer_verdict,
+                citation_verdict=citation_verdict,
+                completeness_verdict=completeness_verdict,
                 refusal_verdict=refusal_verdict,
+                reviewer_slot=reviewer_slot,
                 severity=severity,
                 error_categories=list(error_categories),
                 notes=notes,
@@ -574,7 +1086,9 @@ with review_tab:
 
 with st.sidebar:
     st.header("当前版本")
-    st.write("v0.5.0-reviewed")
+    st.write("v0.6-stage5")
+    st.caption(f"数据：{active_version['data_version'][:21]}…")
+    st.caption(f"策略：{active_version['policy_version']}")
     git_sha = os.getenv("ADC_GIT_SHA", "").strip()
     if git_sha and git_sha != "unknown":
         st.caption(f"部署提交：{git_sha[:12]}")

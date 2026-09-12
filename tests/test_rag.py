@@ -61,6 +61,31 @@ class RetrievalTests(unittest.TestCase):
         )
         self.assertEqual(results[0].retrieval_document_id, "adc_profile:adc_001")
 
+    def test_explicit_pmid_is_resolved_exactly(self) -> None:
+        document = RetrievalDocument(
+            retrieval_document_id="pubmed:34413126",
+            source_type="pubmed",
+            source_record_id="34413126",
+            title="Dato-DXd preclinical activity",
+            content="PMID 34413126 Dato-DXd internalization and DXd release.",
+            source_url="https://pubmed.ncbi.nlm.nih.gov/34413126/",
+            metadata={},
+        )
+        persist_retrieval_corpus(
+            self.database_path,
+            [document],
+            chunk_documents([document]),
+        )
+
+        results = HybridRetriever(self.database_path).identifier_search(
+            "PMID 34413126 的直接摘要证据是什么？",
+            source_type="pubmed",
+            top_k=5,
+        )
+
+        self.assertEqual([item.source_record_id for item in results], ["34413126"])
+        self.assertEqual(results[0].retrieval_document_id, "pubmed:34413126")
+
     def test_persist_is_idempotent(self) -> None:
         documents = build_retrieval_documents(self.database_path)
         chunks = chunk_documents(documents)

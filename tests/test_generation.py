@@ -107,6 +107,39 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "specific_identifier_not_found")
 
+    def test_precise_topic_without_evidence_is_refused(self) -> None:
+        decision = self.guard.check_evidence(
+            "文献摘要是否直接支持 Dato-DXd 具有旁观者效应？",
+            [sample_result()],
+            "sparse",
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "topic_not_supported")
+
+    def test_precise_topic_with_evidence_passes(self) -> None:
+        result = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "content": sample_result().content + "\nBystander effect was observed.",
+            }
+        )
+        decision = self.guard.check_evidence(
+            "文献摘要是否直接支持 Dato-DXd 具有旁观者效应？",
+            [result],
+            "sparse",
+        )
+        self.assertTrue(decision.allowed)
+
+    def test_patient_action_is_refused(self) -> None:
+        decision = self.guard.check_question("患者是否应该停用 T-DXd？")
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "personalized_medical_advice")
+
+    def test_forecast_and_investment_claim_is_refused(self) -> None:
+        decision = self.guard.check_question("预测 SKB264 临床成功率和目标价")
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "future_or_unpublished_claim")
+
 
 class ServiceTests(unittest.TestCase):
     def test_valid_cited_answer_is_returned(self) -> None:

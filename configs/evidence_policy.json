@@ -1,0 +1,285 @@
+{
+  "policy_version": "0.6.0",
+  "scope": {
+    "targets": ["HER2", "TROP2"],
+    "supported_jobs": [
+      "adc_evidence_card",
+      "adc_comparison",
+      "change_monitoring",
+      "trial_lookup",
+      "literature_evidence",
+      "evidence_brief"
+    ],
+    "prohibited_jobs": [
+      "personalized_medical_advice",
+      "future_trial_prediction",
+      "commercial_success_prediction",
+      "unsupported_fact_completion"
+    ]
+  },
+  "sources": {
+    "clinicaltrials": {
+      "display_name": "ClinicalTrials.gov",
+      "cadence": "daily",
+      "max_age_hours": 48,
+      "is_authoritative_external_source": true
+    },
+    "pubmed": {
+      "display_name": "PubMed",
+      "cadence": "weekly",
+      "max_age_hours": 240,
+      "is_authoritative_external_source": true
+    },
+    "adcdb": {
+      "display_name": "ADCdb",
+      "cadence": "weekly",
+      "max_age_hours": 336,
+      "is_authoritative_external_source": true
+    },
+    "curated_seed": {
+      "display_name": "Public curated seed",
+      "cadence": "manual",
+      "max_age_hours": null,
+      "is_authoritative_external_source": false
+    }
+  },
+  "fields": {
+    "adc.target": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.antibody": {
+      "value_type": "string",
+      "cardinality": "one",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.linker_name": {
+      "value_type": "string",
+      "cardinality": "one",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.linker_type": {
+      "value_type": "enum",
+      "cardinality": "one",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.payload_name": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.payload_class": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.dar": {
+      "value_type": "decimal",
+      "cardinality": "one",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.indication": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["adcdb", "clinicaltrials", "curated_seed"],
+      "conflict_resolution": "preserve_all",
+      "material_change": true
+    },
+    "adc.development_status": {
+      "value_type": "enum",
+      "cardinality": "one",
+      "preferred_sources": ["adcdb", "clinicaltrials", "curated_seed"],
+      "conflict_resolution": "require_review",
+      "material_change": true
+    },
+    "adc.company": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["adcdb", "curated_seed"],
+      "conflict_resolution": "preserve_all",
+      "material_change": true
+    },
+    "trial.overall_status": {
+      "value_type": "enum",
+      "cardinality": "one",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.phases": {
+      "value_type": "enum",
+      "cardinality": "many",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.conditions": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.interventions": {
+      "value_type": "object",
+      "cardinality": "many",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.primary_outcomes": {
+      "value_type": "object",
+      "cardinality": "many",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.enrollment": {
+      "value_type": "integer",
+      "cardinality": "one",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.start_date": {
+      "value_type": "date",
+      "cardinality": "one",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "trial.completion_date": {
+      "value_type": "date",
+      "cardinality": "one",
+      "preferred_sources": ["clinicaltrials"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "publication.title": {
+      "value_type": "string",
+      "cardinality": "one",
+      "preferred_sources": ["pubmed"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": false
+    },
+    "publication.abstract": {
+      "value_type": "text",
+      "cardinality": "one",
+      "preferred_sources": ["pubmed"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": true
+    },
+    "publication.publication_date": {
+      "value_type": "date",
+      "cardinality": "one",
+      "preferred_sources": ["pubmed"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": false
+    },
+    "publication.publication_type": {
+      "value_type": "string",
+      "cardinality": "many",
+      "preferred_sources": ["pubmed"],
+      "conflict_resolution": "authoritative_first",
+      "material_change": false
+    }
+  },
+  "fact_statuses": ["current", "superseded", "conflicted"],
+  "review_statuses": [
+    "needs_review",
+    "reviewed_supported",
+    "reviewed_unsupported",
+    "reviewed_conflicted",
+    "superseded"
+  ],
+  "change_types": {
+    "source.collection_failed": {
+      "severity": "high",
+      "review_required": false,
+      "tracked_field": null
+    },
+    "source.record_missing": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": null
+    },
+    "adc.record_created": {
+      "severity": "medium",
+      "review_required": true,
+      "tracked_field": null
+    },
+    "adc.development_status.changed": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": "adc.development_status"
+    },
+    "adc.structure.changed": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": "adc.payload_name"
+    },
+    "trial.record_created": {
+      "severity": "medium",
+      "review_required": false,
+      "tracked_field": null
+    },
+    "trial.overall_status.changed": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": "trial.overall_status"
+    },
+    "trial.phases.changed": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": "trial.phases"
+    },
+    "trial.primary_outcomes.changed": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": "trial.primary_outcomes"
+    },
+    "publication.record_created": {
+      "severity": "medium",
+      "review_required": false,
+      "tracked_field": null
+    },
+    "fact.conflict_detected": {
+      "severity": "high",
+      "review_required": true,
+      "tracked_field": null
+    },
+    "fact.conflict_resolved": {
+      "severity": "medium",
+      "review_required": true,
+      "tracked_field": null
+    },
+    "fact.value_changed": {
+      "severity": "medium",
+      "review_required": true,
+      "tracked_field": null
+    }
+  },
+  "answer_routes": [
+    "structured_fact",
+    "comparison",
+    "change_query",
+    "trial_lookup",
+    "literature_evidence",
+    "refusal"
+  ]
+}

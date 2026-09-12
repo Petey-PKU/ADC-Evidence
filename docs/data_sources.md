@@ -1,5 +1,9 @@
 # 数据来源与采集边界
 
+以下采集数量来自 2026-08-19 的历史运行记录，不是当前数据库的实时统计。
+公开种子初始化只导入 ADC 演示档案；正式研究运行须检查实际数据库的覆盖、来源快照和
+历史观测，并记录新的数据版本。`data/processed/data_quality_report.json` 同样是历史汇总。
+
 ## ClinicalTrials.gov
 
 - 接口：`https://clinicaltrials.gov/api/v2/studies`
@@ -37,4 +41,3 @@
 - 数据集版本或时间戳。
 
 自动规则生成的证据状态统一为 `needs_review`。
-

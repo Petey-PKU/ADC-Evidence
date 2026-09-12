@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from adc_evidence.config import environment_flag
+from adc_evidence.config import environment_flag, load_local_environment
 
 
 class EnvironmentFlagTests(unittest.TestCase):
@@ -28,6 +31,33 @@ class EnvironmentFlagTests(unittest.TestCase):
         with patch.dict(os.environ, {"TEST_FLAG": "tru"}):
             with self.assertRaises(ValueError):
                 environment_flag("TEST_FLAG")
+
+    def test_explicit_env_file_is_loaded_without_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            env_path = Path(temporary) / ".env"
+            env_path.write_text("SECRET=value\n", encoding="utf-8")
+            calls = []
+            fake_dotenv = SimpleNamespace(
+                load_dotenv=lambda path, override: calls.append((path, override))
+            )
+            with patch.dict(
+                os.environ,
+                {"ADC_ENV_FILE": str(env_path)},
+                clear=True,
+            ), patch.dict("sys.modules", {"dotenv": fake_dotenv}):
+                load_local_environment()
+            self.assertEqual(calls, [(env_path, False)])
+
+    def test_missing_explicit_env_file_fails_without_echoing_path(self) -> None:
+        secret_path = "C:/private/location/.env"
+        with patch.dict(
+            os.environ,
+            {"ADC_ENV_FILE": secret_path},
+            clear=True,
+        ):
+            with self.assertRaises(RuntimeError) as context:
+                load_local_environment()
+        self.assertNotIn(secret_path, str(context.exception))
 
 
 if __name__ == "__main__":

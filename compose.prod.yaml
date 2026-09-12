@@ -2,6 +2,7 @@ services:
   adc-evidence:
     build:
       context: .
+      network: "${ADC_BUILD_NETWORK:-host}"
       args:
         ADC_INSTALL_PROFILE: demo
         ADC_GIT_SHA: "${ADC_GIT_SHA:-unknown}"

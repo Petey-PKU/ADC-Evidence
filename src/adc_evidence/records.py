@@ -15,6 +15,7 @@ class SourceRecord(BaseModel):
     raw_path: str
     sha256: str
     dataset_version: str | None = None
+    source_updated_at: str | None = None
 
 
 class DocumentRecord(BaseModel):
@@ -96,4 +97,3 @@ class ADCdbRecord(BaseModel):
     raw_path: str
     checksum: str
     raw_fields: dict[str, Any] = Field(default_factory=dict)
-

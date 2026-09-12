@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
+from adc_evidence.database import REVIEW_SCHEMA_VERSION, create_database
 from adc_evidence.review.bad_cases import (
     build_bad_case_report,
     render_bad_case_markdown,
@@ -114,6 +117,43 @@ class ReviewRepositoryTests(unittest.TestCase):
         self.assertEqual(len(items), 2)
         self.assertEqual({item["item_type"] for item in items}, {"generation", "retrieval"})
         self.assertEqual(review_stats(self.database)["remaining_items"], 2)
+
+    def test_existing_review_database_adds_stage5_rubric_columns(self) -> None:
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                """
+                CREATE TABLE expert_reviews (
+                    review_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_id TEXT NOT NULL,
+                    reviewer TEXT NOT NULL,
+                    question_verdict TEXT NOT NULL,
+                    evidence_verdict TEXT NOT NULL,
+                    answer_verdict TEXT NOT NULL,
+                    refusal_verdict TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    error_categories_json TEXT NOT NULL,
+                    notes TEXT NOT NULL,
+                    item_content_hash TEXT NOT NULL,
+                    reviewed_at TEXT NOT NULL,
+                    UNIQUE (item_id, reviewer)
+                )
+                """
+            )
+            connection.commit()
+        create_database(self.database)
+        with closing(sqlite3.connect(self.database)) as connection:
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(expert_reviews)")
+            }
+            versions = {
+                row[0] for row in connection.execute("SELECT version FROM schema_versions")
+            }
+        self.assertTrue(
+            {"citation_verdict", "completeness_verdict", "reviewer_slot"}
+            <= columns
+        )
+        self.assertIn(REVIEW_SCHEMA_VERSION, versions)
 
     def test_review_becomes_stale_when_system_output_changes(self) -> None:
         import_generation_report(self.generation_path, self.database)

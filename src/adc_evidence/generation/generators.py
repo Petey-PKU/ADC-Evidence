@@ -8,7 +8,7 @@ from adc_evidence.config import (
     DEFAULT_OPENAI_MODEL,
     DEFAULT_SILICONFLOW_BASE_URL,
     DEFAULT_SILICONFLOW_MODEL,
-    PROJECT_ROOT,
+    load_local_environment,
 )
 from adc_evidence.generation.citations import NumberedSource
 from adc_evidence.generation.models import GeneratorResponse
@@ -25,20 +25,11 @@ class AnswerGenerator(Protocol):
     ) -> GeneratorResponse: ...
 
 
-def _load_local_env() -> None:
-    try:
-        from dotenv import load_dotenv
-
-        load_dotenv(PROJECT_ROOT / ".env")
-    except ImportError:
-        pass
-
-
 class OpenAIResponsesGenerator:
     backend_name = "openai"
 
     def __init__(self, model_name: str | None = None, api_key: str | None = None) -> None:
-        _load_local_env()
+        load_local_environment()
         try:
             from openai import OpenAI
         except ImportError as exc:  # pragma: no cover - optional dependency
@@ -94,7 +85,7 @@ class SiliconFlowChatGenerator:
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> None:
-        _load_local_env()
+        load_local_environment()
         try:
             from openai import OpenAI
         except ImportError as exc:  # pragma: no cover - optional dependency
@@ -286,12 +277,12 @@ class ExtractiveGenerator:
 
 
 def openai_configured() -> bool:
-    _load_local_env()
+    load_local_environment()
     return bool(os.getenv("OPENAI_API_KEY"))
 
 
 def siliconflow_configured() -> bool:
-    _load_local_env()
+    load_local_environment()
     return bool(os.getenv("SILICONFLOW_API_KEY"))
 
 
@@ -305,7 +296,7 @@ def configured_generation_backends() -> list[str]:
 
 
 def create_generator(name: str = "auto") -> AnswerGenerator:
-    _load_local_env()
+    load_local_environment()
     resolved = name.strip().lower()
     if resolved == "auto":
         preferred = os.getenv("ADC_LLM_BACKEND", "").strip().lower()

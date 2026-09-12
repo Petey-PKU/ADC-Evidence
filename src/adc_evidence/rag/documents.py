@@ -318,7 +318,7 @@ def persist_retrieval_corpus(
                     item.content,
                     item.source_url,
                     json.dumps(item.metadata, ensure_ascii=False, sort_keys=True),
-                    _hash(item.content),
+                    _retrieval_document_hash(item),
                 )
                 for item in documents
             ],
@@ -339,7 +339,7 @@ def persist_retrieval_corpus(
                     item.content,
                     len(item.content),
                     json.dumps(item.metadata, ensure_ascii=False, sort_keys=True),
-                    _hash(item.content),
+                    _text_chunk_hash(item),
                 )
                 for item in chunks
             ],
@@ -362,6 +362,181 @@ def persist_retrieval_corpus(
         )
 
 
+def _retrieval_document_hash(item: RetrievalDocument) -> str:
+    return _hash(
+        json.dumps(
+            {
+                "source_type": item.source_type,
+                "source_record_id": item.source_record_id,
+                "title": item.title,
+                "content": item.content,
+                "source_url": item.source_url,
+                "metadata": item.metadata,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
+def _text_chunk_hash(item: TextChunk) -> str:
+    return _hash(
+        json.dumps(
+            {
+                "title": item.title,
+                "content": item.content,
+                "metadata": item.metadata,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
+def persist_retrieval_corpus_incremental(
+    database_path: Path,
+    documents: list[RetrievalDocument],
+    chunks: list[TextChunk],
+) -> dict[str, object]:
+    """Replace only changed retrieval documents and their dependent chunks."""
+    create_database(database_path)
+    document_by_id = {item.retrieval_document_id: item for item in documents}
+    chunks_by_document: dict[str, list[TextChunk]] = {}
+    for chunk in chunks:
+        chunks_by_document.setdefault(chunk.retrieval_document_id, []).append(chunk)
+
+    with closing(connect(database_path)) as connection, connection:
+        existing = {
+            str(row[0]): str(row[1])
+            for row in connection.execute(
+                "SELECT retrieval_document_id, content_hash FROM retrieval_documents"
+            ).fetchall()
+        }
+        incoming_hashes = {
+            document_id: _retrieval_document_hash(document)
+            for document_id, document in document_by_id.items()
+        }
+        added = sorted(set(incoming_hashes) - set(existing))
+        deleted = sorted(set(existing) - set(incoming_hashes))
+        updated = sorted(
+            document_id
+            for document_id in set(existing) & set(incoming_hashes)
+            if existing[document_id] != incoming_hashes[document_id]
+        )
+        unchanged = sorted(set(existing) & set(incoming_hashes) - set(updated))
+        affected = set(added) | set(updated) | set(deleted)
+        if affected:
+            old_chunk_ids = [
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT chunk_id, retrieval_document_id FROM text_chunks"
+                ).fetchall()
+                if str(row[1]) in affected
+            ]
+            connection.executemany(
+                "DELETE FROM text_chunks_fts WHERE chunk_id = ?",
+                [(chunk_id,) for chunk_id in old_chunk_ids],
+            )
+            connection.executemany(
+                "DELETE FROM retrieval_documents WHERE retrieval_document_id = ?",
+                [(document_id,) for document_id in sorted(affected)],
+            )
+
+        changed_documents = [
+            document_by_id[document_id] for document_id in added + updated
+        ]
+        connection.executemany(
+            """
+            INSERT INTO retrieval_documents (
+                retrieval_document_id, source_type, source_record_id, title,
+                content, source_url, metadata_json, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    item.retrieval_document_id,
+                    item.source_type,
+                    item.source_record_id,
+                    item.title,
+                    item.content,
+                    item.source_url,
+                    json.dumps(item.metadata, ensure_ascii=False, sort_keys=True),
+                    incoming_hashes[item.retrieval_document_id],
+                )
+                for item in changed_documents
+            ],
+        )
+        changed_chunks = [
+            chunk
+            for document_id in added + updated
+            for chunk in chunks_by_document.get(document_id, [])
+        ]
+        connection.executemany(
+            """
+            INSERT INTO text_chunks (
+                chunk_id, retrieval_document_id, chunk_index, title, content,
+                char_count, metadata_json, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    item.chunk_id,
+                    item.retrieval_document_id,
+                    item.chunk_index,
+                    item.title,
+                    item.content,
+                    len(item.content),
+                    json.dumps(item.metadata, ensure_ascii=False, sort_keys=True),
+                    _text_chunk_hash(item),
+                )
+                for item in changed_chunks
+            ],
+        )
+        connection.executemany(
+            "INSERT INTO text_chunks_fts (chunk_id, title, content, entities) VALUES (?, ?, ?, ?)",
+            [
+                (
+                    item.chunk_id,
+                    item.title,
+                    item.content,
+                    " ".join(
+                        str(value)
+                        for key in ("adc_names", "targets", "payloads", "aliases")
+                        for value in item.metadata.get(key, [])
+                    ),
+                )
+                for item in changed_chunks
+            ],
+        )
+    return {
+        "document_count": len(documents),
+        "chunk_count": len(chunks),
+        "added_document_ids": added,
+        "updated_document_ids": updated,
+        "deleted_document_ids": deleted,
+        "unchanged_document_count": len(unchanged),
+        "affected_document_count": len(affected),
+        "rewritten_chunk_count": len(changed_chunks),
+    }
+
+
+def retrieval_corpus_version(database_path: Path) -> str:
+    """Return a deterministic version for exactly the rows consumed by dense search."""
+    digest = hashlib.sha256()
+    with closing(connect(database_path)) as connection:
+        rows = connection.execute(
+            "SELECT chunk_id, content_hash FROM text_chunks ORDER BY chunk_id"
+        ).fetchall()
+    for row in rows:
+        digest.update(str(row[0]).encode("utf-8"))
+        digest.update(b"\x1f")
+        digest.update(str(row[1]).encode("utf-8"))
+        digest.update(b"\n")
+    return "corpus_" + digest.hexdigest()
+
+
 def build_and_persist_corpus(
     database_path: Path = DEFAULT_DATABASE_PATH,
     *,
@@ -374,5 +549,5 @@ def build_and_persist_corpus(
         max_chars=max_chars,
         overlap_chars=overlap_chars,
     )
-    persist_retrieval_corpus(database_path, documents, chunks)
+    persist_retrieval_corpus_incremental(database_path, documents, chunks)
     return len(documents), len(chunks)

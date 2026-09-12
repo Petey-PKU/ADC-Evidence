@@ -11,8 +11,9 @@ from adc_evidence.config import (
     VECTOR_INDEX_PATH,
 )
 from adc_evidence.database import connect, create_database, initialize_database
-from adc_evidence.rag.documents import build_and_persist_corpus
+from adc_evidence.rag.documents import build_and_persist_corpus, retrieval_corpus_version
 from adc_evidence.rag.vector_index import build_vector_index
+from adc_evidence.workbench import sync_public_seed_facts
 
 
 def ensure_runtime_assets(
@@ -36,6 +37,7 @@ def ensure_runtime_assets(
             adc_count = int(
                 connection.execute("SELECT COUNT(*) FROM adcs").fetchone()[0]
             )
+    seed_fact_sync = sync_public_seed_facts(database_path, seed_path)
 
     with closing(connect(database_path)) as connection:
         chunk_count = int(
@@ -48,7 +50,14 @@ def ensure_runtime_assets(
 
     manifest_path = index_path / "manifest.json"
     index_built = False
-    if not manifest_path.exists():
+    index_is_current = False
+    if manifest_path.exists():
+        existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        index_is_current = (
+            existing_manifest.get("retrieval_corpus_version")
+            == retrieval_corpus_version(database_path)
+        )
+    if not index_is_current:
         build_vector_index(
             database_path=database_path,
             index_path=index_path,
@@ -62,6 +71,7 @@ def ensure_runtime_assets(
         "corpus_built": corpus_built,
         "index_built": index_built,
         "embedding_backend": manifest["embedding_backend"],
+        "seed_fact_sync": seed_fact_sync,
     }
 
 

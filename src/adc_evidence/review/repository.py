@@ -14,7 +14,10 @@ from adc_evidence.database import connect, create_database
 QUESTION_VERDICTS = ("valid", "needs_edit", "invalid")
 EVIDENCE_VERDICTS = ("correct", "partial", "incorrect", "not_applicable")
 ANSWER_VERDICTS = ("correct", "partial", "incorrect", "not_applicable")
+CITATION_VERDICTS = ("correct", "partial", "incorrect", "not_applicable")
+COMPLETENESS_VERDICTS = ("correct", "partial", "incorrect", "not_applicable")
 REFUSAL_VERDICTS = ("correct", "incorrect", "not_applicable")
+REVIEWER_SLOTS = ("primary", "secondary", "adjudicator")
 SEVERITIES = ("none", "low", "medium", "high", "critical")
 ERROR_CATEGORIES = (
     "retrieval_miss",
@@ -272,14 +275,167 @@ def import_retrieval_report(
     return len(result.get("questions", []))
 
 
+def import_benchmark_review_packet(
+    packet_path: Path,
+    database_path: Path = DEFAULT_DATABASE_PATH,
+) -> dict[str, int]:
+    """Import a blind comparison packet without exposing its identity map."""
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    if packet.get("blinded") is not True:
+        raise ValueError("Benchmark review packet must be blinded")
+    comparison_run_id = str(packet.get("comparison_run_id", "")).strip()
+    if not comparison_run_id:
+        raise ValueError("Benchmark review packet has no comparison_run_id")
+    question_rows = list(packet.get("questions", []))
+    expected_candidate_count = int(packet.get("candidate_count", -1))
+    answer_count = 0
+    claim_count = 0
+    candidate_ids: set[str] = set()
+    for question in question_rows:
+        for candidate in question.get("candidates", []):
+            if "arm" in candidate or "model" in candidate:
+                raise ValueError("Blinded candidate unexpectedly exposes system identity")
+            candidate_id = str(candidate.get("candidate_id", "")).strip()
+            blind_arm = str(candidate.get("blind_arm", "")).strip()
+            if not candidate_id or blind_arm not in {"A", "B", "C"}:
+                raise ValueError("Invalid blinded benchmark candidate")
+            if candidate_id in candidate_ids:
+                raise ValueError(f"Duplicate benchmark candidate: {candidate_id}")
+            candidate_ids.add(candidate_id)
+            citations = list(candidate.get("citations", []))
+            document_ids = list(
+                dict.fromkeys(
+                    str(citation["retrieval_document_id"])
+                    for citation in citations
+                    if isinstance(citation, dict)
+                    and citation.get("retrieval_document_id")
+                )
+            )
+            shared_metadata = {
+                "candidate_id": candidate_id,
+                "blind_arm": blind_arm,
+                "comparison_run_id": comparison_run_id,
+                "evaluation_window_id": packet.get("evaluation_window_id"),
+                "question_set_hash": packet.get("question_set_hash"),
+                "blind_mapping_hash": packet.get("blind_mapping_hash"),
+                "split": question.get("split"),
+                "risk_level": question.get("risk_level"),
+                "second_review_required": bool(
+                    question.get("second_review_required")
+                ),
+                "identity_hidden": True,
+            }
+            _upsert_item(
+                database_path,
+                {
+                    "item_id": f"benchmark_answer:{candidate_id}",
+                    "item_type": "benchmark_answer",
+                    "evaluation_run_id": comparison_run_id,
+                    "question_id": str(question["question_id"]),
+                    "category": str(question["category"]),
+                    "question": str(question["question"]),
+                    "expected_refusal": bool(question.get("should_refuse")),
+                    "expected_document_ids": list(
+                        question.get("expected_document_ids", [])
+                    ),
+                    "system_status": str(candidate.get("status", "unknown")),
+                    "system_output": str(candidate.get("answer", "")),
+                    "system_document_ids": document_ids,
+                    "backend": f"blind-{blind_arm}",
+                    "model_name": "hidden-until-adjudication",
+                    "metadata": {
+                        **shared_metadata,
+                        "claim_count": len(candidate.get("claims", [])),
+                        "citation_count": len(citations),
+                        "external_citations": [
+                            {
+                                "citation_id": citation.get("citation_id"),
+                                "title": citation.get("title"),
+                                "source_url": citation.get("source_url"),
+                                "excerpt": citation.get("excerpt"),
+                            }
+                            for citation in citations
+                            if isinstance(citation, dict)
+                            and citation.get("source_type") == "web"
+                        ],
+                    },
+                },
+            )
+            answer_count += 1
+            for claim in candidate.get("claims", []):
+                claim_id = str(claim.get("claim_id", "")).strip()
+                if not claim_id:
+                    raise ValueError(f"Candidate {candidate_id} contains a claim without ID")
+                claim_citation_ids = set(claim.get("citation_ids", []))
+                claim_document_ids = list(
+                    dict.fromkeys(
+                        str(citation["retrieval_document_id"])
+                        for citation in citations
+                        if isinstance(citation, dict)
+                        and citation.get("citation_id") in claim_citation_ids
+                        and citation.get("retrieval_document_id")
+                    )
+                )
+                _upsert_item(
+                    database_path,
+                    {
+                        "item_id": f"answer_claim:{candidate_id}:{claim_id}",
+                        "item_type": "answer_claim",
+                        "evaluation_run_id": comparison_run_id,
+                        "question_id": f"{question['question_id']}:{blind_arm}:{claim_id}",
+                        "category": str(question["category"]),
+                        "question": str(question["question"]),
+                        "expected_refusal": False,
+                        "expected_document_ids": list(
+                            question.get("expected_document_ids", [])
+                        ),
+                        "system_status": str(
+                            claim.get("validation_status", "pending_human_review")
+                        ),
+                        "system_output": str(claim.get("text", "")),
+                        "system_document_ids": claim_document_ids,
+                        "backend": f"blind-{blind_arm}",
+                        "model_name": "hidden-until-adjudication",
+                        "metadata": {
+                            **shared_metadata,
+                            "parent_item_id": f"benchmark_answer:{candidate_id}",
+                            "claim_id": claim_id,
+                            "identity_neutral_claim": True,
+                            "external_citations": [
+                                {
+                                    "citation_id": citation.get("citation_id"),
+                                    "title": citation.get("title"),
+                                    "source_url": citation.get("source_url"),
+                                    "excerpt": citation.get("excerpt"),
+                                }
+                                for citation in citations
+                                if isinstance(citation, dict)
+                                and citation.get("citation_id") in claim_citation_ids
+                                and citation.get("source_type") == "web"
+                            ],
+                        },
+                    },
+                )
+                claim_count += 1
+    if len(candidate_ids) != expected_candidate_count:
+        raise ValueError("Benchmark review packet candidate count mismatch")
+    return {"benchmark_answer": answer_count, "answer_claim": claim_count}
+
+
 def prepare_review_queue(
     *,
     database_path: Path = DEFAULT_DATABASE_PATH,
     generation_report_path: Path | None = None,
     retrieval_report_path: Path | None = None,
+    benchmark_packet_path: Path | None = None,
     retrieval_mode: str = "sparse",
 ) -> dict[str, int]:
-    counts = {"generation": 0, "retrieval": 0}
+    counts = {
+        "generation": 0,
+        "retrieval": 0,
+        "benchmark_answer": 0,
+        "answer_claim": 0,
+    }
     if generation_report_path and generation_report_path.exists():
         counts["generation"] = import_generation_report(
             generation_report_path, database_path
@@ -288,6 +444,11 @@ def prepare_review_queue(
         counts["retrieval"] = import_retrieval_report(
             retrieval_report_path, database_path, mode=retrieval_mode
         )
+    if benchmark_packet_path and benchmark_packet_path.exists():
+        benchmark_counts = import_benchmark_review_packet(
+            benchmark_packet_path, database_path
+        )
+        counts.update(benchmark_counts)
     create_database(database_path)
     return counts
 
@@ -326,7 +487,8 @@ def list_review_items(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     sql = f"""
         SELECT i.*, r.review_id, r.reviewer, r.question_verdict,
-               r.evidence_verdict, r.answer_verdict, r.refusal_verdict,
+               r.evidence_verdict, r.answer_verdict, r.citation_verdict,
+               r.completeness_verdict, r.refusal_verdict, r.reviewer_slot,
                r.severity, r.error_categories_json, r.notes,
                r.item_content_hash, r.reviewed_at
         FROM review_items i
@@ -409,6 +571,9 @@ def save_expert_review(
     severity: str,
     error_categories: list[str],
     notes: str,
+    citation_verdict: str = "not_applicable",
+    completeness_verdict: str = "not_applicable",
+    reviewer_slot: str = "primary",
     database_path: Path = DEFAULT_DATABASE_PATH,
 ) -> int:
     reviewer = reviewer.strip()
@@ -418,7 +583,13 @@ def save_expert_review(
         "question_verdict": (question_verdict, QUESTION_VERDICTS),
         "evidence_verdict": (evidence_verdict, EVIDENCE_VERDICTS),
         "answer_verdict": (answer_verdict, ANSWER_VERDICTS),
+        "citation_verdict": (citation_verdict, CITATION_VERDICTS),
+        "completeness_verdict": (
+            completeness_verdict,
+            COMPLETENESS_VERDICTS,
+        ),
         "refusal_verdict": (refusal_verdict, REFUSAL_VERDICTS),
+        "reviewer_slot": (reviewer_slot, REVIEWER_SLOTS),
         "severity": (severity, SEVERITIES),
     }
     for field, (value, choices) in allowed.items():
@@ -440,14 +611,18 @@ def save_expert_review(
                 """
                 INSERT INTO expert_reviews (
                     item_id, reviewer, question_verdict, evidence_verdict,
-                    answer_verdict, refusal_verdict, severity,
+                    answer_verdict, citation_verdict, completeness_verdict,
+                    refusal_verdict, reviewer_slot, severity,
                     error_categories_json, notes, item_content_hash, reviewed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(item_id, reviewer) DO UPDATE SET
                     question_verdict = excluded.question_verdict,
                     evidence_verdict = excluded.evidence_verdict,
                     answer_verdict = excluded.answer_verdict,
+                    citation_verdict = excluded.citation_verdict,
+                    completeness_verdict = excluded.completeness_verdict,
                     refusal_verdict = excluded.refusal_verdict,
+                    reviewer_slot = excluded.reviewer_slot,
                     severity = excluded.severity,
                     error_categories_json = excluded.error_categories_json,
                     notes = excluded.notes,
@@ -460,7 +635,10 @@ def save_expert_review(
                     question_verdict,
                     evidence_verdict,
                     answer_verdict,
+                    citation_verdict,
+                    completeness_verdict,
                     refusal_verdict,
+                    reviewer_slot,
                     severity,
                     _json(sorted(set(error_categories))),
                     notes.strip(),
@@ -537,7 +715,8 @@ def review_export_rows(
         rows = connection.execute(
             """
             SELECT i.*, r.review_id, r.reviewer, r.question_verdict,
-                   r.evidence_verdict, r.answer_verdict, r.refusal_verdict,
+                   r.evidence_verdict, r.answer_verdict, r.citation_verdict,
+                   r.completeness_verdict, r.refusal_verdict, r.reviewer_slot,
                    r.severity, r.error_categories_json, r.notes,
                    r.item_content_hash, r.reviewed_at
             FROM review_items i
@@ -556,3 +735,38 @@ def review_export_rows(
             else "reviewed"
         )
     return decoded
+
+
+def benchmark_reviews_from_database(
+    comparison_run_id: str,
+    database_path: Path = DEFAULT_DATABASE_PATH,
+) -> list[dict[str, object]]:
+    """Build the de-identified scoring rows consumed by benchmark aggregation."""
+    rows = review_export_rows(database_path)
+    result = []
+    for row in rows:
+        if (
+            row.get("item_type") != "benchmark_answer"
+            or row.get("evaluation_run_id") != comparison_run_id
+            or row.get("review_status") != "reviewed"
+        ):
+            continue
+        metadata = dict(row.get("metadata", {}))
+        result.append(
+            {
+                "candidate_id": metadata["candidate_id"],
+                "reviewer_slot": row.get("reviewer_slot", "primary"),
+                "answer_verdict": row["answer_verdict"],
+                "evidence_verdict": row["evidence_verdict"],
+                "citation_verdict": row.get(
+                    "citation_verdict", "not_applicable"
+                ),
+                "completeness_verdict": row.get(
+                    "completeness_verdict", "not_applicable"
+                ),
+                "refusal_verdict": row["refusal_verdict"],
+                "severity": row["severity"],
+                "error_categories": list(row.get("error_categories", [])),
+            }
+        )
+    return result

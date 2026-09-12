@@ -1,6 +1,10 @@
 # ADC-Evidence
 
-ADC-Evidence 是一个面向 ADC 研发信息检索的入门级 AI 项目。当前版本已经完成阶段 0～8 的工程闭环：
+ADC-Evidence 是一个面向 ADC 研发信息核查的证据工作台。v0.6.0 研究实现已在
+`v0.6.0-research-baseline` 标签冻结，正式对照评测和独立人工复核仍待完成。
+现有 120 题已用于后续开发调整，只能作为探索性评测或回归集；确认性结论需要新保留集。
+题集编码、测试集使用及自定义数据库绑定的更正见 [题集审计](docs/question_audit_2026-09-12.md)。
+已实现的数据、检索、问答和复核流程为：
 
 ```text
 公开数据源 -> 标准化 -> SQLite -> 文档切片 -> 混合检索 -> 引用约束生成 -> 拒答与评测 -> 人工复核 -> Bad Case -> Docker
@@ -37,8 +41,26 @@ ADC-Evidence 是一个面向 ADC 研发信息检索的入门级 AI 项目。当�
 - 将全部待审项目和人工结论导出为 JSONL、CSV 与 SHA-256 manifest；
 - 自动生成规则筛选与人工结论分离的 Bad Case JSON/Markdown 报告；
 - 提供轻量 Docker demo、可选完整 CPU 检索镜像、Compose 健康检查与 GitHub Actions CI。
+- 保存不可变来源快照、时间化原子事实、字段级证据、冲突状态和变化事件；
+- 提供互斥、逐来源重试、完整性/数量异常/缺失记录门禁的安全刷新命令；
+- 仅更新受影响检索文档和分块，并将向量索引绑定到确定性语料版本；
+- 在暂存环境通过门禁后生成发布清单，备份线上库并支持发布失败自动回滚。
+- 提供字段级可展开来源、时间、快照、审核状态和历史值的 ADC 证据卡；
+- 支持 2～10 个 ADC 的结构化比较、单元格证据以及版本化 CSV/Markdown 导出；
+- 提供最近 1/7/30 天变化中心，可按 ADC、靶点、来源和事件类型过滤；
+- 导出包含数据/模式/策略/语料版本、字段证据和免责声明的 Evidence Brief。
+- 在检索和模型调用前路由结构化事实、比较、变化、试验、文献和拒答任务；
+- 将回答拆为带主体、谓词、规范值和证据绑定的原子结论；
+- 对结构化值与字段证据执行确定性校验，对文献结论执行逐条文本支持校验；
+- 显式返回已回答项与未回答项；冲突、缺失或校验失败时部分回答或拒答。
 
 > 当前数据仅用于开发和界面演示，尚未经过系统文献审核，不能用于科研或临床决策。
+
+研究执行入口见 [冻结记录](docs/release_v0.6_research_baseline.md)和
+[研究协议](docs/research_protocol.md)。文档中的历史采集规模与旧版评测汇总不代表当前
+运行数据库：仅初始化公开种子会得到 10 个 ADC，正式评测前必须单独确认试验、文献、
+快照和历史数据是否存在，并冻结评测数据版本。
+无远程模型的同语料对照命令见 [离线对照协议](docs/offline_comparison.md)。
 
 ## 环境要求
 
@@ -90,6 +112,24 @@ python -m adc_evidence.ingestion.pipeline --skip-pubmed
 
 原始响应保存在 `data/raw/<run_id>/`，默认不提交 Git。数据库质量报告保存在 `data/processed/data_quality_report.json`。
 
+生产安全刷新应使用暂存、门禁、备份和索引版本绑定的一体化命令：
+
+```powershell
+python -m adc_evidence.refresh
+```
+
+该命令与参数、退出码、回滚语义见
+[`docs/v0.6_stage2_continuous_refresh.md`](docs/v0.6_stage2_continuous_refresh.md)。直接运行采集管线适合本地开发，
+不应替代生产发布流程。
+
+启动页面后，“ADC 证据卡”“ADC 比较”和“变化中心”三个标签页直接读取结构化事实与变化
+事件，不调用生成模型。阶段 3 的字段状态、导出结构和验收路径见
+[`docs/v0.6_stage3_evidence_workbench.md`](docs/v0.6_stage3_evidence_workbench.md)。
+
+“证据问答”会先选择结构化查询或文献检索路径。结构化字段不调用模型，文献生成结论必须
+逐条通过直接文本支持校验；完整协议与失败关闭范围见
+[`docs/v0.6_stage4_structured_answering.md`](docs/v0.6_stage4_structured_answering.md)。
+
 重新生成质量报告：
 
 ```powershell
@@ -130,9 +170,9 @@ python -m adc_evidence.rag.evaluate --modes sparse dense hybrid
 
 详细设计与指标说明见 `docs/retrieval_design.md` 和 `docs/retrieval_evaluation.md`。公开版保留汇总指标和方法说明；包含评审者标识、本机路径及运行元数据的原始人工复核快照不进入公开仓库。
 
-## 生成带引用回答
+## 结构化优先证据问答
 
-无需 API key 的离线演示：
+无需 API key 的结构化字段核查与离线文献演示：
 
 ```powershell
 python -m adc_evidence.generation.answer "T-DXd 的靶点、载荷和 DAR 是什么？" --backend extractive
@@ -225,4 +265,21 @@ python -m unittest discover -s tests -v
 
 ## 后续工作
 
-后续可为多字段修复补充重复采样与完整重评、增加第二复核者，并在多实例部署前将 SQLite 迁移至 PostgreSQL。
+阶段 5 已完成 120 题版本化题集、三组同窗协议、答案与原子结论盲评对象、第二复核与
+裁决规则、人工汇总、Bad Case 和回归候选生成。8 题开发集已用硅基流动
+`deepseek-ai/DeepSeek-V4-Flash` 与 Tavily 完成三组真实链路验证并进入盲评队列；120 题
+正式运行和人工复核尚未执行，因此当前不宣称本系统优于通用模型。完整流程与发布门禁见
+[阶段 5 说明](docs/v0.6_stage5_benchmark_review.md)。
+
+v0.6 将项目从带引用问答演示升级为 ADC 证据核查、比较和变化追踪工作台。阶段 0 已固定
+[产品范围](docs/v0.6_product_scope.md)、[数据与证据规范](docs/v0.6_data_spec.md)和
+[验收门禁](docs/v0.6_acceptance_plan.md)；机器可读来源与冲突策略位于
+configs/evidence_policy.json。阶段 1 已实现
+[时间化事实与历史数据层](docs/v0.6_stage1_data_layer.md)，在保持现有查询兼容的同时
+增加不可变来源快照、字段级事实、跨来源冲突和变化事件；阶段 2～4 已继续完成
+[安全持续刷新](docs/v0.6_stage2_continuous_refresh.md)、
+[证据工作台](docs/v0.6_stage3_evidence_workbench.md)和
+[结构化优先问答与结论验证](docs/v0.6_stage4_structured_answering.md)。
+[盲评、对照评测与回归闭环](docs/v0.6_stage5_benchmark_review.md)已把差异化优势转成可审计
+的人工作答正确性、证据支持、引用对应、完整性和拒答指标；结果只有在真实三组同窗运行并
+完成规定复核后才可发布。

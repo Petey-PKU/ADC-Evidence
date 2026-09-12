@@ -1,16 +1,33 @@
 from __future__ import annotations
 
+import re
 import time
+from pathlib import Path
 
 from adc_evidence.generation.citations import (
+    atomic_claim_lines,
     citation_sources,
     number_sources,
     validate_citations,
+    validate_text_support,
 )
 from adc_evidence.generation.generators import AnswerGenerator, create_generator
 from adc_evidence.generation.guards import EvidenceGuard
-from adc_evidence.generation.models import AnswerResult, CitationValidation
+from adc_evidence.generation.models import (
+    AnswerGap,
+    AnswerResult,
+    AtomicClaim,
+    CitationValidation,
+    ClaimValidationSummary,
+    QuestionPlan,
+)
+from adc_evidence.generation.structured import (
+    STRUCTURED_MODEL,
+    StructuredAnswerEngine,
+    route_question,
+)
 from adc_evidence.rag.retriever import HybridRetriever
+from adc_evidence.workbench import evidence_data_version
 
 
 REFUSAL_MESSAGES = {
@@ -22,8 +39,12 @@ REFUSAL_MESSAGES = {
     "no_retrieval_results": "当前数据库中没有检索到相关证据。",
     "low_retrieval_relevance": "检索结果相关性不足，无法可靠作答。",
     "specific_identifier_not_found": "问题中的特定药物或试验编号未在证据中出现。",
+    "topic_not_supported": "检索到的证据没有直接覆盖问题所问的具体结论。",
     "citation_validation_failed": "生成内容未通过引用完整性校验，因此不展示答案。",
+    "text_support_validation_failed": "生成结论没有被所引证据片段直接支持，因此不展示答案。",
     "model_refusal": "现有证据不足以直接支持该问题。",
+    "comparison_requires_two_known_adcs": "结构化比较需要识别至少两个已收录 ADC。",
+    "no_supported_entity_or_route": "未识别到已收录实体或受支持的核查任务。",
 }
 
 
@@ -59,10 +80,24 @@ class EvidenceAnsweringService:
         retriever: HybridRetriever | None = None,
         generator: AnswerGenerator | None = None,
         guard: EvidenceGuard | None = None,
+        database_path: Path | None = None,
     ) -> None:
-        self.retriever = retriever or HybridRetriever()
+        if retriever is None:
+            retriever = (
+                HybridRetriever(database_path=database_path)
+                if database_path is not None
+                else HybridRetriever()
+            )
+        elif database_path is not None and isinstance(retriever, HybridRetriever):
+            if retriever.database_path.resolve() != Path(database_path).resolve():
+                raise ValueError("Structured queries and retrieval must use the same database")
+        self.retriever = retriever
         self.generator = generator or create_generator("auto")
         self.guard = guard or EvidenceGuard()
+        self.database_path = database_path
+        self.structured = (
+            StructuredAnswerEngine(database_path) if database_path is not None else None
+        )
 
     def _refusal(
         self,
@@ -76,6 +111,11 @@ class EvidenceAnsweringService:
         model: str | None = None,
         usage: dict[str, int] | None = None,
         response_id: str | None = None,
+        route: str = "refusal",
+        route_reason: str | None = None,
+        claim_validation: ClaimValidationSummary | None = None,
+        unanswered: list[AnswerGap] | None = None,
+        data_version: dict[str, object] | None = None,
     ) -> AnswerResult:
         message = model_message or REFUSAL_MESSAGES.get(reason, "当前无法可靠回答。")
         return AnswerResult(
@@ -86,7 +126,12 @@ class EvidenceAnsweringService:
             generator_backend=self.generator.backend_name,
             model=model or self.generator.model_name,
             retrieval_mode=retrieval_mode,
+            route=route,
+            route_reason=route_reason,
             retrieved_source_count=retrieved_source_count,
+            claim_validation=claim_validation,
+            unanswered=unanswered or [],
+            data_version=data_version,
             usage=usage or {},
             response_id=response_id,
             latency_ms=round((time.perf_counter() - started_at) * 1000),
@@ -109,14 +154,67 @@ class EvidenceAnsweringService:
                 started_at,
             )
 
+        plan: QuestionPlan | None = None
+        version: dict[str, object] | None = None
+        if self.database_path is not None:
+            plan = route_question(self.database_path, question)
+            version = evidence_data_version(self.database_path)
+            if plan.route == "refusal":
+                return self._refusal(
+                    question,
+                    plan.reason,
+                    "none",
+                    started_at,
+                    route="refusal",
+                    route_reason=plan.reason,
+                    data_version=version,
+                )
+            if plan.route != "literature_evidence":
+                try:
+                    return self.structured.answer(
+                        question,
+                        plan,
+                        started_at=started_at,
+                    )
+                except Exception as exc:
+                    return AnswerResult(
+                        question=question,
+                        status="error",
+                        answer="结构化查询发生错误；系统没有退回自由生成。",
+                        refusal_reason=type(exc).__name__,
+                        generator_backend="structured",
+                        model=STRUCTURED_MODEL,
+                        retrieval_mode="structured",
+                        route=plan.route,
+                        route_reason=plan.reason,
+                        data_version=version,
+                        latency_ms=round((time.perf_counter() - started_at) * 1000),
+                    )
+
         try:
-            source_type = infer_source_type(question)
-            results = self.retriever.search(
-                question,
-                mode=retrieval_mode,
-                top_k=top_k,
-                source_type=source_type,
+            source_type = (
+                "pubmed"
+                if plan is not None and plan.route == "literature_evidence"
+                else infer_source_type(question)
             )
+            identifier_search = getattr(self.retriever, "identifier_search", None)
+            results = (
+                identifier_search(
+                    question,
+                    source_type=source_type,
+                    top_k=top_k,
+                )
+                if source_type in {"pubmed", "clinical_trial"}
+                and callable(identifier_search)
+                else []
+            )
+            if not results:
+                results = self.retriever.search(
+                    question,
+                    mode=retrieval_mode,
+                    top_k=top_k,
+                    source_type=source_type,
+                )
         except Exception as exc:
             return AnswerResult(
                 question=question,
@@ -126,6 +224,9 @@ class EvidenceAnsweringService:
                 generator_backend=self.generator.backend_name,
                 model=self.generator.model_name,
                 retrieval_mode=retrieval_mode,
+                route="literature_evidence",
+                route_reason=plan.reason if plan else "legacy_retrieval_route",
+                data_version=version,
                 latency_ms=round((time.perf_counter() - started_at) * 1000),
             )
 
@@ -137,6 +238,9 @@ class EvidenceAnsweringService:
                 retrieval_mode,
                 started_at,
                 retrieved_source_count=len(results),
+                route="literature_evidence",
+                route_reason=plan.reason if plan else "legacy_retrieval_route",
+                data_version=version,
             )
 
         sources = number_sources(results, max_sources=top_k)
@@ -151,7 +255,10 @@ class EvidenceAnsweringService:
                 generator_backend=self.generator.backend_name,
                 model=self.generator.model_name,
                 retrieval_mode=retrieval_mode,
+                route="literature_evidence",
+                route_reason=plan.reason if plan else "legacy_retrieval_route",
                 retrieved_source_count=len(results),
+                data_version=version,
                 latency_ms=round((time.perf_counter() - started_at) * 1000),
             )
 
@@ -168,6 +275,9 @@ class EvidenceAnsweringService:
                 model=generated.model,
                 usage=generated.usage,
                 response_id=generated.response_id,
+                route="literature_evidence",
+                route_reason=plan.reason if plan else "legacy_retrieval_route",
+                data_version=version,
             )
 
         validation = validate_citations(
@@ -184,21 +294,93 @@ class EvidenceAnsweringService:
                 model=generated.model,
                 usage=generated.usage,
                 response_id=generated.response_id,
+                route="literature_evidence",
+                route_reason=plan.reason if plan else "legacy_retrieval_route",
+                data_version=version,
             )
             result.validation = validation
             return result
 
-        citations = citation_sources(sources, validation.cited_ids)
+        support_validation = validate_text_support(raw_answer, sources)
+        lines = atomic_claim_lines(raw_answer)
+        supported_lines: list[str] = []
+        claims: list[AtomicClaim] = []
+        unanswered: list[AnswerGap] = []
+        supported_citation_ids: list[str] = []
+        source_by_id = {source.citation_id: source for source in sources}
+        for line, check in zip(lines, support_validation.claims, strict=True):
+            if not check.supported:
+                unanswered.append(
+                    AnswerGap(
+                        item=f"生成结论 {check.claim_id}",
+                        reason="validation_failed",
+                        detail="所引片段未包含该结论的全部可核查要素。",
+                    )
+                )
+                continue
+            supported_lines.append(f"- {line}")
+            supported_citation_ids.extend(check.citation_ids)
+            first_source = source_by_id[check.citation_ids[0]]
+            claim_text = re.sub(r"\[[^\]]+\]", "", line).strip()
+            claims.append(
+                AtomicClaim(
+                    claim_id=check.claim_id,
+                    text=claim_text,
+                    subject_type="publication",
+                    subject_id=first_source.result.source_record_id,
+                    predicate="publication.claim",
+                    value=claim_text,
+                    citation_ids=check.citation_ids,
+                    support_kind="text",
+                    validation_status="supported",
+                )
+            )
+
+        if not claims:
+            result = self._refusal(
+                question,
+                "text_support_validation_failed",
+                retrieval_mode,
+                started_at,
+                retrieved_source_count=len(results),
+                model=generated.model,
+                usage=generated.usage,
+                response_id=generated.response_id,
+                route="literature_evidence",
+                route_reason=plan.reason if plan else "legacy_retrieval_route",
+                claim_validation=support_validation,
+                unanswered=unanswered,
+                data_version=version,
+            )
+            result.validation = validation
+            return result
+
+        if unanswered:
+            supported_lines.extend(
+                ["", "未回答："]
+                + [f"- {gap.item}：{gap.detail}" for gap in unanswered]
+            )
+        citations = citation_sources(
+            sources,
+            list(dict.fromkeys(supported_citation_ids)),
+        )
         return AnswerResult(
             question=question,
-            status="answered",
-            answer=raw_answer,
+            status="partial" if unanswered else "answered",
+            answer="\n".join(supported_lines),
+            refusal_reason="partial_evidence" if unanswered else None,
             generator_backend=generated.backend,
             model=generated.model,
             retrieval_mode=retrieval_mode,
+            route="literature_evidence",
+            route_reason=plan.reason if plan else "legacy_retrieval_route",
             retrieved_source_count=len(results),
             citations=citations,
             validation=validation,
+            claim_validation=support_validation,
+            claims=claims,
+            unanswered=unanswered,
+            data_version=version,
             usage=generated.usage,
             response_id=generated.response_id,
             latency_ms=round((time.perf_counter() - started_at) * 1000),
