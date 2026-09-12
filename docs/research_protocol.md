@@ -206,7 +206,7 @@ python scripts/audit_paper_readiness.py --output readiness.json
 
 默认结果会因缺少独立保留集和真实人工标签而返回 `not_ready_for_submission`；
 这两个阻塞项必须由项目外部产生的证据解除，代码不会用自动指标代替它们。
-独立保留集 manifest 还必须包含题集版本、`sha256:` 题集哈希、正整数题数、评测窗口、
+独立保留集 manifest 还必须包含题集版本、`sha256:` 题集哈希、题号哈希、原始文件哈希、正整数题数、评测窗口、
 `access_controlled: true`，以及 `evaluation_use.status: unseen_holdout`。
 
 若评测环境能够提供题集文件给审计程序，manifest 还应记录

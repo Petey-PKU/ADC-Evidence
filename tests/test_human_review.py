@@ -84,6 +84,7 @@ class HumanReviewTests(unittest.TestCase):
             "question_set_version": "v1",
             "question_set_hash": "sha256:" + "a" * 64,
             "question_id_sha256": "sha256:" + "b" * 64,
+            "question_file_sha256": "sha256:" + "c" * 64,
             "question_count": 40,
             "evaluation_window_id": "window-1",
             "access_controlled": True,
@@ -96,6 +97,7 @@ class HumanReviewTests(unittest.TestCase):
         for field in (
             "question_set_hash",
             "question_id_sha256",
+            "question_file_sha256",
             "question_count",
             "evaluation_window_id",
         ):

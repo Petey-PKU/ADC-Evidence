@@ -53,6 +53,11 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
         r"sha256:[0-9a-f]{64}", question_ids_hash
     ):
         raise ValueError("Independent holdout question_id_sha256 must be sha256:<64 lowercase hex>")
+    question_file_hash = manifest.get("question_file_sha256")
+    if not isinstance(question_file_hash, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", question_file_hash
+    ):
+        raise ValueError("Independent holdout question_file_sha256 must be sha256:<64 lowercase hex>")
     for field in ("question_set_version", "evaluation_window_id"):
         if not isinstance(manifest.get(field), str) or not manifest[field].strip():
             raise ValueError(f"Independent holdout needs nonempty {field}")
