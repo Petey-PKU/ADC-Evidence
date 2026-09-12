@@ -28,6 +28,8 @@ from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.models import AnswerResult
 from adc_evidence.generation.service import EvidenceAnsweringService
 from adc_evidence.generation.structured import STRUCTURED_MODEL
+from adc_evidence.rag.retriever import HybridRetriever
+from adc_evidence.workbench import evidence_data_version
 
 
 BENCHMARK_SCHEMA_VERSION = "v0.6-benchmark-v1"
@@ -35,7 +37,9 @@ QUESTION_SET_VERSION = "v0.6-120q-2026-08-21"
 PROMPT_VERSION = "v0.6-comparison-prompt-v1"
 IMPLEMENTATION_VERSION = STRUCTURED_MODEL
 FROZEN_IMPLEMENTATION_VERSION = "v0.6-structured-validator-v1"
-ARM_NAMES = ("direct_model", "web_model", "adc_evidence")
+OFFLINE_BASELINE_VERSION = "v0.6-rag-extractive-baseline-v1"
+ARM_NAMES = ("direct_model", "web_model", "adc_evidence", "offline_rag_baseline")
+COMPARISON_ARM_NAMES = ("direct_model", "web_model", "adc_evidence")
 CATEGORY_TARGETS = {
     "structured_fact": 25,
     "comparison": 20,
@@ -382,6 +386,49 @@ def run_adc_evidence_arm(
     return report
 
 
+def run_offline_rag_baseline(
+    *,
+    database_path: Path = DEFAULT_DATABASE_PATH,
+    questions: list[dict[str, object]] | None = None,
+    evaluation_window_id: str,
+    evaluated_at: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, object]:
+    """Run a same-corpus RAG baseline with structured routing disabled.
+
+    The baseline still uses the deterministic extractive generator, so this
+    comparison isolates the structured route and field-validation path without
+    introducing a remote model or a second corpus.
+    """
+    rows = questions or load_benchmark_questions()
+    manifest = question_set_manifest(rows)
+    service = EvidenceAnsweringService(
+        database_path=None,
+        retriever=HybridRetriever(database_path=database_path),
+        generator=ExtractiveGenerator(),
+    )
+    outputs = [_system_row(row, service.answer(str(row["question"]))) for row in rows]
+    report = {
+        "schema_version": BENCHMARK_SCHEMA_VERSION,
+        "run_id": run_id or f"offline-rag-{uuid4().hex[:12]}",
+        "question_set_version": QUESTION_SET_VERSION,
+        "question_set_hash": manifest["question_set_hash"],
+        "evaluation_use": manifest["evaluation_use"],
+        "evaluation_window_id": evaluation_window_id,
+        "evaluated_at": evaluated_at or datetime.now(UTC).isoformat(),
+        "arm": "offline_rag_baseline",
+        "model": OFFLINE_BASELINE_VERSION,
+        "network_enabled": False,
+        "prompt_version": PROMPT_VERSION,
+        "database_data_version": evidence_data_version(database_path),
+        "question_count": len(outputs),
+        "automatic_diagnostics": automatic_diagnostics(outputs, rows),
+        "questions": outputs,
+    }
+    validate_arm_report(report, rows)
+    return report
+
+
 def validate_arm_report(
     report: dict[str, object],
     questions: list[dict[str, object]],
@@ -492,7 +539,7 @@ def build_blinded_review_packet(
 ) -> tuple[dict[str, object], dict[str, object]]:
     rows = questions or load_benchmark_questions()
     reports = list(reports)
-    if {str(report.get("arm")) for report in reports} != set(ARM_NAMES):
+    if {str(report.get("arm")) for report in reports} != set(COMPARISON_ARM_NAMES):
         raise ValueError("Comparison requires direct_model, web_model and adc_evidence arms")
     for report in reports:
         validate_arm_report(report, rows)
@@ -513,7 +560,7 @@ def build_blinded_review_packet(
     for question in rows:
         question_id = str(question["question_id"])
         ordered_arms = sorted(
-            ARM_NAMES,
+            COMPARISON_ARM_NAMES,
             key=lambda arm: _digest(
                 {
                     "question_set_hash": next(iter(hashes)),
@@ -708,7 +755,7 @@ def aggregate_human_scores(
             ),
             "refusal_correctness": metric(by_arm.get(arm, []), "refusal_verdict"),
         }
-        for arm in ARM_NAMES
+        for arm in COMPARISON_ARM_NAMES
     }
     complete = (
         coverage["required_review_coverage"] == 1.0
@@ -900,6 +947,16 @@ def main() -> None:
     system_parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE_PATH)
     system_parser.add_argument("--output", type=Path, required=True)
     system_parser.add_argument("--scope", choices=("full", "dev-pilot"), default="full")
+    baseline_parser = subparsers.add_parser("run-offline-baseline")
+    baseline_parser.add_argument("--window-id", required=True)
+    baseline_parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE_PATH)
+    baseline_parser.add_argument("--output", type=Path, required=True)
+    baseline_parser.add_argument("--scope", choices=("full", "dev-pilot"), default="full")
+    compare_parser = subparsers.add_parser("compare-offline")
+    compare_parser.add_argument("--system-report", type=Path, required=True)
+    compare_parser.add_argument("--baseline-report", type=Path, required=True)
+    compare_parser.add_argument("--output", type=Path, required=True)
+    compare_parser.add_argument("--scope", choices=("full", "dev-pilot"), default="full")
     assemble_parser = subparsers.add_parser("assemble")
     assemble_parser.add_argument("--direct-report", type=Path, required=True)
     assemble_parser.add_argument("--web-report", type=Path, required=True)
@@ -974,6 +1031,22 @@ def main() -> None:
                 evaluation_window_id=args.window_id,
             ),
         )
+    elif args.command == "run-offline-baseline":
+        _write_json(
+            args.output,
+            run_offline_rag_baseline(
+                database_path=args.database,
+                questions=_questions_for_scope(args.scope),
+                evaluation_window_id=args.window_id,
+            ),
+        )
+    elif args.command == "compare-offline":
+        from adc_evidence.evaluation.offline_comparison import compare_offline_reports
+
+        questions = _questions_for_scope(args.scope)
+        system_report = json.loads(args.system_report.read_text(encoding="utf-8"))
+        baseline_report = json.loads(args.baseline_report.read_text(encoding="utf-8"))
+        _write_json(args.output, compare_offline_reports(system_report, baseline_report, questions))
     elif args.command == "assemble":
         reports = [
             json.loads(path.read_text(encoding="utf-8"))

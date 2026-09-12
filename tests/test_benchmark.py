@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from adc_evidence.config import BENCHMARK_REGRESSION_PATH
+from adc_evidence.database import initialize_database
 from adc_evidence.evaluation.benchmark import (
     CATEGORY_TARGETS,
     aggregate_human_scores,
@@ -17,6 +18,7 @@ from adc_evidence.evaluation.benchmark import (
     load_benchmark_questions,
     question_set_manifest,
     run_adc_evidence_arm,
+    run_offline_rag_baseline,
     select_dev_pilot_questions,
     validate_arm_report,
 )
@@ -27,6 +29,7 @@ from adc_evidence.generation.models import (
     CitationSource,
     CitationValidation,
 )
+from adc_evidence.rag.documents import build_retrieval_documents, chunk_documents, persist_retrieval_corpus
 from adc_evidence.review.repository import (
     benchmark_reviews_from_database,
     import_benchmark_review_packet,
@@ -138,6 +141,21 @@ def verdict(candidate_id: str, slot: str = "primary", **changes: object) -> dict
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_offline_baseline_uses_same_window_and_never_networks(self) -> None:
+        questions = small_questions()
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "baseline.db"
+            initialize_database(database_path, Path(__file__).resolve().parents[1] / "data" / "sample" / "adcs.csv")
+            documents = build_retrieval_documents(database_path)
+            persist_retrieval_corpus(database_path, documents, chunk_documents(documents))
+            report = run_offline_rag_baseline(
+                database_path=database_path, questions=questions, evaluation_window_id="window-1"
+            )
+        self.assertEqual(report["arm"], "offline_rag_baseline")
+        self.assertFalse(report["network_enabled"])
+        self.assertEqual(report["question_count"], 1)
+        self.assertEqual(report["evaluation_use"]["eligible_for_unseen_test_claim"], False)
+
     def test_frozen_question_set_has_exact_split_category_and_review_scope(self) -> None:
         questions = load_benchmark_questions()
         manifest = question_set_manifest(questions)
