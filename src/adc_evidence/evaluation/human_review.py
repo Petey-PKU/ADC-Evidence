@@ -9,6 +9,7 @@ become the correctness reference used in a paper.
 from __future__ import annotations
 
 import json
+import hashlib
 from collections import Counter
 from pathlib import Path
 from typing import Iterable
@@ -17,6 +18,12 @@ from adc_evidence.evaluation.statistics import paired_binary_summary
 
 
 HUMAN_REVIEW_ORIGINS = frozenset({"human_independent", "human_adjudicated"})
+
+
+def _question_id_binding(question_ids: Iterable[str]) -> str:
+    """Return a stable, content-free binding for the reviewed question set."""
+    canonical = "\n".join(sorted(question_ids))
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def load_human_paired_reviews(path: Path) -> list[dict[str, object]]:
@@ -80,6 +87,10 @@ def summarize_human_paired_reviews(
     )
     return {
         "schema_version": "v0.6-human-paired-review-v1",
+        "question_count": len(validated),
+        "question_id_sha256": _question_id_binding(
+            str(row["question_id"]) for row in validated
+        ),
         "review_origin_counts": dict(
             sorted(Counter(str(row["review_origin"]) for row in validated).items())
         ),
@@ -131,6 +142,7 @@ def summarize_inter_rater_agreement(
         (slots["primary"], slots["secondary"])
         for _, slots in sorted(by_question.items())
     ]
+    question_ids = sorted(by_question)
     labels = sorted({label for pair in pairs for label in pair})
     observed_agreement = sum(primary == secondary for primary, secondary in pairs) / len(pairs)
     primary_counts = Counter(primary for primary, _ in pairs)
@@ -147,6 +159,7 @@ def summarize_inter_rater_agreement(
         "schema_version": "v0.6-inter-rater-agreement-v1",
         "field": field,
         "question_count": len(pairs),
+        "question_id_sha256": _question_id_binding(question_ids),
         "observed_agreement_rate": round(observed_agreement, 6),
         "disagreement_count": sum(primary != secondary for primary, secondary in pairs),
         "cohens_kappa": round(kappa, 6),

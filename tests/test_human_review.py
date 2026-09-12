@@ -26,6 +26,8 @@ class HumanReviewTests(unittest.TestCase):
         second = summarize_human_paired_reviews(rows, bootstrap_iterations=200, seed=7)
         self.assertEqual(first, second)
         self.assertEqual(first["review_origin_counts"], {"human_adjudicated": 1, "human_independent": 1})
+        self.assertEqual(first["question_count"], 2)
+        self.assertTrue(str(first["question_id_sha256"]).startswith("sha256:"))
         self.assertTrue(first["human_review_required"])
 
     def test_ai_assisted_labels_are_rejected(self) -> None:
@@ -55,6 +57,7 @@ class HumanReviewTests(unittest.TestCase):
         self.assertEqual(summary["question_count"], 2)
         self.assertEqual(summary["observed_agreement_rate"], 0.5)
         self.assertEqual(summary["disagreement_count"], 1)
+        self.assertTrue(str(summary["question_id_sha256"]).startswith("sha256:"))
         self.assertNotIn("reviewer", " ".join(summary))
 
     def test_inter_rater_agreement_rejects_adjudicated_or_incomplete_pairs(self) -> None:
