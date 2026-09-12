@@ -216,3 +216,4 @@ python scripts/audit_paper_readiness.py --output readiness.json
 
 CI 还会扫描 Git 跟踪文件中的常见凭据、私钥块和本机路径模式；报告只包含文件与类别，不包含匹配值。
 公开 artifact 可用 `scripts/build_public_artifact_manifest.py` 生成，清单只记录 Git 提交、公开跟踪文件哈希和卫生审计结果，不包含文件内容、评审者身份或私有路径。
+CI 会从 `data/sample/adcs.csv` 生成未提交的 demo SQLite，再执行质量报告一致性测试；这一步不代表正式评测语料已经存在。
