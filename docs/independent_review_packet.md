@@ -1,0 +1,62 @@
+# 独立盲评执行包
+
+这份说明用于生成和复核正式投稿所需的人工证据。它不能把 AI 输出或同一人的
+两次评分伪装成独立复核。
+
+## 评审前
+
+1. 在开发完成后，单独冻结题集、数据库/语料版本、代码提交和评测窗口。
+2. 运行 `benchmark assemble` 生成盲评包和身份映射。盲评包交给评审者；身份映射
+   只由项目负责人保存，评审完成和分歧裁决前不得打开。
+3. 两名评审者分别使用 `primary` 和 `secondary` 槽位，各自完成预先指定的全部高风险题
+   和普通题抽样。评审者应先看问题、答案、引用和原始证据，再填写判断。
+
+## 每条答案的最低记录
+
+JSONL 每行至少包含：
+
+```json
+{"question_id":"q001","reviewer_slot":"primary","review_origin":"human_independent","answer_verdict":"correct","evidence_verdict":"supported","citation_verdict":"corresponding","completeness_verdict":"complete","refusal_verdict":"not_applicable","severity":"none","error_categories":[]}
+```
+
+`review_origin` 只有真实人员独立评分时填写 `human_independent`。裁决后的最终标签才填写
+`human_adjudicated`；`ai_assisted_primary`、`automatic` 或空值不能进入论文主结果。
+评审身份、自由文本备注和联系方式留在私有环境，不进入公开 JSONL。
+
+## 评审顺序
+
+- 先判断问题和 gold 是否有效；无效题应记录原因，不把它算作系统答对。
+- 再判断答案是否回答了所有必需信息、是否有误导性附加结论。
+- 逐条检查证据是否真的支持结论，引用是否对应来源，拒答是否合理。
+- 两人提交后才查看身份映射；分歧由预先指定的 adjudicator 裁决，并保留原始两份评分。
+
+## 统计与导出
+
+先计算双评一致性：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/summarize_inter_rater_agreement.py private_reviews.jsonl --output agreement.json
+```
+
+再导出去身份化的、已完成裁决的配对标签：
+
+```powershell
+python scripts/summarize_human_paired_reviews.py paired_labels.jsonl --output paired_summary.json
+python scripts/audit_paper_readiness.py `
+  --human-review-jsonl paired_labels.jsonl `
+  --independent-holdout-manifest holdout_manifest.json `
+  --independent-holdout-questions holdout_questions.jsonl `
+  --output readiness.json
+```
+
+题集文件应通过 manifest 的 `question_file_sha256` 和 `question_count` 绑定。审计通过前，
+不能把结果写成独立测试准确率、专家金标准或系统优越性。
+
+## 公开前检查
+
+- 公开仓库只保留去身份化汇总、方法、代码和有再分发许可的样例；
+- 删除 reviewer、备注、身份映射、原始 API 响应、密钥和本机路径；
+- 保存代码、数据库、语料、题集、prompt、评审导出和统计报告的 hash；
+- 同时报告全部题目、可回答题、拒答题、每个类别的分母和失败运行；
+- 若任一题未完成裁决或任一来源是 AI/自动标签，投稿审计必须保持阻塞。

@@ -117,6 +117,7 @@ between smoke diagnostics and confirmation results.
 - [ ] Independent holdout manifest and access-control record.
 - [ ] Independent holdout manifest bound to the frozen JSONL file hash and count.
 - [ ] Human review JSONL with accepted provenance values only.
+- [ ] Independent reviewers followed the blinded packet and submitted before identity reveal.
 - [ ] Double-review agreement and adjudication report.
 - [ ] Database, corpus, question, code, and prompt hashes.
 - [ ] Paired statistics JSON and analysis command.
