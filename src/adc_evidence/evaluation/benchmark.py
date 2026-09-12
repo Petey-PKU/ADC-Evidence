@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import re
+import unicodedata
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,12 +27,14 @@ from adc_evidence.config import (
 from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.models import AnswerResult
 from adc_evidence.generation.service import EvidenceAnsweringService
+from adc_evidence.generation.structured import STRUCTURED_MODEL
 
 
 BENCHMARK_SCHEMA_VERSION = "v0.6-benchmark-v1"
 QUESTION_SET_VERSION = "v0.6-120q-2026-08-21"
 PROMPT_VERSION = "v0.6-comparison-prompt-v1"
-IMPLEMENTATION_VERSION = "v0.6-structured-validator-v2"
+IMPLEMENTATION_VERSION = STRUCTURED_MODEL
+FROZEN_IMPLEMENTATION_VERSION = "v0.6-structured-validator-v1"
 ARM_NAMES = ("direct_model", "web_model", "adc_evidence")
 CATEGORY_TARGETS = {
     "structured_fact": 25,
@@ -59,6 +62,19 @@ def _read_jsonl(path: Path) -> list[dict[str, object]]:
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def validate_question_text(text: object) -> None:
+    """Reject damaged decoded text before it can enter an evaluation request."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Question text must be a nonempty string")
+    if any(
+        character in {"\ufffd", "\ufeff"}
+        or unicodedata.category(character) == "Cs"
+        or (unicodedata.category(character) == "Cc" and character not in "\t\r\n")
+        for character in text
+    ):
+        raise ValueError("Question text contains replacement, surrogate, or control characters")
 
 
 def _legacy_question(
@@ -151,6 +167,10 @@ def load_benchmark_questions(
     if category_counts != CATEGORY_TARGETS:
         raise ValueError(f"Unexpected benchmark category counts: {dict(category_counts)}")
     for row in rows:
+        try:
+            validate_question_text(row.get("question"))
+        except ValueError as exc:
+            raise ValueError(f"Invalid question text for {row['question_id']}: {exc}") from exc
         if row.get("expected_route") not in {
             "structured_fact",
             "comparison",
@@ -174,7 +194,13 @@ def question_set_manifest(
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "question_set_version": QUESTION_SET_VERSION,
         "frozen_at": "2026-08-21T00:00:00+08:00",
-        "implementation_frozen_after": IMPLEMENTATION_VERSION,
+        "implementation_frozen_after": FROZEN_IMPLEMENTATION_VERSION,
+        "current_implementation": IMPLEMENTATION_VERSION,
+        "evaluation_use": {
+            "status": "development_exposed",
+            "eligible_for_unseen_test_claim": False,
+            "reason": "Full-set diagnostics informed post-freeze implementation changes.",
+        },
         "question_set_hash": f"sha256:{_digest(rows)}",
         "question_count": len(rows),
         "split_counts": dict(sorted(Counter(row["split"] for row in rows).items())),
@@ -247,6 +273,7 @@ def build_external_arm_request(
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "arm": arm,
         "network_enabled": arm == "web_model",
@@ -281,6 +308,7 @@ def build_external_arm_report(
         "run_id": run_id or f"{arm}-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at,
         "arm": arm,
@@ -339,6 +367,7 @@ def run_adc_evidence_arm(
         "run_id": run_id or f"adc-evidence-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at or datetime.now(UTC).isoformat(),
         "arm": "adc_evidence",

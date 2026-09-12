@@ -5,6 +5,7 @@ import unittest
 from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from adc_evidence.database import connect
 from adc_evidence.facts import FactObservationSet, ObservedFactValue, record_fact_sets
@@ -16,7 +17,8 @@ from adc_evidence.generation.structured import (
     route_question,
     validate_structured_claim,
 )
-from adc_evidence.rag.retriever import SearchResult
+from adc_evidence.rag.documents import RetrievalDocument, chunk_documents, persist_retrieval_corpus
+from adc_evidence.rag.retriever import HybridRetriever, SearchResult
 from adc_evidence.workbench import sync_public_seed_facts
 
 
@@ -131,6 +133,36 @@ class StructuredAnsweringTests(unittest.TestCase):
             "change_query",
         )
 
+    def test_trial_comparators_do_not_trigger_adc_field_comparison(self) -> None:
+        for question in (
+            "T-DXd 对比化疗的 III 期试验注册号是什么？",
+            "比较 T-DXd 与 Trodelvy 的试验招募状态。",
+        ):
+            with self.subTest(question=question):
+                self.assertEqual(route_question(self.database, question).route, "trial_lookup")
+
+    def test_comparison_synonyms_preserve_requested_fields(self) -> None:
+        plan = route_question(self.database, "T-DXd 和 T-DM1 的载荷有何不同？")
+        self.assertEqual(plan.route, "comparison")
+        self.assertEqual(plan.predicates, ["adc.payload_name"])
+        self.assertEqual(set(plan.adc_ids), {"adc_001", "adc_002"})
+
+    def test_research_endpoints_never_return_default_adc_profile(self) -> None:
+        for question in (
+            "哪篇综述提到 T-DXd？",
+            "T-DXd 的客观缓解率是多少？",
+            "T-DM1 的最大耐受剂量是多少？",
+            "T-DXd 的 ORR 和 MTD 是多少？",
+        ):
+            with self.subTest(question=question):
+                service, retriever, generator = self._service(results=[])
+                result = service.answer(question)
+                self.assertEqual(result.route, "literature_evidence")
+                self.assertEqual(result.status, "refused")
+                self.assertEqual(result.claims, [])
+                self.assertEqual(retriever.call_count, 1)
+                self.assertEqual(generator.call_count, 0)
+
     def test_structured_fact_bypasses_retriever_and_generator(self) -> None:
         service, retriever, generator = self._service()
         result = service.answer("T-DXd 的靶点和 DAR 是多少？")
@@ -143,6 +175,38 @@ class StructuredAnsweringTests(unittest.TestCase):
         self.assertTrue(result.data_version["data_version"].startswith("data_"))
         self.assertEqual(retriever.call_count, 0)
         self.assertEqual(generator.call_count, 0)
+
+    def test_literature_uses_selected_database_instead_of_default_corpus(self) -> None:
+        decoy = self.database.with_name("decoy.db")
+        sync_public_seed_facts(decoy, observed_at="2026-08-01T00:00:00+00:00")
+        for database, identifier in ((self.database, "selected"), (decoy, "decoy")):
+            documents = [RetrievalDocument(
+                retrieval_document_id=f"pubmed:{identifier}", source_type="pubmed",
+                source_record_id=identifier, title="Synthetic T-DXd mechanism",
+                content="T-DXd isolationmarker mechanism: synthetic evidence for database selection.",
+                source_url=f"https://example.test/{identifier}", metadata={"adc_ids": ["adc_001"]},
+            )]
+            documents.extend(RetrievalDocument(
+                retrieval_document_id=f"pubmed:filler{i}", source_type="pubmed",
+                source_record_id=f"filler{i}", title="Unrelated synthetic record",
+                content="Unrelated synthetic record for retrieval testing.",
+                source_url="https://example.test/filler", metadata={},
+            ) for i in range(12))
+            persist_retrieval_corpus(database, documents, chunk_documents(documents))
+        with patch.object(HybridRetriever.__init__, "__defaults__", (decoy, decoy.parent / "index")):
+            service = EvidenceAnsweringService(database_path=self.database, generator=ExtractiveGenerator())
+            result = service.answer("T-DXd isolationmarker 机制文献？")
+        self.assertIn(result.status, {"answered", "partial"})
+        self.assertEqual({item.retrieval_document_id for item in result.citations}, {"pubmed:selected"})
+        self.assertTrue(all(item.source_url == "https://example.test/selected" for item in result.citations))
+
+    def test_explicit_retriever_cannot_mix_database_versions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "same database"):
+            EvidenceAnsweringService(
+                database_path=self.database,
+                retriever=HybridRetriever(self.database.with_name("other.db")),
+                generator=ExtractiveGenerator(),
+            )
 
     def test_missing_field_returns_explicit_partial_answer(self) -> None:
         service, _, _ = self._service()

@@ -21,7 +21,11 @@ from adc_evidence.generation.models import (
     ClaimValidationSummary,
     QuestionPlan,
 )
-from adc_evidence.generation.structured import StructuredAnswerEngine, route_question
+from adc_evidence.generation.structured import (
+    STRUCTURED_MODEL,
+    StructuredAnswerEngine,
+    route_question,
+)
 from adc_evidence.rag.retriever import HybridRetriever
 from adc_evidence.workbench import evidence_data_version
 
@@ -77,7 +81,16 @@ class EvidenceAnsweringService:
         guard: EvidenceGuard | None = None,
         database_path: Path | None = None,
     ) -> None:
-        self.retriever = retriever or HybridRetriever()
+        if retriever is None:
+            retriever = (
+                HybridRetriever(database_path=database_path)
+                if database_path is not None
+                else HybridRetriever()
+            )
+        elif database_path is not None and isinstance(retriever, HybridRetriever):
+            if retriever.database_path.resolve() != Path(database_path).resolve():
+                raise ValueError("Structured queries and retrieval must use the same database")
+        self.retriever = retriever
         self.generator = generator or create_generator("auto")
         self.guard = guard or EvidenceGuard()
         self.database_path = database_path
@@ -169,7 +182,7 @@ class EvidenceAnsweringService:
                         answer="结构化查询发生错误；系统没有退回自由生成。",
                         refusal_reason=type(exc).__name__,
                         generator_backend="structured",
-                        model="v0.6-structured-validator-v2",
+                        model=STRUCTURED_MODEL,
                         retrieval_mode="structured",
                         route=plan.route,
                         route_reason=plan.reason,

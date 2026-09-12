@@ -27,7 +27,7 @@ from adc_evidence.workbench import (
 )
 
 
-STRUCTURED_MODEL = "v0.6-structured-validator-v2"
+STRUCTURED_MODEL = "v0.6-structured-validator-v3"
 ADC_FIELD_LABELS = dict(ADC_FIELD_SPECS)
 DEFAULT_PROFILE_FIELDS = (
     "adc.target",
@@ -182,7 +182,8 @@ def route_question(database_path: Path, question: str) -> QuestionPlan:
     nct_ids = list(dict.fromkeys(re.findall(r"\bNCT\d{8}\b", question, re.I)))
     nct_ids = [item.upper() for item in nct_ids]
     comparison = any(
-        marker in lowered for marker in ("比较", "对比", "区别", "差异", " versus ", " vs ")
+        marker in lowered
+        for marker in ("比较", "对比", "区别", "差异", "不同", "异同", " versus ", " vs ")
     )
     change = any(
         marker in lowered
@@ -215,10 +216,16 @@ def route_question(database_path: Path, question: str) -> QuestionPlan:
             "释放",
             "研究",
             "提及",
+            "综述",
+            "提到",
+            "客观缓解率",
+            "最大耐受剂量",
         )
-    )
+    ) or bool(re.search(r"\b(?:orr|mtd)\b", lowered))
 
-    if comparison:
+    # A registry question can compare an ADC with chemotherapy or another ADC.
+    # It still asks for a trial record, rather than a comparison of ADC fields.
+    if comparison and not trial:
         if len(adc_ids) < 2:
             if literature:
                 return QuestionPlan(
