@@ -20,6 +20,7 @@ from adc_evidence.evaluation.benchmark import (
     validate_arm_report,
     validate_question_text,
 )
+from adc_evidence.evaluation.human_review import question_id_sha256
 
 
 def inspect_question_file(path: Path) -> dict[str, object]:
@@ -28,6 +29,7 @@ def inspect_question_file(path: Path) -> dict[str, object]:
         "file_name": path.name,
         "sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
         "hash_representation": "file_bytes",
+        "question_id_sha256": None,
         "valid": False,
         "row_count": 0,
         "issues": [],
@@ -67,6 +69,11 @@ def inspect_question_file(path: Path) -> dict[str, object]:
     if not result["row_count"]:
         issues.append({"reason": "empty_file"})
     result["valid"] = not issues
+    if ids and len(ids) == result["row_count"] and not any(
+        item.get("reason") in {"missing_question_id", "duplicate_question_id"}
+        for item in issues
+    ):
+        result["question_id_sha256"] = question_id_sha256(ids)
     return result
 
 
@@ -119,6 +126,7 @@ def audit_system_report(
         "model": report["model"],
         "evaluated_at": report["evaluated_at"],
         "question_set_hash": report["question_set_hash"],
+        "question_id_sha256": report["question_id_sha256"],
         "question_count": len(questions),
         "route_mismatch_count": sum(row["route_mismatch"] for row in mismatches),
         "by_split": by_split,
