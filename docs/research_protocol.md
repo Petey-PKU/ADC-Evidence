@@ -189,3 +189,13 @@ Cohen's κ；缺少第二评、使用人工仲裁标签或混入 AI 标签时会
 $env:PYTHONPATH="src"
 python scripts/summarize_inter_rater_agreement.py reviews.jsonl --output agreement.json
 ```
+
+投稿前可运行公开审计：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_paper_readiness.py --output readiness.json
+```
+
+默认结果会因缺少独立保留集和真实人工标签而返回 `not_ready_for_submission`；
+这两个阻塞项必须由项目外部产生的证据解除，代码不会用自动指标代替它们。

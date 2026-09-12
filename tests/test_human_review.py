@@ -4,6 +4,11 @@ from adc_evidence.evaluation.human_review import (
     summarize_human_paired_reviews,
     summarize_inter_rater_agreement,
 )
+from adc_evidence.evaluation.paper_readiness import audit_public_paper_readiness
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class HumanReviewTests(unittest.TestCase):
@@ -53,6 +58,15 @@ class HumanReviewTests(unittest.TestCase):
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_adjudicated", "answer_verdict": "correct"},
                 {"question_id": "q1", "reviewer_slot": "secondary", "review_origin": "human_independent", "answer_verdict": "correct"},
             ])
+
+    def test_paper_readiness_audit_fails_closed_without_confirmation_artifacts(self) -> None:
+        report = audit_public_paper_readiness(PROJECT_ROOT)
+        self.assertEqual(report["status"], "not_ready_for_submission")
+        self.assertEqual(report["blocker_count"], 2)
+        self.assertEqual(
+            {item["name"] for item in report["checks"] if item["status"] == "blocker"},
+            {"human_review_labels", "independent_holdout"},
+        )
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},
