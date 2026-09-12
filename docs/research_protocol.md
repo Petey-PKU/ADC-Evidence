@@ -205,3 +205,5 @@ python scripts/audit_paper_readiness.py --output readiness.json
 这两个阻塞项必须由项目外部产生的证据解除，代码不会用自动指标代替它们。
 独立保留集 manifest 还必须包含题集版本、`sha256:` 题集哈希、正整数题数、评测窗口、
 `access_controlled: true`，以及 `evaluation_use.status: unseen_holdout`。
+
+CI 还会扫描 Git 跟踪文件中的常见凭据、私钥块和本机路径模式；报告只包含文件与类别，不包含匹配值。
