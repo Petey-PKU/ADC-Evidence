@@ -54,7 +54,7 @@ def load_holdout_questions(path: Path) -> list[dict[str, object]]:
         if not row.get("expected_status"):
             raise ValueError(f"Missing expected status for {row.get('question_id')}")
         row.setdefault("split", "holdout")
-        row.setdefault("evaluation_use", "unseen_holdout")
+        row.setdefault("evaluation_use", "public_smoke_holdout")
     return rows
 
 
@@ -100,9 +100,13 @@ def holdout_manifest(questions: list[dict[str, object]]) -> dict[str, object]:
         "question_set_hash": f"sha256:{_digest(questions)}",
         "question_count": len(questions),
         "evaluation_use": {
-            "status": "unseen_holdout",
-            "eligible_for_unseen_test_claim": True,
-            "reason": "Public questions are separate from the exposed v0.6 benchmark files.",
+            "status": "public_smoke_holdout",
+            "eligible_for_unseen_test_claim": False,
+            "reason": (
+                "The questions are public and may have informed development; use them only "
+                "for reproducible smoke checks, not a confirmation claim."
+            ),
+            "confirmation_requires": "A separately frozen, access-controlled holdout with human review.",
         },
     }
 

@@ -19,13 +19,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class PublicHoldoutTests(unittest.TestCase):
-    def test_holdout_manifest_is_unseen_and_hashed(self) -> None:
+    def test_holdout_manifest_is_public_smoke_and_hashed(self) -> None:
         path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
         questions = load_holdout_questions(path)
         manifest = holdout_manifest(questions)
         self.assertEqual(manifest["question_set_version"], HOLDOUT_VERSION)
-        self.assertEqual(manifest["evaluation_use"]["status"], "unseen_holdout")
-        self.assertTrue(manifest["evaluation_use"]["eligible_for_unseen_test_claim"])
+        self.assertEqual(manifest["evaluation_use"]["status"], "public_smoke_holdout")
+        self.assertFalse(manifest["evaluation_use"]["eligible_for_unseen_test_claim"])
         self.assertTrue(str(manifest["question_set_hash"]).startswith("sha256:"))
 
     def test_holdout_rejects_duplicate_question_text(self) -> None:
@@ -58,7 +58,7 @@ class PublicHoldoutTests(unittest.TestCase):
                 evaluation_window_id="test-holdout",
             )
         self.assertEqual(report["question_count"], 20)
-        self.assertEqual(report["evaluation_use"]["status"], "unseen_holdout")
+        self.assertEqual(report["evaluation_use"]["status"], "public_smoke_holdout")
         self.assertEqual(set(report["arms"]), {"adc_evidence", "offline_rag_baseline"})
         for arm in report["arms"].values():
             self.assertFalse(arm["network_enabled"])
