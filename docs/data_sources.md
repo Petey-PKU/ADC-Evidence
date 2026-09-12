@@ -2,7 +2,9 @@
 
 以下采集数量来自 2026-08-19 的历史运行记录，不是当前数据库的实时统计。
 公开种子初始化只导入 ADC 演示档案；正式研究运行须检查实际数据库的覆盖、来源快照和
-历史观测，并记录新的数据版本。`data/processed/data_quality_report.json` 同样是历史汇总。
+历史观测，并记录新的数据版本。当前 `data/processed/data_quality_report.json` 与提交的
+公开 demo-seed 数据库一致；旧的采集规模保存在
+`data/processed/data_quality_report_historical_2026-08-20.json`，只能作为历史快照。
 
 ## ClinicalTrials.gov
 
