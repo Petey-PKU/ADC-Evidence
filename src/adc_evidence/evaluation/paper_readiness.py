@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from pathlib import Path
 
@@ -48,11 +49,41 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
     return manifest
 
 
+def validate_independent_holdout_file(
+    questions_path: Path, manifest: dict[str, object]
+) -> dict[str, object]:
+    """Bind an external JSONL question file to its manifest without exposing rows."""
+    raw = questions_path.read_bytes()
+    expected_hash = manifest.get("question_file_sha256")
+    if not isinstance(expected_hash, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", expected_hash
+    ):
+        raise ValueError("Independent holdout needs question_file_sha256 for file binding")
+    actual_hash = "sha256:" + hashlib.sha256(raw).hexdigest()
+    if actual_hash != expected_hash:
+        raise ValueError("Independent holdout question file hash mismatch")
+    rows = [
+        json.loads(line)
+        for line in raw.decode("utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    if len(rows) != manifest["question_count"]:
+        raise ValueError("Independent holdout question file count mismatch")
+    if any(not isinstance(row, dict) for row in rows):
+        raise ValueError("Independent holdout question file rows must be objects")
+    return {
+        "question_file_sha256": actual_hash,
+        "question_count": len(rows),
+        "path": questions_path.name,
+    }
+
+
 def audit_public_paper_readiness(
     repo_root: Path,
     *,
     human_review_jsonl: Path | None = None,
     independent_holdout_manifest: Path | None = None,
+    independent_holdout_questions: Path | None = None,
 ) -> dict[str, object]:
     """Audit public evidence and optional externally supplied confirmation artifacts.
 
@@ -115,11 +146,17 @@ def audit_public_paper_readiness(
         manifest = validate_independent_holdout_manifest(
             json.loads(independent_holdout_manifest.read_text(encoding="utf-8-sig"))
         )
+        binding_detail = "manifest declares an access-controlled holdout eligible for an unseen-test claim"
+        if independent_holdout_questions is not None:
+            bound = validate_independent_holdout_file(independent_holdout_questions, manifest)
+            binding_detail = (
+                f"manifest and question file hash/count validated ({bound['question_count']} questions)"
+            )
         checks.append(
             _check(
                 "independent_holdout",
                 "pass",
-                "manifest declares an access-controlled holdout eligible for an unseen-test claim",
+                binding_detail,
             )
         )
     blockers = [item for item in checks if item["status"] == "blocker"]

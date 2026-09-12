@@ -206,4 +206,9 @@ python scripts/audit_paper_readiness.py --output readiness.json
 独立保留集 manifest 还必须包含题集版本、`sha256:` 题集哈希、正整数题数、评测窗口、
 `access_controlled: true`，以及 `evaluation_use.status: unseen_holdout`。
 
+若评测环境能够提供题集文件给审计程序，manifest 还应记录
+`question_file_sha256`（原始 JSONL 字节哈希），并使用
+`--independent-holdout-questions` 绑定校验题数和文件哈希；仅有自报 manifest 时，报告只证明
+元数据格式正确，不证明题集文件未被替换。
+
 CI 还会扫描 Git 跟踪文件中的常见凭据、私钥块和本机路径模式；报告只包含文件与类别，不包含匹配值。

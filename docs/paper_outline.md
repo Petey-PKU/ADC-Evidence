@@ -115,6 +115,7 @@ between smoke diagnostics and confirmation results.
 ## 7. Reproducibility checklist
 
 - [ ] Independent holdout manifest and access-control record.
+- [ ] Independent holdout manifest bound to the frozen JSONL file hash and count.
 - [ ] Human review JSONL with accepted provenance values only.
 - [ ] Double-review agreement and adjudication report.
 - [ ] Database, corpus, question, code, and prompt hashes.

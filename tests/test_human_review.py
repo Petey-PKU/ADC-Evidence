@@ -1,4 +1,5 @@
 import unittest
+import hashlib
 
 from adc_evidence.evaluation.human_review import (
     summarize_human_paired_reviews,
@@ -6,6 +7,7 @@ from adc_evidence.evaluation.human_review import (
 )
 from adc_evidence.evaluation.paper_readiness import (
     audit_public_paper_readiness,
+    validate_independent_holdout_file,
     validate_independent_holdout_manifest,
 )
 from pathlib import Path
@@ -95,6 +97,18 @@ class HumanReviewTests(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 validate_independent_holdout_manifest(invalid)
+
+    def test_independent_holdout_file_binding_checks_hash_and_count(self) -> None:
+        questions_path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
+        manifest = {
+            "question_count": 20,
+            "question_file_sha256": "sha256:" + hashlib.sha256(questions_path.read_bytes()).hexdigest(),
+        }
+        bound = validate_independent_holdout_file(questions_path, manifest)
+        self.assertEqual(bound["question_count"], 20)
+        invalid = dict(manifest, question_file_sha256="sha256:" + "0" * 64)
+        with self.assertRaisesRegex(ValueError, "hash mismatch"):
+            validate_independent_holdout_file(questions_path, invalid)
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},
