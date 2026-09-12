@@ -55,6 +55,7 @@ class AnswerGap(BaseModel):
         "no_matching_record",
         "validation_failed",
         "unsupported_route",
+        "unsupported_requested_field",
     ]
     detail: str
 

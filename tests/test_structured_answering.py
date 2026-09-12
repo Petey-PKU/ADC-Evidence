@@ -163,6 +163,26 @@ class StructuredAnsweringTests(unittest.TestCase):
                 self.assertEqual(retriever.call_count, 1)
                 self.assertEqual(generator.call_count, 0)
 
+    def test_unsupported_fine_grained_fields_are_explicit_gaps(self) -> None:
+        cases = (
+            ("RC48 的抗体亚型和糖基化位点是什么？", {"抗体亚型", "糖基化位点"}),
+            ("SYD985 的 linker 具体断裂位点是什么？", {"连接子断裂位点"}),
+            ("SKB264 的全部知识产权归属能否从当前证据确定？", {"知识产权归属"}),
+        )
+        for question, expected in cases:
+            with self.subTest(question=question):
+                service, retriever, generator = self._service()
+                result = service.answer(question)
+                self.assertEqual(result.route, "structured_fact")
+                self.assertIn(result.status, {"partial", "refused"})
+                self.assertNotEqual(result.status, "error")
+                self.assertEqual({item.reason for item in result.unanswered}, {"unsupported_requested_field"})
+                self.assertEqual(
+                    {item.item.rsplit(" · ", 1)[1] for item in result.unanswered}, expected
+                )
+                self.assertEqual(retriever.call_count, 0)
+                self.assertEqual(generator.call_count, 0)
+
     def test_structured_fact_bypasses_retriever_and_generator(self) -> None:
         service, retriever, generator = self._service()
         result = service.answer("T-DXd 的靶点和 DAR 是多少？")

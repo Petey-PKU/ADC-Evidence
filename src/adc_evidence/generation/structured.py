@@ -27,8 +27,14 @@ from adc_evidence.workbench import (
 )
 
 
-STRUCTURED_MODEL = "v0.6-structured-validator-v3"
+STRUCTURED_MODEL = "v0.6-structured-validator-v4"
 ADC_FIELD_LABELS = dict(ADC_FIELD_SPECS)
+_UNSUPPORTED_FIELD_LABELS = {
+    "adc.antibody_subtype": "抗体亚型",
+    "adc.glycosylation_sites": "糖基化位点",
+    "adc.linker_cleavage_site": "连接子断裂位点",
+    "adc.intellectual_property": "知识产权归属",
+}
 DEFAULT_PROFILE_FIELDS = (
     "adc.target",
     "adc.payload_name",
@@ -121,6 +127,17 @@ def _resolve_adcs(database_path: Path, question: str) -> list[tuple[str, str]]:
 def _extract_adc_predicates(question: str) -> list[str]:
     lowered = _normalized(question)
     predicates: list[str] = []
+    unsupported_markers = (
+        ("adc.antibody_subtype", ("抗体亚型", "抗体同种型", "antibody subtype", "antibody isotype")),
+        ("adc.glycosylation_sites", ("糖基化位点", "glycosylation site")),
+        ("adc.linker_cleavage_site", ("断裂位点", "切割位点", "cleavage site")),
+        ("adc.intellectual_property", ("知识产权", "专利归属", "intellectual property", "patent ownership")),
+    )
+    requested_unsupported = [
+        predicate
+        for predicate, markers in unsupported_markers
+        if any(marker in lowered for marker in markers)
+    ]
     payload_class_requested = any(
         marker in lowered for marker in _ADC_FIELD_KEYWORDS[0][1]
     )
@@ -128,6 +145,12 @@ def _extract_adc_predicates(question: str) -> list[str]:
         marker in lowered for marker in _ADC_FIELD_KEYWORDS[2][1]
     )
     for predicate, markers in _ADC_FIELD_KEYWORDS:
+        if predicate == "adc.antibody" and "adc.antibody_subtype" in requested_unsupported:
+            if not any(marker in lowered for marker in ("抗体名称", "抗体名", "antibody name")):
+                continue
+        if predicate == "adc.linker_name" and "adc.linker_cleavage_site" in requested_unsupported:
+            if not any(marker in lowered for marker in ("连接子名称", "linker name")):
+                continue
         if predicate == "adc.payload_name" and payload_class_requested:
             specific = ("payload name", "载荷名称")
             if not any(marker in lowered for marker in specific):
@@ -138,7 +161,7 @@ def _extract_adc_predicates(question: str) -> list[str]:
                 continue
         if any(marker in lowered for marker in markers):
             predicates.append(predicate)
-    return predicates
+    return list(dict.fromkeys([*predicates, *requested_unsupported]))
 
 
 def _extract_trial_predicates(question: str) -> list[str]:
@@ -393,6 +416,8 @@ def _gap(field_label: str, reason: str) -> AnswerGap:
         detail = "存在未解决的来源冲突，系统不选择单一值。"
     elif reason == "validation_failed":
         detail = "结构化值或字段证据映射未通过校验。"
+    elif reason == "unsupported_requested_field":
+        detail = "当前结构化模式没有该属性的字段定义，系统不会用相近字段代答。"
     else:
         detail = "当前事实层没有该字段的直接证据。"
     return AnswerGap(item=field_label, reason=reason, detail=detail)
@@ -503,8 +528,14 @@ class StructuredAnswerEngine:
             )
             for predicate in plan.predicates:
                 field = card["field_map"].get(predicate)
-                label = f"{card['adc_name']} · {ADC_FIELD_LABELS.get(predicate, predicate)}"
-                if field is None or field["is_missing"]:
+                field_label = _UNSUPPORTED_FIELD_LABELS.get(
+                    predicate, ADC_FIELD_LABELS.get(predicate, predicate)
+                )
+                label = f"{card['adc_name']} · {field_label}"
+                if field is None:
+                    gaps.append(_gap(label, "unsupported_requested_field"))
+                    continue
+                if field["is_missing"]:
                     gaps.append(_gap(label, "missing_direct_evidence"))
                     continue
                 if field["is_conflicted"]:
