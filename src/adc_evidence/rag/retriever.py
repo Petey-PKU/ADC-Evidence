@@ -150,6 +150,47 @@ class HybridRetriever:
                 break
         return results
 
+    def identifier_search(
+        self,
+        query: str,
+        *,
+        source_type: str,
+        top_k: int = 10,
+    ) -> list[SearchResult]:
+        """Resolve explicit source identifiers before ranked retrieval.
+
+        An identifier supplied by the user is a stronger signal than lexical
+        relevance.  In particular, a PMID can be absent from the top-k result
+        when the query contains mostly Chinese prose, even though the exact
+        publication is present in the local corpus.
+        """
+        if source_type == "pubmed":
+            identifiers = list(dict.fromkeys(re.findall(r"\bPMID\s*:?[ \t]*(\d+)\b", query, re.I)))
+        elif source_type == "clinical_trial":
+            identifiers = list(dict.fromkeys(re.findall(r"\b(NCT\d{8})\b", query, re.I)))
+            identifiers = [item.upper() for item in identifiers]
+        else:
+            identifiers = []
+        if not identifiers:
+            return []
+        placeholders = ", ".join("?" for _ in identifiers)
+        with closing(connect(self.database_path)) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT chunk.*, document.source_type, document.source_record_id,
+                       document.source_url
+                FROM text_chunks AS chunk
+                JOIN retrieval_documents AS document
+                  ON document.retrieval_document_id = chunk.retrieval_document_id
+                WHERE document.source_type = ?
+                  AND document.source_record_id IN ({placeholders})
+                ORDER BY document.source_record_id, chunk.chunk_index
+                LIMIT ?
+                """,
+                [source_type, *identifiers, top_k],
+            ).fetchall()
+        return [self._row_to_result(row, 1.0, rank) for rank, row in enumerate(rows, 1)]
+
     def dense_search(
         self,
         query: str,

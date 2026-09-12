@@ -430,6 +430,30 @@ class StructuredAnsweringTests(unittest.TestCase):
         self.assertNotIn("FDA", result.answer)
         self.assertNotIn("肺癌", result.answer)
 
+    def test_explicit_pmid_is_resolved_before_ranked_retrieval(self) -> None:
+        source = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "chunk_id": "pubmed:34413126#chunk-000",
+                "retrieval_document_id": "pubmed:34413126",
+                "source_type": "pubmed",
+                "source_record_id": "34413126",
+                "title": "Dato-DXd preclinical activity",
+                "content": "PMID 34413126 Dato-DXd internalization, DXd release and antitumor activity.",
+            }
+        )
+        retriever = FakeRetriever([source])
+        retriever.identifier_search = lambda query, **kwargs: retriever.results
+        service = EvidenceAnsweringService(
+            database_path=self.database,
+            retriever=retriever,
+            generator=ExtractiveGenerator(),
+        )
+        result = service.answer("PMID 34413126 对 Dato-DXd 的直接摘要证据是什么？")
+
+        self.assertEqual(result.route, "literature_evidence")
+        self.assertNotEqual(result.refusal_reason, "specific_identifier_not_found")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -196,12 +196,24 @@ class EvidenceAnsweringService:
                 if plan is not None and plan.route == "literature_evidence"
                 else infer_source_type(question)
             )
-            results = self.retriever.search(
-                question,
-                mode=retrieval_mode,
-                top_k=top_k,
-                source_type=source_type,
+            identifier_search = getattr(self.retriever, "identifier_search", None)
+            results = (
+                identifier_search(
+                    question,
+                    source_type=source_type,
+                    top_k=top_k,
+                )
+                if source_type in {"pubmed", "clinical_trial"}
+                and callable(identifier_search)
+                else []
             )
+            if not results:
+                results = self.retriever.search(
+                    question,
+                    mode=retrieval_mode,
+                    top_k=top_k,
+                    source_type=source_type,
+                )
         except Exception as exc:
             return AnswerResult(
                 question=question,
