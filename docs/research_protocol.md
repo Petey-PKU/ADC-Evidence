@@ -154,3 +154,26 @@ sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da
 
 拟稿顺序：研究问题 → 方法与数据 → 评测协议 → 真实结果 → 消融与误差分析 → 局限。
 投稿类型在结果完成后选择；当前不承诺录用，不预填性能提升，不将工程冻结等同于生产发布。
+
+## 真实人工标签与配对统计
+
+论文中的正确性比较必须使用明确标注为 `human_independent` 或
+`human_adjudicated` 的逐题标签。公共代码中的
+`adc_evidence.evaluation.human_review.summarize_human_paired_reviews` 会检查
+每个 `question_id` 唯一、两组标签为布尔值，并拒绝 `ai_assisted_primary`、
+自动诊断或缺少来源的记录。它随后调用配对 bootstrap 区间和 McNemar 精确检验。
+
+JSONL 每行至少包含以下字段：
+
+```json
+{"question_id":"q001","review_origin":"human_independent","system_correct":true,"baseline_correct":false}
+```
+
+没有真实人工或人工仲裁标签时，只能报告自动诊断和 AI 辅助初审结果，不能将其写成论文的人工金标准。
+
+命令行入口为：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/summarize_human_paired_reviews.py reviews.jsonl --output summary.json
+```
