@@ -1,5 +1,6 @@
 import unittest
 import hashlib
+import json
 
 from adc_evidence.evaluation.human_review import (
     summarize_human_paired_reviews,
@@ -104,15 +105,26 @@ class HumanReviewTests(unittest.TestCase):
 
     def test_independent_holdout_file_binding_checks_hash_and_count(self) -> None:
         questions_path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
+        rows = [
+            json.loads(line)
+            for line in questions_path.read_text(encoding="utf-8-sig").splitlines()
+            if line.strip()
+        ]
+        canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         manifest = {
             "question_count": 20,
             "question_file_sha256": "sha256:" + hashlib.sha256(questions_path.read_bytes()).hexdigest(),
+            "question_set_hash": "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         }
         bound = validate_independent_holdout_file(questions_path, manifest)
         self.assertEqual(bound["question_count"], 20)
+        self.assertEqual(bound["question_set_hash"], manifest["question_set_hash"])
         invalid = dict(manifest, question_file_sha256="sha256:" + "0" * 64)
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             validate_independent_holdout_file(questions_path, invalid)
+        invalid_set = dict(manifest, question_set_hash="sha256:" + "0" * 64)
+        with self.assertRaisesRegex(ValueError, "question set hash mismatch"):
+            validate_independent_holdout_file(questions_path, invalid_set)
         with self.assertRaisesRegex(ValueError, "exactly one primary"):
             summarize_inter_rater_agreement([
                 {"question_id": "q1", "reviewer_slot": "primary", "review_origin": "human_independent", "answer_verdict": "correct"},

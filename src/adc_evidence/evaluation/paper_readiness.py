@@ -85,8 +85,14 @@ def validate_independent_holdout_file(
             validate_question_text(row.get("question"))
         except ValueError as exc:
             raise ValueError("Independent holdout contains invalid question text") from exc
+    canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    actual_question_set_hash = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    expected_question_set_hash = manifest.get("question_set_hash")
+    if expected_question_set_hash != actual_question_set_hash:
+        raise ValueError("Independent holdout question set hash mismatch")
     return {
         "question_file_sha256": actual_hash,
+        "question_set_hash": actual_question_set_hash,
         "question_count": len(rows),
         "path": questions_path.name,
     }
