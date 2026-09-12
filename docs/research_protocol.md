@@ -182,3 +182,10 @@ python scripts/summarize_human_paired_reviews.py reviews.jsonl --output summary.
 `human_independent` 标签。`summarize_inter_rater_agreement` 会输出逐题一致率和
 Cohen's κ；缺少第二评、使用人工仲裁标签或混入 AI 标签时会失败。只有完成裁决后，
 才能把最终标签用于主结果统计。
+
+命令行入口为：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/summarize_inter_rater_agreement.py reviews.jsonl --output agreement.json
+```
