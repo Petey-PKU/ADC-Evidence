@@ -95,6 +95,10 @@ labels, sensitivity analyses for partial answers, and all failed runs.
 Every table row must link to a report hash, review-origin audit, database
 version, and the exact analysis command.
 
+The readiness report also records warnings separately from blockers; a warning
+such as a runtime-generated demo database must not be presented as confirmation
+evidence.
+
 ## 5. Ablation and error analysis
 
 For each component, report a matched ablation with the same questions, corpus,

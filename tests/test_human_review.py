@@ -68,6 +68,7 @@ class HumanReviewTests(unittest.TestCase):
         report = audit_public_paper_readiness(PROJECT_ROOT)
         self.assertEqual(report["status"], "not_ready_for_submission")
         self.assertEqual(report["blocker_count"], 2)
+        self.assertEqual(report["warning_count"], 0)
         self.assertEqual(
             {item["name"] for item in report["checks"] if item["status"] == "blocker"},
             {"human_review_labels", "independent_holdout"},

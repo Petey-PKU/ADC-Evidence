@@ -221,10 +221,12 @@ def audit_public_paper_readiness(
             )
         )
     blockers = [item for item in checks if item["status"] == "blocker"]
+    warnings = [item for item in checks if item["status"] == "warning"]
     return {
         "schema_version": "v0.6-paper-readiness-audit-v1",
         "status": "not_ready_for_submission" if blockers else "evidence_ready_for_submission_review",
         "checks": checks,
         "blocker_count": len(blockers),
+        "warning_count": len(warnings),
         "next_actions": [item["detail"] for item in blockers],
     }
