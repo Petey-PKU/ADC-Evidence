@@ -35,6 +35,12 @@ class PublicHoldoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_holdout_disjoint(holdout, exposed)
 
+    def test_holdout_rejects_duplicate_question_id_even_with_changed_text(self) -> None:
+        holdout = [{"question_id": "shared", "question": "改写后的问题？"}]
+        exposed = [{"question_id": "shared", "question": "原始问题？"}]
+        with self.assertRaisesRegex(ValueError, "question IDs"):
+            validate_holdout_disjoint(holdout, exposed)
+
     def test_holdout_disjoint_check_returns_audit_record(self) -> None:
         result = validate_holdout_disjoint(
             [{"question_id": "h1", "question": "T-DXd 的 payload 是什么？"}],
@@ -42,6 +48,7 @@ class PublicHoldoutTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "disjoint")
         self.assertEqual(result["overlap_count"], 0)
+        self.assertEqual(result["question_id_overlap_count"], 0)
 
     def test_holdout_runs_both_local_arms_without_network(self) -> None:
         path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"

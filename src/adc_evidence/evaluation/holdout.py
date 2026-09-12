@@ -68,7 +68,16 @@ def validate_holdout_disjoint(
     holdout_questions: list[dict[str, object]],
     exposed_questions: list[dict[str, object]],
 ) -> dict[str, object]:
-    """Fail closed if holdout wording duplicates an exposed question."""
+    """Fail closed if holdout wording or identifiers overlap exposed questions."""
+    holdout_ids = {
+        str(row.get("question_id", "")) for row in holdout_questions if str(row.get("question_id", ""))
+    }
+    exposed_ids = {
+        str(row.get("question_id", "")) for row in exposed_questions if str(row.get("question_id", ""))
+    }
+    id_overlaps = sorted(holdout_ids & exposed_ids)
+    if id_overlaps:
+        raise ValueError(f"Holdout overlaps exposed question IDs: {id_overlaps}")
     exposed_by_text: dict[str, list[str]] = {}
     for row in exposed_questions:
         key = _normalized_question(row.get("question"))
@@ -91,6 +100,7 @@ def validate_holdout_disjoint(
         "holdout_question_count": len(holdout_questions),
         "exposed_question_count": len(exposed_questions),
         "overlap_count": 0,
+        "question_id_overlap_count": 0,
     }
 
 
