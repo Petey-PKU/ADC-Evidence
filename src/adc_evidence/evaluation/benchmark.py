@@ -28,6 +28,7 @@ from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.models import AnswerResult
 from adc_evidence.generation.service import EvidenceAnsweringService
 from adc_evidence.generation.structured import STRUCTURED_MODEL
+from adc_evidence.evaluation.human_review import question_id_sha256
 from adc_evidence.rag.retriever import HybridRetriever
 from adc_evidence.workbench import evidence_data_version
 
@@ -206,6 +207,7 @@ def question_set_manifest(
             "reason": "Full-set diagnostics informed post-freeze implementation changes.",
         },
         "question_set_hash": f"sha256:{_digest(rows)}",
+        "question_id_sha256": question_id_sha256(str(row["question_id"]) for row in rows),
         "question_count": len(rows),
         "split_counts": dict(sorted(Counter(row["split"] for row in rows).items())),
         "category_counts": dict(

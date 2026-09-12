@@ -27,6 +27,7 @@ class PublicHoldoutTests(unittest.TestCase):
         self.assertEqual(manifest["evaluation_use"]["status"], "public_smoke_holdout")
         self.assertFalse(manifest["evaluation_use"]["eligible_for_unseen_test_claim"])
         self.assertTrue(str(manifest["question_set_hash"]).startswith("sha256:"))
+        self.assertTrue(str(manifest["question_id_sha256"]).startswith("sha256:"))
 
     def test_holdout_rejects_duplicate_question_text(self) -> None:
         holdout = [{"question_id": "h1", "question": "T-DXd 的靶点是什么？"}]

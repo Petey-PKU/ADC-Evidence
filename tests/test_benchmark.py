@@ -166,6 +166,7 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(manifest["review_scope"]["double_review_question_count"], 45)
         self.assertEqual(manifest["review_scope"]["high_risk_double_review_count"], 20)
         self.assertTrue(str(manifest["question_set_hash"]).startswith("sha256:"))
+        self.assertTrue(str(manifest["question_id_sha256"]).startswith("sha256:"))
         self.assertEqual(
             manifest["question_set_hash"],
             "sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da",
