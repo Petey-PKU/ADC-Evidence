@@ -8,8 +8,8 @@
 - `siliconflow`：硅基流动的 OpenAI 兼容 Chat Completions 接口；
 - `openai`：OpenAI Responses API。
 
-首次真实模型测试推荐使用 `siliconflow` 和
-`deepseek-ai/DeepSeek-V4-Flash`。大模型只负责把检索出的证据组织成带
+当前研究优先使用 `extractive` 离线后端。若经批准使用远程模型，才选择
+`siliconflow` 和 `deepseek-ai/DeepSeek-V4-Flash`。大模型只负责把检索出的证据组织成带
 `[S1]` 等编号的回答；检索、证据截取、拒答前置检查和引用校验仍由项目代码完成。
 
 [硅基流动官方快速开始](https://docs.siliconflow.cn/en/userguide/quickstart)同样使用
