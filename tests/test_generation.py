@@ -221,6 +221,24 @@ class RoutingTests(unittest.TestCase):
         ):
             self.assertIsInstance(create_generator("auto"), ExtractiveGenerator)
 
+    def test_offline_only_ignores_api_keys_and_preference(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "ADC_OFFLINE_ONLY": "true",
+                "ADC_LLM_BACKEND": "openai",
+                "OPENAI_API_KEY": "test-key",
+                "SILICONFLOW_API_KEY": "test-key",
+            },
+            clear=True,
+        ):
+            self.assertIsInstance(create_generator("auto"), ExtractiveGenerator)
+
+    def test_offline_only_rejects_explicit_network_backend(self) -> None:
+        with patch.dict(os.environ, {"ADC_OFFLINE_ONLY": "1"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "ADC_OFFLINE_ONLY"):
+                create_generator("openai")
+
     def test_auto_backend_honors_siliconflow_preference(self) -> None:
         with patch.dict(
             os.environ,
