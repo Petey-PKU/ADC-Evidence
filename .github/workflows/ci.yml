@@ -35,6 +35,18 @@ jobs:
         run: python scripts/audit_public_hygiene.py --output /tmp/public_hygiene.json
       - name: Build public artifact manifest
         run: python scripts/build_public_artifact_manifest.py --output /tmp/public_artifact_manifest.json
+      - name: Validate reproducibility manifest metadata
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          manifest = json.loads(Path('/tmp/public_artifact_manifest.json').read_text())
+          assert manifest['code_commit'] == subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert manifest['package_version']
+          assert manifest['release_ref']
+          assert manifest['public_hygiene']['status'] == 'clean'
+          PY
       - name: Run tests
         run: python -m unittest discover -s tests -v
       - name: Validate public holdout separation
@@ -46,6 +58,19 @@ jobs:
           --questions data/annotations/v0.6_public_holdout_questions.jsonl
           --window-id ci-${{ matrix.python-version }}
           --output /tmp/public_holdout.json
+      - name: Validate public smoke holdout metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/public_holdout.json').read_text())
+          assert report['evaluation_use']['status'] == 'public_smoke_holdout'
+          assert report['evaluation_use']['eligible_for_unseen_test_claim'] is False
+          assert report['question_count'] == 20
+          assert report['question_set_hash'].startswith('sha256:')
+          assert report['question_id_sha256'].startswith('sha256:')
+          assert all(not arm['network_enabled'] for arm in report['arms'].values())
+          PY
       - name: Validate paper readiness remains fail-closed
         run: |
           set +e
