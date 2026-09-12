@@ -107,6 +107,23 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "specific_identifier_not_found")
 
+    def test_pmid_label_is_not_treated_as_a_second_identifier(self) -> None:
+        source = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "source_type": "pubmed",
+                "source_record_id": "34413126",
+                "retrieval_document_id": "pubmed:34413126",
+                "content": "Dato-DXd internalization and DXd release.",
+            }
+        )
+        decision = self.guard.check_evidence(
+            "PMID 34413126 的直接摘要证据是什么？",
+            [source],
+            "sparse",
+        )
+        self.assertTrue(decision.allowed)
+
     def test_precise_topic_without_evidence_is_refused(self) -> None:
         decision = self.guard.check_evidence(
             "文献摘要是否直接支持 Dato-DXd 具有旁观者效应？",
