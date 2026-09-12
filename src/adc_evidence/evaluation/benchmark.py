@@ -670,6 +670,12 @@ def _effective_reviews(
         slot = str(review.get("reviewer_slot"))
         if slot not in {"primary", "secondary", "adjudicator"}:
             raise ValueError("reviewer_slot must be primary, secondary or adjudicator")
+        origin = review.get("review_origin")
+        expected_origin = "human_adjudicated" if slot == "adjudicator" else "human_independent"
+        if origin != expected_origin:
+            raise ValueError(
+                f"{slot} reviews require review_origin={expected_origin!r}"
+            )
         reviews_by_candidate[str(review["candidate_id"])][slot] = review
     effective: dict[str, dict[str, object]] = {}
     required_count = 0

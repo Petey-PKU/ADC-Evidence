@@ -128,6 +128,7 @@ def verdict(candidate_id: str, slot: str = "primary", **changes: object) -> dict
     row: dict[str, object] = {
         "candidate_id": candidate_id,
         "reviewer_slot": slot,
+        "review_origin": "human_adjudicated" if slot == "adjudicator" else "human_independent",
         "answer_verdict": "correct",
         "evidence_verdict": "correct",
         "citation_verdict": "correct",
@@ -377,6 +378,19 @@ class BenchmarkTests(unittest.TestCase):
         reviews.append(verdict(candidate_a, "adjudicator", answer_verdict="partial"))
         summary = aggregate_human_scores(packet, identity, reviews)
         self.assertEqual(summary["status"], "complete")
+
+    def test_benchmark_aggregation_rejects_nonhuman_review_origin(self) -> None:
+        questions = small_questions()
+        packet, identity = build_blinded_review_packet(
+            reports(questions), questions=questions, run_id="cmp-1"
+        )
+        candidate_id = packet["questions"][0]["candidates"][0]["candidate_id"]
+        with self.assertRaisesRegex(ValueError, "human_independent"):
+            aggregate_human_scores(
+                packet,
+                identity,
+                [verdict(candidate_id, review_origin="ai_assisted_primary")],
+            )
 
     def test_human_bad_cases_and_regression_exclude_reviewer_identity(self) -> None:
         questions = small_questions()
