@@ -38,6 +38,12 @@ python -m adc_evidence.generation.answer "T-DXd 的靶点和载荷是什么？" 
 
 `partial` 是覆盖状态而非失败：它禁止把当前快照当作完整文献全集。长 PubMed 查询现在自动使用 POST；首轮结果缺少某个规范 ADC 时，会执行最多 50 条记录的精确名称补充。下一次完整抓取仍应重新生成数据库、索引、Benchmark、发布包及其哈希。
 
+字段级主来源复核包已生成 299 条（23 个 ADC × 13 个关键字段），状态为
+`awaiting_independent_primary_source_review`；JSONL SHA-256 为
+`sha256:ebe6e64cb0a105d61543933dcfb815c6ed783976c9f757462f9a70bc7f81f717`，manifest
+SHA-256 为 `sha256:6a1dfb9b24015743b17b32bd7adf31aa3419f71b7e49803be0a03e324ce7af33a`。
+包中不含评审身份，且明确拒绝把 AI 或自动标签计入论文主结果。
+
 本轮曾用每页 100 条、最多 140 页尝试扩大 ClinicalTrials.gov 覆盖。代理在读取分页响应时长时间无终止结果，人工中断；该次运行已在 SQLite 中标记为 `failed`，没有新试验写入，失败信息和参数保留在 `ingestion_runs`/`ingestion_source_runs`。因此当前发布包仍明确是 3,503 条试验的 `partial` 快照。
 
 ## GitHub 推送状态
