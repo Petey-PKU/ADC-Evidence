@@ -21,6 +21,7 @@ DEFAULT_DATABASE = ROOT / "data" / "processed" / "adc_public_2026-09-30.db"
 DEFAULT_INDEX = ROOT / "artifacts" / "vector_index" / "public_2026-09-30"
 DEFAULT_CATALOG = ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 DEFAULT_BENCHMARK = ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json"
+DEFAULT_BENCHMARK_QUESTIONS = ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
 DEFAULT_OUTPUT = ROOT / "artifacts" / "releases" / "adc-public-2026-09-30.zip"
 
 
@@ -57,10 +58,13 @@ def build_release_inventory(
     catalog: Path,
     benchmark_manifest: Path,
     as_of: str,
+    benchmark_questions: Path | None = None,
 ) -> tuple[list[tuple[Path, str]], dict[str, object]]:
     database = _require_file(database, "database")
     catalog = _require_file(catalog, "catalog")
     benchmark_manifest = _require_file(benchmark_manifest, "benchmark manifest")
+    if benchmark_questions is not None:
+        benchmark_questions = _require_file(benchmark_questions, "benchmark questions")
     index_path = index_path.resolve()
     if not index_path.is_dir():
         raise FileNotFoundError(f"index not found: {index_path}")
@@ -74,6 +78,8 @@ def build_release_inventory(
         (catalog, f"data/public/{catalog.name}"),
         (benchmark_manifest, f"data/annotations/{benchmark_manifest.name}"),
     ]
+    if benchmark_questions is not None:
+        files.append((benchmark_questions, f"data/annotations/{benchmark_questions.name}"))
     files.extend(
         (path, f"artifacts/vector_index/{index_path.name}/{path.relative_to(index_path).as_posix()}")
         for path in _index_files(index_path)
@@ -96,7 +102,7 @@ def _release_readme(as_of: str) -> str:
     return f"""# ADC-Evidence public release ({as_of})
 
 This archive contains a public SQLite snapshot, its matching retrieval index,
-the public ADC catalog, and the benchmark manifest. `RELEASE_MANIFEST.json`
+the public ADC catalog, the benchmark questions and manifest. `RELEASE_MANIFEST.json`
 binds every file to a SHA-256 checksum.
 
 After extracting at the repository root, configure:
@@ -121,12 +127,14 @@ def package_release(
     benchmark_manifest: Path,
     output: Path,
     as_of: str,
+    benchmark_questions: Path | None = None,
 ) -> dict[str, object]:
     files, inventory = build_release_inventory(
         database=database,
         index_path=index_path,
         catalog=catalog,
         benchmark_manifest=benchmark_manifest,
+        benchmark_questions=benchmark_questions,
         as_of=as_of,
     )
     output = output.resolve()
@@ -151,6 +159,7 @@ def main() -> None:
     parser.add_argument("--index-path", type=Path, default=DEFAULT_INDEX)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--benchmark-manifest", type=Path, default=DEFAULT_BENCHMARK)
+    parser.add_argument("--benchmark-questions", type=Path, default=DEFAULT_BENCHMARK_QUESTIONS)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--as-of", default="2026-09-30")
     args = parser.parse_args()
@@ -159,6 +168,7 @@ def main() -> None:
         index_path=args.index_path,
         catalog=args.catalog,
         benchmark_manifest=args.benchmark_manifest,
+        benchmark_questions=args.benchmark_questions,
         output=args.output,
         as_of=args.as_of,
     )
