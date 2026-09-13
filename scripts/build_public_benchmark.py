@@ -25,6 +25,12 @@ def _file_hash(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
+def _catalog_hash(path: Path) -> str:
+    """Hash catalog text independently of the checkout newline convention."""
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
 def _catalog_rows(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -325,7 +331,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
     validated = load_public_benchmark(args.output)
     manifest = benchmark_manifest(
         validated,
-        catalog_sha256=_file_hash(catalog),
+        catalog_sha256=_catalog_hash(catalog),
         database_data_version=evidence_data_version(database),
         requested_as_of=args.requested_as_of,
     )

@@ -115,6 +115,11 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _catalog_hash(path: Path) -> str:
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(content).hexdigest()
+
+
 def _catalog_summary(path: Path) -> dict[str, object]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -134,7 +139,7 @@ def _catalog_summary(path: Path) -> dict[str, object]:
         statuses[status] = statuses.get(status, 0) + 1
     return {
         "row_count": len(rows),
-        "catalog_sha256": f"sha256:{_sha256(path)}",
+        "catalog_sha256": f"sha256:{_catalog_hash(path)}",
         "status_counts": dict(sorted(statuses.items())),
         "adc_ids": ids,
     }

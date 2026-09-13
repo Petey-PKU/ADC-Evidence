@@ -15,6 +15,12 @@ def _sha256_bytes(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
 
 
+def _catalog_hash(path: Path) -> str:
+    """Hash catalog text independently of the checkout newline convention."""
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return _sha256_bytes(content)
+
+
 def validate_public_benchmark(
     questions_path: Path,
     manifest_path: Path,
@@ -47,7 +53,7 @@ def validate_public_benchmark(
         raise ValueError("category_counts does not match question file")
     catalog_hash = None
     if catalog_path is not None:
-        catalog_hash = _sha256_bytes(catalog_path.resolve().read_bytes())
+        catalog_hash = _catalog_hash(catalog_path.resolve())
         if manifest.get("catalog_sha256") != catalog_hash:
             raise ValueError("catalog_sha256 does not match catalog file")
     return {
