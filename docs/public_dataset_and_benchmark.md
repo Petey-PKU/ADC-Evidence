@@ -56,6 +56,8 @@ embedding 模型后重新构建。
 benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
+打包前还会逐条比较 SQLite 与目录中重叠的 ADC 字段；如果数据库仍是旧来源或旧值，打包会
+直接失败，避免发布包中的可查询数据库与目录清单不一致。
 
 公共仓库还提供手动触发的 `.github/workflows/public-release.yml`。在 GitHub Actions 中输入
 快照日期和抓取上限后，它会在干净的 Ubuntu runner 上重建数据库、hashing 索引和 benchmark，
