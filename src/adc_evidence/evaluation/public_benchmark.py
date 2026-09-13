@@ -119,6 +119,11 @@ def benchmark_manifest(
             "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
             "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI",
         },
+        "evidence_acceptance_policy": {
+            "literature_public_smoke": "Any listed directly linked PubMed candidate is accepted for the natural-language 'a relevant paper' questions.",
+            "candidate_cap_per_question": 50,
+            "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims.",
+        },
     }
 
 
@@ -202,7 +207,15 @@ def _answer_field_hit(gold: dict[str, object], output: dict[str, object]) -> flo
         return matched / len(fields)
     if kind == "evidence_document":
         document_id = str(standard.get("document_id", ""))
-        return float(any(_source_id_matches(item, document_id) for item in output.get("citation_source_record_ids", [])))
+        accepted = [document_id, *(
+            str(item) for item in gold.get("allowed_answers", [])
+            if isinstance(item, (str, int, float))
+        )]
+        return float(any(
+            _source_id_matches(item, candidate)
+            for item in output.get("citation_source_record_ids", [])
+            for candidate in accepted
+        ))
     if kind == "refusal":
         return float(output.get("status") == "refused")
     return 0.0

@@ -210,11 +210,19 @@ class EvidenceAnsweringService:
                 else []
             )
             if not results:
+                # When a literature question names one ADC, constrain both
+                # sparse and dense retrieval to documents linked to that
+                # entity. This prevents generic ADC papers from displacing
+                # directly relevant evidence in the fused top-k list.
+                adc_filter = None
+                if plan is not None and plan.route == "literature_evidence" and len(plan.adc_ids) == 1:
+                    adc_filter = plan.adc_ids[0]
                 results = self.retriever.search(
                     question,
                     mode=retrieval_mode,
                     top_k=top_k,
                     source_type=source_type,
+                    adc_id=adc_filter,
                 )
         except Exception as exc:
             return AnswerResult(

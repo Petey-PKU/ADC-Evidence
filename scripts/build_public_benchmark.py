@@ -205,18 +205,41 @@ def _build_rows(catalog: list[dict[str, str]], database: Path) -> list[dict[str,
             ], allow_partial=True, should_refuse=False, primary_metric="evidence_recall",
         ))
     seen_entities.clear()
+    documents_by_entity: dict[str, list[dict[str, object]]] = {}
     for document in document_rows:
-        entity_id = str(document["entity_id"])
+        documents_by_entity.setdefault(str(document["entity_id"]), []).append(document)
+    for entity_id, entity_documents in documents_by_entity.items():
         if entity_id in seen_entities or len(seen_entities) >= 12:
             continue
         seen_entities.add(entity_id)
+        catalog_row = by_id.get(entity_id, {})
+        names = [str(catalog_row.get("adc_name", "")), *str(catalog_row.get("aliases", "")).split(";")]
+        names = [name.casefold().strip() for name in names if name.strip()]
+
+        def relevance(document: dict[str, object]) -> tuple[int, int, str]:
+            title = str(document.get("title", "")).casefold()
+            abstract = str(document.get("abstract", "")).casefold()
+            title_hit = int(any(name in title for name in names))
+            abstract_hit = int(any(name in abstract for name in names))
+            # Prefer papers whose title names the ADC, then papers with an
+            # abstract-level name match. Keep the selection deterministic.
+            return (-title_hit, -abstract_hit, str(document.get("document_id", "")))
+
+        # Keep a generous accepted set because a natural-language query may
+        # validly retrieve any directly linked paper, while the public file
+        # still remains small enough for review and reproducibility.
+        candidates = sorted(entity_documents, key=relevance)[:50]
+        if not candidates:
+            continue
+        accepted_ids = [f"pubmed:{document['source_record_id']}" for document in candidates]
         rows.append(_base(
             f"pb_v1_literature_{len(seen_entities):02d}", split="public_smoke", category="literature_evidence",
             question=f"请给出一篇与 {by_id.get(entity_id, {}).get('adc_name', entity_id)} 直接相关的文献证据。",
             expected_route="literature_evidence", expected_status=["answered", "partial"],
-            standard_answer={"kind": "evidence_document", "document_id": document["document_id"], "title": document["title"]},
-            allowed_answers=[], evidence_sources=[
+            standard_answer={"kind": "evidence_document", "document_id": accepted_ids[0], "title": candidates[0]["title"]},
+            allowed_answers=accepted_ids[1:], evidence_sources=[
                 _source("pubmed", str(document["source_record_id"]), str(document["source_url"]), "abstract")
+                for document in candidates
             ], allow_partial=True, should_refuse=False, primary_metric="evidence_recall",
         ))
 

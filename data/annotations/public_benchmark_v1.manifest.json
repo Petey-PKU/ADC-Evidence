@@ -14,7 +14,7 @@
     "structured_fact": 44,
     "trial_lookup": 12
   },
-  "question_set_sha256": "sha256:ccb0bb58c673d888a6940be0d294223ba7b0feccfebbd3d7e28a70c25c908b11",
+  "question_set_sha256": "sha256:07b9657f6c5722d4e21d278e57c156353d0f0c2b7f569d21d8e040f8c9442602",
   "catalog_sha256": "sha256:c3396dccf5c73537c53deef2883a5d0ecbefe9e956e7620096689c6cf7185615",
   "database_data_version": {
     "data_version": "data_e9c47bd93c39e15d4e4ee63fa335e457ac96cfab95ea5d1660399c36b9b89a67",
@@ -55,6 +55,11 @@
     "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
     "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI"
   },
-  "question_file_sha256": "sha256:9ada5b2b05abba952be93e8ea3016c22b334052097b33340e2597a77455882af",
+  "evidence_acceptance_policy": {
+    "literature_public_smoke": "Any listed directly linked PubMed candidate is accepted for the natural-language 'a relevant paper' questions.",
+    "candidate_cap_per_question": 50,
+    "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims."
+  },
+  "question_file_sha256": "sha256:792360b93638e0b8b67e9ff26add8227ed53ed4a2ff345f9cca4bc8b055c8440",
   "question_provenance": "auto_derived_from_public_database_snapshot"
 }
