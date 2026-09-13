@@ -1,8 +1,8 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
 import sqlite3
-import tempfile
 import unittest
 from contextlib import closing
 from datetime import UTC, datetime
@@ -13,7 +13,7 @@ from adc_evidence.backup import backup_database, sha256_file
 
 class DatabaseBackupTests(unittest.TestCase):
     def test_backup_is_readable_and_has_matching_manifest(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             database = root / "source.db"
             with closing(sqlite3.connect(database)) as connection:
@@ -37,7 +37,7 @@ class DatabaseBackupTests(unittest.TestCase):
             self.assertEqual(manifest["database"], backup.name)
 
     def test_missing_database_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             with self.assertRaises(FileNotFoundError):
                 backup_database(root / "missing.db", root / "backups")

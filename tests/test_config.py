@@ -1,7 +1,7 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import os
-import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,7 +33,7 @@ class EnvironmentFlagTests(unittest.TestCase):
                 environment_flag("TEST_FLAG")
 
     def test_explicit_env_file_is_loaded_without_override(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
+        with WorkspaceTemporaryDirectory() as temporary:
             env_path = Path(temporary) / ".env"
             env_path.write_text("SECRET=value\n", encoding="utf-8")
             calls = []

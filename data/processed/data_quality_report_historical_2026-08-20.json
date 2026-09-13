@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-08-19T11:52:23+00:00",
+  "database_metrics": {
+    "adc_count": 10,
+    "document_count": 199,
+    "document_with_abstract_count": 190,
+    "trial_count": 833,
+    "source_record_count": 1044,
+    "entity_link_count": 2036,
+    "evidence_count": 2100,
+    "adcdb_linked_adc_count": 8,
+    "adcdb_unlinked_source_count": 2,
+    "trial_linked_adc_count": 10,
+    "document_linked_adc_count": 10,
+    "source_counts": {
+      "adcdb": 10,
+      "clinicaltrials": 834,
+      "pubmed": 200
+    },
+    "trial_status_counts": {
+      "RECRUITING": 322,
+      "ACTIVE_NOT_RECRUITING": 137,
+      "NOT_YET_RECRUITING": 127,
+      "COMPLETED": 117,
+      "UNKNOWN": 68,
+      "TERMINATED": 37,
+      "WITHDRAWN": 17,
+      "ENROLLING_BY_INVITATION": 5,
+      "APPROVED_FOR_MARKETING": 2,
+      "NO_LONGER_AVAILABLE": 1
+    },
+    "adcdb_unlinked_adc_names": [
+      "MRG002",
+      "SHR-A1921"
+    ],
+    "adc_missing_dar_names": [
+      "SHR-A1921"
+    ],
+    "abstract_coverage": 0.9548
+  },
+  "collection_scope": {
+    "clinicaltrials_total_matches": 833,
+    "clinicaltrials_stored": 833,
+    "clinicaltrials_coverage": 1.0,
+    "pubmed_total_matches": 2609,
+    "pubmed_stored": 199,
+    "pubmed_coverage": 0.0763
+  },
+  "report_scope": "historical_snapshot_2026-08-20"
+}

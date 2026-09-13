@@ -8,6 +8,7 @@ from adc_evidence.config import (
     DEFAULT_OPENAI_MODEL,
     DEFAULT_SILICONFLOW_BASE_URL,
     DEFAULT_SILICONFLOW_MODEL,
+    environment_flag,
     load_local_environment,
 )
 from adc_evidence.generation.citations import NumberedSource
@@ -287,6 +288,8 @@ def siliconflow_configured() -> bool:
 
 
 def configured_generation_backends() -> list[str]:
+    if offline_only_configured():
+        return ["extractive"]
     backends = ["extractive"]
     if siliconflow_configured():
         backends.append("siliconflow")
@@ -295,13 +298,25 @@ def configured_generation_backends() -> list[str]:
     return backends
 
 
+def offline_only_configured() -> bool:
+    """Return whether all generation must stay on the local deterministic path."""
+    load_local_environment()
+    return environment_flag("ADC_OFFLINE_ONLY", default=False)
+
+
 def create_generator(name: str = "auto") -> AnswerGenerator:
     load_local_environment()
     resolved = name.strip().lower()
+    offline_only = offline_only_configured()
+    if offline_only and resolved not in {"auto", "extractive"}:
+        raise RuntimeError(
+            "ADC_OFFLINE_ONLY is enabled; network model backends are disabled."
+        )
     if resolved == "auto":
-        preferred = os.getenv("ADC_LLM_BACKEND", "").strip().lower()
-        if preferred:
-            resolved = preferred
+        if offline_only:
+            resolved = "extractive"
+        elif os.getenv("ADC_LLM_BACKEND", "").strip().lower():
+            resolved = os.getenv("ADC_LLM_BACKEND", "").strip().lower()
         elif openai_configured():
             resolved = "openai"
         elif siliconflow_configured():

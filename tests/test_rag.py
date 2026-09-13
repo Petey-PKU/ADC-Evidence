@@ -1,7 +1,7 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import sqlite3
-import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
@@ -45,7 +45,7 @@ class ChunkingTests(unittest.TestCase):
 
 class RetrievalTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = WorkspaceTemporaryDirectory()
         self.database_path = Path(self.temp_dir.name) / "test.db"
         initialize_database(self.database_path, PROJECT_ROOT / "data" / "sample" / "adcs.csv")
         documents = build_retrieval_documents(self.database_path)

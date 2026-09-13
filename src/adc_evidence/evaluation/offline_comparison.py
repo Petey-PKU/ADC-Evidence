@@ -23,7 +23,12 @@ def compare_offline_reports(
         raise ValueError("system_report must be the adc_evidence arm")
     if baseline_report["arm"] != "offline_rag_baseline":
         raise ValueError("baseline_report must be the offline_rag_baseline arm")
-    for key in ("question_set_hash", "evaluation_window_id", "prompt_version"):
+    for key in (
+        "question_set_hash",
+        "question_id_sha256",
+        "evaluation_window_id",
+        "prompt_version",
+    ):
         if system_report.get(key) != baseline_report.get(key):
             raise ValueError(f"Offline reports disagree on {key}")
     system_data = system_report.get("database_data_version")
@@ -68,6 +73,7 @@ def compare_offline_reports(
         "system_model": IMPLEMENTATION_VERSION,
         "baseline_model": OFFLINE_BASELINE_VERSION,
         "question_set_hash": system_report["question_set_hash"],
+        "question_id_sha256": system_report["question_id_sha256"],
         "evaluation_window_id": system_report["evaluation_window_id"],
         "database_data_version": system_data,
         "question_count": len(questions),

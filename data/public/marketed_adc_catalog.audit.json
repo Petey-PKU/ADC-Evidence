@@ -1,0 +1,193 @@
+{
+  "schema_version": "public-adc-catalog-audit-v1",
+  "catalog_sha256": "sha256:c3396dccf5c73537c53deef2883a5d0ecbefe9e956e7620096689c6cf7185615",
+  "requested_as_of": "2026-09-30",
+  "row_count": 23,
+  "status_counts": {
+    "marketed": 22,
+    "withdrawn": 1
+  },
+  "required_field_count": 21,
+  "rows_with_missing_required_fields": 4,
+  "generic_source_url_count": 8,
+  "approval_after_requested_as_of_count": 0,
+  "verification_status_counts": {
+    "primary_check_pending": 23
+  },
+  "review_status": "needs_primary_source_review",
+  "manual_review_queue": [
+    {
+      "adc_id": "adc_001",
+      "adc_name": "Trastuzumab deruxtecan",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_002",
+      "adc_name": "Trastuzumab emtansine",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_003",
+      "adc_name": "Disitamab vedotin",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_004",
+      "adc_name": "Sacituzumab govitecan",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_005",
+      "adc_name": "Datopotamab deruxtecan",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_006",
+      "adc_name": "Sacituzumab tirumotecan",
+      "reasons": [
+        "missing_fields:dar",
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_007",
+      "adc_name": "Gemtuzumab ozogamicin",
+      "reasons": [
+        "missing_fields:dar",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_008",
+      "adc_name": "Brentuximab vedotin",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_009",
+      "adc_name": "Inotuzumab ozogamicin",
+      "reasons": [
+        "missing_fields:dar",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_010",
+      "adc_name": "Polatuzumab vedotin",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_011",
+      "adc_name": "Enfortumab vedotin",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_012",
+      "adc_name": "Loncastuximab tesirine",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_013",
+      "adc_name": "Tisotumab vedotin",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_014",
+      "adc_name": "Mirvetuximab soravtansine",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_015",
+      "adc_name": "Telisotuzumab vedotin",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_016",
+      "adc_name": "Trastuzumab rezetecan",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_017",
+      "adc_name": "Trastuzumab botidotin",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_018",
+      "adc_name": "Becotatug vedotin",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_019",
+      "adc_name": "Pivekimab sunirine",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_020",
+      "adc_name": "Izalontamab brengitecan",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_021",
+      "adc_name": "Cetuximab sarotalocan",
+      "reasons": [
+        "generic_source_url",
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_022",
+      "adc_name": "Belantamab mafodotin",
+      "reasons": [
+        "verification_status:primary_check_pending"
+      ]
+    },
+    {
+      "adc_id": "adc_023",
+      "adc_name": "Moxetumomab pasudotox",
+      "reasons": [
+        "missing_fields:linker_name,dar,dar_reported",
+        "verification_status:primary_check_pending"
+      ]
+    }
+  ]
+}

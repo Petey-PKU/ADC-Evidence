@@ -93,8 +93,9 @@ class GateDecision:
 
 
 class EvidenceGuard:
-    def __init__(self) -> None:
+    def __init__(self, *, enforce_topic_alignment: bool = True) -> None:
         self.normalizer = EntityNormalizer()
+        self.enforce_topic_alignment = enforce_topic_alignment
 
     def check_question(self, question: str) -> GateDecision:
         stripped = question.strip()
@@ -137,27 +138,31 @@ class EvidenceGuard:
                 for result in results
             )
         )
-        identifiers = re.findall(
-            r"\b(?:NCT\d{8}|[A-Za-z]{2,}[- ]?\d{2,}[A-Za-z0-9-]*)\b",
+        explicit_pmids = re.findall(r"\bPMID\s*:?[ \t]*(\d+)\b", question, re.I)
+        explicit_ncts = re.findall(r"\bNCT\d{8}\b", question, re.I)
+        generic_identifiers = re.findall(
+            r"\b(?!PMID\b)(?!NCT\d{8}\b)[A-Za-z]{2,}[- ]?\d{2,}[A-Za-z0-9-]*\b",
             question,
             flags=re.IGNORECASE,
         )
+        identifiers = [*explicit_pmids, *explicit_ncts, *generic_identifiers]
         for identifier in identifiers:
             normalized_identifier = normalize_text(identifier)
             if normalized_identifier and normalized_identifier not in combined:
                 return GateDecision(False, "specific_identifier_not_found")
-        lowered_question = unicodedata.normalize("NFKC", question).casefold()
-        lowered_evidence = unicodedata.normalize("NFKC", combined).casefold()
-        for trigger_group in TOPIC_EVIDENCE_REQUIREMENTS:
-            trigger = next(
-                (term for term in trigger_group[0] if term.casefold() in lowered_question),
-                None,
-            )
-            if trigger is None:
-                continue
-            if not any(
-                term.casefold() in lowered_evidence
-                for term in trigger_group[0]
-            ):
-                return GateDecision(False, "topic_not_supported")
+        if self.enforce_topic_alignment:
+            lowered_question = unicodedata.normalize("NFKC", question).casefold()
+            lowered_evidence = unicodedata.normalize("NFKC", combined).casefold()
+            for trigger_group in TOPIC_EVIDENCE_REQUIREMENTS:
+                trigger = next(
+                    (term for term in trigger_group[0] if term.casefold() in lowered_question),
+                    None,
+                )
+                if trigger is None:
+                    continue
+                if not any(
+                    term.casefold() in lowered_evidence
+                    for term in trigger_group[0]
+                ):
+                    return GateDecision(False, "topic_not_supported")
         return GateDecision(True)

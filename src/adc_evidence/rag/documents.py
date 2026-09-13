@@ -124,6 +124,15 @@ def _pubmed_documents(connection) -> list[RetrievalDocument]:
     documents: list[RetrievalDocument] = []
     for row in connection.execute("SELECT * FROM documents ORDER BY document_id"):
         entities = _linked_entities(connection, "document", str(row["document_id"]))
+        try:
+            topic_rows = connection.execute(
+                "SELECT topic FROM literature_topics WHERE document_id=? ORDER BY topic",
+                (row["document_id"],),
+            ).fetchall()
+            literature_topics = [str(item["topic"]) for item in topic_rows]
+        except Exception:
+            # Older/demo databases have no public topic table.
+            literature_topics = []
         title = _clean(row["title"])
         abstract = _clean(row["abstract"])
         content = "\n".join(
@@ -146,6 +155,7 @@ def _pubmed_documents(connection) -> list[RetrievalDocument]:
             "journal": row["journal"],
             "publication_date": row["publication_date"],
             "doi": row["doi"],
+            "literature_topics": literature_topics,
         }
         documents.append(
             RetrievalDocument(

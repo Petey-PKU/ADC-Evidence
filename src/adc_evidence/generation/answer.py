@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from adc_evidence.config import DEFAULT_DATABASE_PATH
@@ -9,6 +10,12 @@ from adc_evidence.generation.service import EvidenceAnsweringService
 
 
 def main() -> None:
+    # Windows consoles may default to GBK; answers and source excerpts contain
+    # Chinese text and symbols, so make the CLI safe for the public release.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
     parser = argparse.ArgumentParser(description="Generate a cited ADC-Evidence answer.")
     parser.add_argument("question")
     parser.add_argument(

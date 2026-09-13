@@ -12,7 +12,7 @@ from adc_evidence.models import ADCRecord
 
 FACTS_SCHEMA_VERSION = "0.6-facts-v1"
 SCHEMA_VERSION = "0.6-refresh-v1"
-REVIEW_SCHEMA_VERSION = "0.6-benchmark-review-v1"
+REVIEW_SCHEMA_VERSION = "0.6-benchmark-review-v2"
 SCHEMA_VERSIONS = (FACTS_SCHEMA_VERSION, SCHEMA_VERSION, REVIEW_SCHEMA_VERSION)
 
 
@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS expert_reviews (
     completeness_verdict TEXT NOT NULL DEFAULT 'not_applicable',
     refusal_verdict TEXT NOT NULL,
     reviewer_slot TEXT NOT NULL DEFAULT 'primary',
+    review_origin TEXT,
     severity TEXT NOT NULL,
     error_categories_json TEXT NOT NULL,
     notes TEXT NOT NULL,
@@ -430,6 +431,10 @@ def create_database(database_path: Path) -> None:
                 connection.execute(
                     "ALTER TABLE expert_reviews ADD COLUMN "
                     "reviewer_slot TEXT NOT NULL DEFAULT 'primary'"
+                )
+            if "review_origin" not in review_columns:
+                connection.execute(
+                    "ALTER TABLE expert_reviews ADD COLUMN review_origin TEXT"
                 )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_review_items_run "

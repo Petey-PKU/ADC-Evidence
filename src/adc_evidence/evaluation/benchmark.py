@@ -28,6 +28,7 @@ from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.models import AnswerResult
 from adc_evidence.generation.service import EvidenceAnsweringService
 from adc_evidence.generation.structured import STRUCTURED_MODEL
+from adc_evidence.evaluation.human_review import question_id_sha256
 from adc_evidence.rag.retriever import HybridRetriever
 from adc_evidence.workbench import evidence_data_version
 
@@ -58,6 +59,22 @@ def _canonical(value: object) -> str:
 
 def _digest(value: object) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _resolve_questions(questions: list[dict[str, object]] | None) -> list[dict[str, object]]:
+    """Resolve the default set while rejecting an explicit empty evaluation set."""
+    if questions is None:
+        rows = load_benchmark_questions()
+    else:
+        rows = questions
+    if not rows:
+        raise ValueError("Question set must not be empty")
+    question_ids = [str(row.get("question_id", "")) for row in rows]
+    if any(not question_id.strip() for question_id in question_ids):
+        raise ValueError("Question set needs nonempty question_id values")
+    if len(question_ids) != len(set(question_ids)):
+        raise ValueError("Question set needs unique question_id values")
+    return rows
 
 
 def _read_jsonl(path: Path) -> list[dict[str, object]]:
@@ -193,7 +210,7 @@ def load_benchmark_questions(
 def question_set_manifest(
     questions: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     return {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "question_set_version": QUESTION_SET_VERSION,
@@ -206,6 +223,7 @@ def question_set_manifest(
             "reason": "Full-set diagnostics informed post-freeze implementation changes.",
         },
         "question_set_hash": f"sha256:{_digest(rows)}",
+        "question_id_sha256": question_id_sha256(str(row["question_id"]) for row in rows),
         "question_count": len(rows),
         "split_counts": dict(sorted(Counter(row["split"] for row in rows).items())),
         "category_counts": dict(
@@ -266,7 +284,7 @@ def build_external_arm_request(
 ) -> dict[str, object]:
     if arm not in {"direct_model", "web_model"}:
         raise ValueError("External request arm must be direct_model or web_model")
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     manifest = question_set_manifest(rows)
     instruction = (
         "直接回答问题；不知道时明确说明，不得声称使用了未提供的外部来源。"
@@ -277,6 +295,7 @@ def build_external_arm_request(
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "arm": arm,
@@ -305,13 +324,14 @@ def build_external_arm_report(
     questions: list[dict[str, object]] | None = None,
     run_id: str | None = None,
 ) -> dict[str, object]:
-    expected = questions or load_benchmark_questions()
+    expected = _resolve_questions(questions)
     manifest = question_set_manifest(expected)
     report = {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "run_id": run_id or f"{arm}-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at,
@@ -357,7 +377,7 @@ def run_adc_evidence_arm(
     answerer: Callable[[str], AnswerResult] | None = None,
     run_id: str | None = None,
 ) -> dict[str, object]:
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     manifest = question_set_manifest(rows)
     if answerer is None:
         service = EvidenceAnsweringService(
@@ -371,6 +391,7 @@ def run_adc_evidence_arm(
         "run_id": run_id or f"adc-evidence-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at or datetime.now(UTC).isoformat(),
@@ -401,7 +422,7 @@ def run_offline_rag_baseline(
     comparison isolates the structured route and field-validation path without
     introducing a remote model or a second corpus.
     """
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     manifest = question_set_manifest(rows)
     service = EvidenceAnsweringService(
         database_path=None,
@@ -414,6 +435,7 @@ def run_offline_rag_baseline(
         "run_id": run_id or f"offline-rag-{uuid4().hex[:12]}",
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": manifest["question_set_hash"],
+        "question_id_sha256": manifest["question_id_sha256"],
         "evaluation_use": manifest["evaluation_use"],
         "evaluation_window_id": evaluation_window_id,
         "evaluated_at": evaluated_at or datetime.now(UTC).isoformat(),
@@ -442,6 +464,8 @@ def validate_arm_report(
     manifest = question_set_manifest(questions)
     if report.get("question_set_hash") != manifest["question_set_hash"]:
         raise ValueError("Arm report question set hash mismatch")
+    if report.get("question_id_sha256") != manifest["question_id_sha256"]:
+        raise ValueError("Arm report question ID binding mismatch")
     if not str(report.get("model", "")).strip():
         raise ValueError("Arm report must record model identity")
     if not str(report.get("evaluated_at", "")).strip():
@@ -538,7 +562,7 @@ def build_blinded_review_packet(
     questions: list[dict[str, object]] | None = None,
     run_id: str | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     reports = list(reports)
     if {str(report.get("arm")) for report in reports} != set(COMPARISON_ARM_NAMES):
         raise ValueError("Comparison requires direct_model, web_model and adc_evidence arms")
@@ -546,7 +570,8 @@ def build_blinded_review_packet(
         validate_arm_report(report, rows)
     windows = {str(report["evaluation_window_id"]) for report in reports}
     hashes = {str(report["question_set_hash"]) for report in reports}
-    if len(windows) != 1 or len(hashes) != 1:
+    id_hashes = {str(report["question_id_sha256"]) for report in reports}
+    if len(windows) != 1 or len(hashes) != 1 or len(id_hashes) != 1:
         raise ValueError("All comparison arms must use one evaluation window and question set")
     comparison_run_id = run_id or f"cmp-{uuid4().hex[:12]}"
     by_arm = {
@@ -613,6 +638,7 @@ def build_blinded_review_packet(
         "comparison_run_id": comparison_run_id,
         "evaluation_window_id": next(iter(windows)),
         "question_set_hash": next(iter(hashes)),
+        "question_id_sha256": next(iter(id_hashes)),
         "mapping": mapping_rows,
     }
     mapping_hash = f"sha256:{_digest(identity_map)}"
@@ -622,6 +648,7 @@ def build_blinded_review_packet(
         "evaluation_window_id": next(iter(windows)),
         "question_set_version": QUESTION_SET_VERSION,
         "question_set_hash": next(iter(hashes)),
+        "question_id_sha256": next(iter(id_hashes)),
         "blind_mapping_hash": mapping_hash,
         "blinded": True,
         "identity_disclosure_rule": "Reveal mapping only after answer and evidence verdicts are saved.",
@@ -639,7 +666,12 @@ def validate_blinded_pair(
     """Validate the separately stored blind packet and post-review identity map."""
     if packet.get("blinded") is not True:
         raise ValueError("Review packet must be marked as blinded")
-    for field in ("comparison_run_id", "evaluation_window_id", "question_set_hash"):
+    for field in (
+        "comparison_run_id",
+        "evaluation_window_id",
+        "question_set_hash",
+        "question_id_sha256",
+    ):
         if packet.get(field) != identity_map.get(field):
             raise ValueError(f"Blind packet and identity map disagree on {field}")
     if packet.get("blind_mapping_hash") != f"sha256:{_digest(identity_map)}":
@@ -670,6 +702,12 @@ def _effective_reviews(
         slot = str(review.get("reviewer_slot"))
         if slot not in {"primary", "secondary", "adjudicator"}:
             raise ValueError("reviewer_slot must be primary, secondary or adjudicator")
+        origin = review.get("review_origin")
+        expected_origin = "human_adjudicated" if slot == "adjudicator" else "human_independent"
+        if origin != expected_origin:
+            raise ValueError(
+                f"{slot} reviews require review_origin={expected_origin!r}"
+            )
         reviews_by_candidate[str(review["candidate_id"])][slot] = review
     effective: dict[str, dict[str, object]] = {}
     required_count = 0
@@ -856,7 +894,7 @@ def build_regression_candidates(
     questions: list[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     validate_blinded_pair(packet, identity_map)
-    rows = questions or load_benchmark_questions()
+    rows = _resolve_questions(questions)
     by_question = {str(row["question_id"]): row for row in rows}
     effective, _ = _effective_reviews(packet, list(reviews))
     identity = {

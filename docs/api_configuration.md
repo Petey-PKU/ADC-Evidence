@@ -8,8 +8,8 @@
 - `siliconflow`：硅基流动的 OpenAI 兼容 Chat Completions 接口；
 - `openai`：OpenAI Responses API。
 
-首次真实模型测试推荐使用 `siliconflow` 和
-`deepseek-ai/DeepSeek-V4-Flash`。大模型只负责把检索出的证据组织成带
+当前研究优先使用 `extractive` 离线后端。若经批准使用远程模型，才选择
+`siliconflow` 和 `deepseek-ai/DeepSeek-V4-Flash`。大模型只负责把检索出的证据组织成带
 `[S1]` 等编号的回答；检索、证据截取、拒答前置检查和引用校验仍由项目代码完成。
 
 [硅基流动官方快速开始](https://docs.siliconflow.cn/en/userguide/quickstart)同样使用
@@ -32,6 +32,7 @@ notepad .env
 
 ```text
 ADC_LLM_BACKEND=siliconflow
+ADC_OFFLINE_ONLY=false
 SILICONFLOW_API_KEY=在这里填写你的真实Key
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash
@@ -45,6 +46,7 @@ SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash
 - `.env.example` 只能保留空 Key，不能写入真实值；
 - `ADC_LLM_BACKEND` 只控制 `--backend auto` 的默认路由，命令行显式指定
   `--backend siliconflow` 时不依赖这一项。
+- `.env.example` 默认设置 `ADC_OFFLINE_ONLY=true`；只有明确批准远程模型实验时才改为 `false`。
 
 可以用下面的命令确认 `.env` 会被 Git 忽略；它不会打印 Key：
 
@@ -137,6 +139,7 @@ streamlit run src/adc_evidence/app.py
 
 ```text
 ADC_LLM_BACKEND=openai
+ADC_OFFLINE_ONLY=false
 OPENAI_API_KEY=在这里填写你的真实Key
 OPENAI_MODEL=gpt-5-mini
 ```

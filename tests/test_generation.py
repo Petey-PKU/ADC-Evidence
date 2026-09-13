@@ -107,6 +107,23 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "specific_identifier_not_found")
 
+    def test_pmid_label_is_not_treated_as_a_second_identifier(self) -> None:
+        source = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "source_type": "pubmed",
+                "source_record_id": "34413126",
+                "retrieval_document_id": "pubmed:34413126",
+                "content": "Dato-DXd internalization and DXd release.",
+            }
+        )
+        decision = self.guard.check_evidence(
+            "PMID 34413126 的直接摘要证据是什么？",
+            [source],
+            "sparse",
+        )
+        self.assertTrue(decision.allowed)
+
     def test_precise_topic_without_evidence_is_refused(self) -> None:
         decision = self.guard.check_evidence(
             "文献摘要是否直接支持 Dato-DXd 具有旁观者效应？",
@@ -203,6 +220,24 @@ class RoutingTests(unittest.TestCase):
             clear=True,
         ):
             self.assertIsInstance(create_generator("auto"), ExtractiveGenerator)
+
+    def test_offline_only_ignores_api_keys_and_preference(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "ADC_OFFLINE_ONLY": "true",
+                "ADC_LLM_BACKEND": "openai",
+                "OPENAI_API_KEY": "test-key",
+                "SILICONFLOW_API_KEY": "test-key",
+            },
+            clear=True,
+        ):
+            self.assertIsInstance(create_generator("auto"), ExtractiveGenerator)
+
+    def test_offline_only_rejects_explicit_network_backend(self) -> None:
+        with patch.dict(os.environ, {"ADC_OFFLINE_ONLY": "1"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "ADC_OFFLINE_ONLY"):
+                create_generator("openai")
 
     def test_auto_backend_honors_siliconflow_preference(self) -> None:
         with patch.dict(

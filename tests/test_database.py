@@ -1,4 +1,4 @@
-import tempfile
+from tests.support import WorkspaceTemporaryDirectory
 import unittest
 from pathlib import Path
 
@@ -30,7 +30,7 @@ class DatabaseTests(unittest.TestCase):
             )
 
     def test_initialize_and_search_by_alias(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             database_path = Path(temporary_directory) / "test.db"
             imported = initialize_database(database_path, DEFAULT_SEED_PATH)
 
@@ -40,7 +40,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(results[0]["adc_name"], "Trastuzumab deruxtecan")
 
     def test_initialize_is_idempotent(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             database_path = Path(temporary_directory) / "test.db"
             initialize_database(database_path, DEFAULT_SEED_PATH)
             initialize_database(database_path, DEFAULT_SEED_PATH)
@@ -50,7 +50,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(stats["target_count"], 2)
 
     def test_search_by_target_and_payload(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             database_path = Path(temporary_directory) / "test.db"
             initialize_database(database_path, DEFAULT_SEED_PATH)
 

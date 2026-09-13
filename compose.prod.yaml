@@ -13,6 +13,7 @@ services:
       PORT: "8501"
       ADC_BOOTSTRAP_EMBEDDING_BACKEND: hashing
       ADC_LLM_BACKEND: extractive
+      ADC_OFFLINE_ONLY: "true"
       ADC_PUBLIC_DEMO: "${ADC_PUBLIC_DEMO:-true}"
       ADC_GIT_SHA: "${ADC_GIT_SHA:-unknown}"
     volumes:

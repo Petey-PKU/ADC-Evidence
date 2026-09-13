@@ -4,6 +4,10 @@
 在完整题集已用于开发后更新，不能追溯声称对旧题集预注册。代码与题集冻结不等于数据、
 人工金标准或论文验证通过。当前不使用远程模型，下一轮确认性评测需要新的独立保留集。
 
+若研究运行不允许调用项目 API 模型，应在本地 `.env` 设置
+`ADC_OFFLINE_ONLY=true`。该开关会让 `auto` 始终选择确定性的本地抽取式生成器，
+并拒绝显式的 OpenAI/SiliconFlow 后端请求。
+
 题面文件未损坏；此前乱码来自终端显示。既有测试使用及自定义数据库绑定问题见
 [题集审计与更正](question_audit_2026-09-12.md)。现有三组流程保留作历史工程协议，
 不代表已获授权继续调用外部模型，也不代表正式三组实验已经完成。
@@ -71,10 +75,10 @@ sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da
 新保留集不能由重命名、重新划分或改写这些题目获得。
 
 本仓库新增的 `v0.6-public-holdout-20q-2026-09-13` 是公开工程保留集，题集哈希为
-`sha256:17da14f52f5a59d2d9d4842991380bf2a5ec7239a506ab933d66d93bc311f3dd`。它与上述
-120 题文件分离，运行器会记录 `unseen_holdout`，但它只覆盖公开样例数据库中的结构化、
+`sha256:987eef64df96fd1813f8f8abb65648bba78dc815658a9bde5b0e5f846ae08ffb`。它与上述
+120 题文件分离，运行器会记录 `public_smoke_holdout`，但它只覆盖公开样例数据库中的结构化、
 比较和拒答边界，不能代表真实 PubMed/临床试验领域的确认性结果。后续投稿主结果仍需
-更大、领域策划且经过来源核验的新保留集。
+更大、领域策划且经过来源核验的新保留集；公开题集不能支持确认性未见测试结论。
 
 ## 三组实际配置及解释范围
 
@@ -129,6 +133,9 @@ sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da
   不一致对很少时用精确形式，并对这两项主检验做 Holm 校正。
 - 差值置信区间以题目为配对重采样单位；结论数和多次采样不是新的独立问题。
   同一 ADC 的相关题目可能相关，增加按实体聚类的敏感性分析并说明实体数较少。
+
+公共统计模块 `holm_bonferroni_adjust` 对多项预先指定的 p 值执行顺序保持的 step-down
+校正；报告应同时保留原始 p 值和校正后 p 值。
 - 成本和延迟同时展示中位数、分位数及失败调用；没有计费凭据时只报告用量，估算与
   服务端实际值分列。不能把搜索 credits 估算当作服务端返回值。
 - 不以显著性替代效应量和实际用途。样本量目标以预期效应、题目相关性和评审能力设计，
@@ -154,3 +161,65 @@ sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da
 
 拟稿顺序：研究问题 → 方法与数据 → 评测协议 → 真实结果 → 消融与误差分析 → 局限。
 投稿类型在结果完成后选择；当前不承诺录用，不预填性能提升，不将工程冻结等同于生产发布。
+
+## 真实人工标签与配对统计
+
+论文中的正确性比较必须使用明确标注为 `human_independent` 或
+`human_adjudicated` 的逐题标签。公共代码中的
+`adc_evidence.evaluation.human_review.summarize_human_paired_reviews` 会检查
+每个 `question_id` 唯一、两组标签为布尔值，并拒绝 `ai_assisted_primary`、
+自动诊断或缺少来源的记录。它随后调用配对 bootstrap 区间和 McNemar 精确检验。
+
+JSONL 每行至少包含以下字段：
+
+```json
+{"question_id":"q001","review_origin":"human_independent","system_correct":true,"baseline_correct":false}
+```
+
+没有真实人工或人工仲裁标签时，只能报告自动诊断和 AI 辅助初审结果，不能将其写成论文的人工金标准。人工标签文件还必须配套无身份 manifest，绑定文件字节哈希、题号集合哈希、题数、版本和评测窗口；只提供 JSONL 而没有 manifest 时，投稿审计保持阻塞。
+
+命令行入口为：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/summarize_human_paired_reviews.py reviews.jsonl --output summary.json
+```
+
+双评题还应分别记录 `primary` 和 `secondary` 两个
+`human_independent` 标签。`summarize_inter_rater_agreement` 会输出逐题一致率和
+Cohen's κ；缺少第二评、使用人工仲裁标签或混入 AI 标签时会失败。只有完成裁决后，
+才能把最终标签用于主结果统计。
+
+命令行入口为：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/summarize_inter_rater_agreement.py reviews.jsonl --output agreement.json
+```
+
+投稿前可运行公开审计：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_paper_readiness.py --output readiness.json
+```
+
+若提供人工标签，应同时传入 `--human-review-jsonl` 和 `--human-review-manifest`；后者只能包含
+哈希、题数、版本和评测窗口等无身份元数据。
+可用 `scripts/build_human_review_manifest.py` 从已验证的人工 JSONL 自动生成该 manifest；脚本只输出哈希、题数和评测元数据，不输出标签内容或评审者身份。
+
+默认结果会因缺少独立保留集和真实人工标签而返回 `not_ready_for_submission`；
+这两个阻塞项必须由项目外部产生的证据解除，代码不会用自动指标代替它们。
+独立保留集 manifest 还必须包含题集版本、`sha256:` 题集哈希、题号哈希、原始文件哈希、正整数题数、评测窗口、
+`access_controlled: true`，以及 `evaluation_use.status: unseen_holdout`。
+
+若评测环境能够提供题集文件给审计程序，manifest 还应记录
+`question_file_sha256`（原始 JSONL 字节哈希），并使用
+`--independent-holdout-questions` 绑定校验题数和文件哈希；仅有自报 manifest 时，报告只证明
+元数据格式正确，不证明题集文件未被替换。
+
+CI 还会扫描 Git 跟踪文件中的常见凭据、私钥块和本机路径模式；报告只包含文件与类别，不包含匹配值。
+公开 artifact 可用 `scripts/build_public_artifact_manifest.py` 生成，清单记录包版本、Git 提交、可解析的发布引用、公开跟踪文件哈希和卫生审计结果，不包含文件内容、评审者身份或私有路径。包版本仍对应冻结的研究策略版本；Git 提交和发布引用用于定位具体实现快照。
+人工配对汇总、benchmark manifest 和 holdout manifest 都会输出 `question_count` 和不含题目内容的 `question_id_sha256`；此外 `question_set_hash` 仍绑定完整题目行。两种摘要都应与冻结题集对照，防止误用题集或只挑选部分标签。
+每个 benchmark arm 报告和盲评 packet 也必须携带并校验 `question_id_sha256`；任一 arm 的题号集合发生漂移时，比较流程会失败，而不会回退到默认题集。
+CI 会从 `data/sample/adcs.csv` 生成未提交的 demo SQLite，再执行质量报告一致性测试；这一步不代表正式评测语料已经存在。

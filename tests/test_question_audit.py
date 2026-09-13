@@ -1,8 +1,8 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import copy
 import json
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -18,7 +18,7 @@ from adc_evidence.generation.models import AnswerResult
 
 class QuestionFileAuditTests(unittest.TestCase):
     def _inspect(self, raw: bytes) -> dict[str, object]:
-        with tempfile.TemporaryDirectory() as directory:
+        with WorkspaceTemporaryDirectory() as directory:
             path = Path(directory) / "questions.jsonl"
             path.write_bytes(raw)
             return inspect_question_file(path)
@@ -28,6 +28,7 @@ class QuestionFileAuditTests(unittest.TestCase):
         result = self._inspect(raw)
         self.assertTrue(result["valid"])
         self.assertEqual(result["row_count"], 1)
+        self.assertTrue(str(result["question_id_sha256"]).startswith("sha256:"))
 
     def test_invalid_utf8_and_escaped_damage_are_rejected(self) -> None:
         bad_rows = [b'\xff', b'{invalid json}', b'[]', b'']
@@ -72,6 +73,7 @@ class SystemReportAuditTests(unittest.TestCase):
 
     def test_all_mismatches_include_legacy_dev_and_test_ids(self) -> None:
         audit = audit_system_report(self.report, self.questions)
+        self.assertEqual(audit["question_id_sha256"], self.report["question_id_sha256"])
         self.assertEqual(audit["route_mismatch_count"], 2)
         for split in ("dev", "test"):
             self.assertEqual(audit["by_split"][split]["route_mismatch_count"], 1)

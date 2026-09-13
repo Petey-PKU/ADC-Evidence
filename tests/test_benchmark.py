@@ -1,7 +1,7 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -128,6 +128,7 @@ def verdict(candidate_id: str, slot: str = "primary", **changes: object) -> dict
     row: dict[str, object] = {
         "candidate_id": candidate_id,
         "reviewer_slot": slot,
+        "review_origin": "human_adjudicated" if slot == "adjudicator" else "human_independent",
         "answer_verdict": "correct",
         "evidence_verdict": "correct",
         "citation_verdict": "correct",
@@ -143,7 +144,7 @@ def verdict(candidate_id: str, slot: str = "primary", **changes: object) -> dict
 class BenchmarkTests(unittest.TestCase):
     def test_offline_baseline_uses_same_window_and_never_networks(self) -> None:
         questions = small_questions()
-        with tempfile.TemporaryDirectory() as directory:
+        with WorkspaceTemporaryDirectory() as directory:
             database_path = Path(directory) / "baseline.db"
             initialize_database(database_path, Path(__file__).resolve().parents[1] / "data" / "sample" / "adcs.csv")
             documents = build_retrieval_documents(database_path)
@@ -165,10 +166,20 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(manifest["review_scope"]["double_review_question_count"], 45)
         self.assertEqual(manifest["review_scope"]["high_risk_double_review_count"], 20)
         self.assertTrue(str(manifest["question_set_hash"]).startswith("sha256:"))
+        self.assertTrue(str(manifest["question_id_sha256"]).startswith("sha256:"))
         self.assertEqual(
             manifest["question_set_hash"],
             "sha256:ec3bb920f6eaa953ee55b38d436e8279ffe576be83b420d1c03d09a46a91c2da",
         )
+
+    def test_explicit_empty_question_set_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            question_set_manifest([])
+
+    def test_explicit_duplicate_question_ids_are_rejected(self) -> None:
+        questions = small_questions()
+        with self.assertRaisesRegex(ValueError, "unique question_id"):
+            question_set_manifest([dict(questions[0]), dict(questions[0])])
 
     def test_public_regression_seed_is_deidentified_and_routable(self) -> None:
         rows = [
@@ -282,6 +293,13 @@ class BenchmarkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly one output"):
             validate_arm_report(report, questions)
 
+    def test_arm_validation_rejects_question_id_binding_drift(self) -> None:
+        questions = small_questions()
+        report = reports(questions)[0]
+        report["question_id_sha256"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(ValueError, "question ID binding"):
+            validate_arm_report(report, questions)
+
     def test_system_arm_records_claims_citations_and_data_version(self) -> None:
         questions = small_questions()
 
@@ -378,6 +396,19 @@ class BenchmarkTests(unittest.TestCase):
         summary = aggregate_human_scores(packet, identity, reviews)
         self.assertEqual(summary["status"], "complete")
 
+    def test_benchmark_aggregation_rejects_nonhuman_review_origin(self) -> None:
+        questions = small_questions()
+        packet, identity = build_blinded_review_packet(
+            reports(questions), questions=questions, run_id="cmp-1"
+        )
+        candidate_id = packet["questions"][0]["candidates"][0]["candidate_id"]
+        with self.assertRaisesRegex(ValueError, "human_independent"):
+            aggregate_human_scores(
+                packet,
+                identity,
+                [verdict(candidate_id, review_origin="ai_assisted_primary")],
+            )
+
     def test_human_bad_cases_and_regression_exclude_reviewer_identity(self) -> None:
         questions = small_questions()
         packet, identity = build_blinded_review_packet(
@@ -428,7 +459,7 @@ class BenchmarkTests(unittest.TestCase):
         packet, _ = build_blinded_review_packet(
             reports(questions), questions=questions, run_id="cmp-1"
         )
-        with tempfile.TemporaryDirectory() as temporary:
+        with WorkspaceTemporaryDirectory() as temporary:
             root = Path(temporary)
             packet_path = root / "packet.json"
             database_path = root / "review.db"

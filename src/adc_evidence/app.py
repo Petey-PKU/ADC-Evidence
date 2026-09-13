@@ -724,6 +724,15 @@ with review_tab:
         key="reviewer_slot",
         disabled=PUBLIC_DEMO,
     )
+    review_origin = (
+        "human_adjudicated"
+        if reviewer_slot == "adjudicator"
+        else "human_independent"
+    )
+    st.caption(
+        "来源记录："
+        + ("人工裁决" if review_origin == "human_adjudicated" else "独立人工复核")
+    )
     filter_columns = st.columns(3)
     item_type_label = filter_columns[0].selectbox(
         "复核对象",
@@ -1076,6 +1085,7 @@ with review_tab:
                 completeness_verdict=completeness_verdict,
                 refusal_verdict=refusal_verdict,
                 reviewer_slot=reviewer_slot,
+                review_origin=review_origin,
                 severity=severity,
                 error_categories=list(error_categories),
                 notes=notes,

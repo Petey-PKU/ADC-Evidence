@@ -1,0 +1,66 @@
+{
+  "schema_version": "public-adc-benchmark-v1",
+  "benchmark_id": "adc-public-benchmark-v1",
+  "requested_database_as_of": "2026-09-30",
+  "question_count": 98,
+  "split_counts": {
+    "dev": 54,
+    "public_smoke": 44
+  },
+  "category_counts": {
+    "comparison": 10,
+    "literature_evidence": 24,
+    "safety_refusal": 8,
+    "structured_fact": 44,
+    "trial_lookup": 12
+  },
+  "question_set_sha256": "sha256:d36c13e40ee0341437dc9743d3a564825ae8c82084d99fc54512b12d5d8dccef",
+  "catalog_sha256": "sha256:c3396dccf5c73537c53deef2883a5d0ecbefe9e956e7620096689c6cf7185615",
+  "database_data_version": {
+    "data_version": "data_cf0c057134e4440eff28353b5a1e6989d8a5c7a90e3af44b5978f1506cbf0cbe",
+    "schema_version": "0.6-refresh-v1",
+    "schema_versions": [
+      "0.6-benchmark-review-v2",
+      "0.6-facts-v1",
+      "0.6-refresh-v1"
+    ],
+    "policy_version": "0.6.0",
+    "latest_ingestion_run": {
+      "run_id": "20260913T030744Z",
+      "finished_at": "2026-09-13T03:08:45+00:00",
+      "status": "partial"
+    },
+    "retrieval_corpus_version": "corpus_c0c5d4adf458371bddf8cc75ac62c2f58fae5fa73da7e1b8c1b66f7646f5f16c"
+  },
+  "evaluation_use": {
+    "status": "development_exposed",
+    "eligible_for_unseen_test_claim": false,
+    "reason": "Questions and answers are distributed for reproducible development and smoke checks.",
+    "confirmation_requires": "A separately frozen access-controlled question set with independent human review."
+  },
+  "human_review": {
+    "status": "pending",
+    "required_roles": [
+      "primary_independent",
+      "secondary_independent",
+      "adjudicator_if_disagreement"
+    ],
+    "ai_assisted_review_counts_as": "not_independent_human_review"
+  },
+  "metrics": {
+    "route_accuracy": "expected_route == system.route",
+    "status_coverage": "system.status is in expected_status",
+    "answer_field_accuracy": "mean answer credit; fractional credit is used only when allow_partial=true",
+    "answer_exact_accuracy": "proportion of questions whose required answer fields are all correct",
+    "evidence_recall": "intersection(system cited source IDs, evidence_sources) is nonempty when evidence is required",
+    "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
+    "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI"
+  },
+  "evidence_acceptance_policy": {
+    "literature_public_smoke": "Any listed directly linked PubMed candidate is accepted for the natural-language 'a relevant paper' questions.",
+    "candidate_cap_per_question": 50,
+    "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims."
+  },
+  "question_file_sha256": "sha256:01b3d7940f3b47ad693a549930b54c83e0c5ef2439f82b023c24b79f7e5075aa",
+  "question_provenance": "auto_derived_from_public_database_snapshot"
+}

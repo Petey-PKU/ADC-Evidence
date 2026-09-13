@@ -8,7 +8,7 @@ from contextlib import closing
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from adc_evidence.config import DEFAULT_DATABASE_PATH, VECTOR_INDEX_PATH
+from adc_evidence.config import DEFAULT_DATABASE_PATH, DEFAULT_SEED_PATH, VECTOR_INDEX_PATH
 from adc_evidence.database import connect
 from adc_evidence.processing.normalize import EntityNormalizer
 from adc_evidence.rag.query_expansion import expand_query
@@ -44,13 +44,14 @@ class HybridRetriever:
         self,
         database_path: Path = DEFAULT_DATABASE_PATH,
         index_path: Path = VECTOR_INDEX_PATH,
+        seed_path: Path | None = None,
     ) -> None:
         self.database_path = Path(database_path)
         self.index_path = Path(index_path)
         self._vector_index = None
         self._embedder = None
         self._loaded_asset_signature: tuple[object, ...] | None = None
-        self._entity_normalizer = EntityNormalizer()
+        self._entity_normalizer = EntityNormalizer(seed_path=seed_path or DEFAULT_SEED_PATH)
 
     @property
     def dense_available(self) -> bool:
@@ -98,6 +99,7 @@ class HybridRetriever:
         top_k: int = 10,
         source_type: str | None = None,
         adc_id: str | None = None,
+        topic: str | None = None,
     ) -> list[SearchResult]:
         expression = _fts_expression(query)
         if not expression:
@@ -110,6 +112,9 @@ class HybridRetriever:
         if adc_id:
             filters.append("chunk.metadata_json LIKE ?")
             parameters.append(f'%"{adc_id}"%')
+        if topic:
+            filters.append("chunk.metadata_json LIKE ?")
+            parameters.append(f'%"literature_topics": [%"{topic}"%')
         candidate_limit = max(top_k * 10, 60)
         parameters.append(candidate_limit)
         sql = f"""
@@ -125,6 +130,12 @@ class HybridRetriever:
         """
         with closing(connect(self.database_path)) as connection:
             rows = connection.execute(sql, parameters).fetchall()
+        if not rows and topic:
+            # Keep older/demo indexes usable when they predate the public
+            # literature topic metadata table.
+            return self.sparse_search(
+                query, top_k=top_k, source_type=source_type, adc_id=adc_id, topic=None
+            )
         matched_adc_ids = {
             match.entity_id
             for match in self._entity_normalizer.find_matches(query, entity_types=("adc",))
@@ -198,6 +209,7 @@ class HybridRetriever:
         top_k: int = 10,
         source_type: str | None = None,
         adc_id: str | None = None,
+        topic: str | None = None,
     ) -> list[SearchResult]:
         if not self.dense_available:
             raise RuntimeError("Vector index not found. Run the index builder first.")
@@ -215,6 +227,9 @@ class HybridRetriever:
         if adc_id:
             filters.append("chunk.metadata_json LIKE ?")
             parameters.append(f'%"{adc_id}"%')
+        if topic:
+            filters.append("chunk.metadata_json LIKE ?")
+            parameters.append(f'%"literature_topics": [%"{topic}"%')
         where = f"WHERE {' AND '.join(filters)}" if filters else ""
         with closing(connect(self.database_path)) as connection:
             rows = connection.execute(
@@ -228,6 +243,10 @@ class HybridRetriever:
                 """,
                 parameters,
             ).fetchall()
+        if not rows and topic:
+            return self.dense_search(
+                query, top_k=top_k, source_type=source_type, adc_id=adc_id, topic=None
+            )
         rows_by_id = {str(row["chunk_id"]): row for row in rows}
         results: list[SearchResult] = []
         seen_documents: set[str] = set()
@@ -253,6 +272,7 @@ class HybridRetriever:
         top_k: int = 10,
         source_type: str | None = None,
         adc_id: str | None = None,
+        topic: str | None = None,
         candidate_k: int = 60,
         sparse_weight: float = 6.0,
         dense_weight: float = 1.0,
@@ -262,12 +282,14 @@ class HybridRetriever:
             top_k=candidate_k,
             source_type=source_type,
             adc_id=adc_id,
+            topic=topic,
         )
         dense = self.dense_search(
             query,
             top_k=candidate_k,
             source_type=source_type,
             adc_id=adc_id,
+            topic=topic,
         )
         by_document: dict[str, SearchResult] = {}
         fused: dict[str, float] = {}
@@ -305,8 +327,15 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--source-type", choices=("adc_profile", "pubmed", "clinical_trial"))
     parser.add_argument("--adc-id")
+    parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE_PATH)
+    parser.add_argument("--index-path", type=Path, default=VECTOR_INDEX_PATH)
+    parser.add_argument("--seed", type=Path, default=DEFAULT_SEED_PATH)
     args = parser.parse_args()
-    results = HybridRetriever().search(
+    results = HybridRetriever(
+        database_path=args.database,
+        index_path=args.index_path,
+        seed_path=args.seed,
+    ).search(
         args.query,
         mode=args.mode,
         top_k=args.top_k,

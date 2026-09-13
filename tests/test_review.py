@@ -1,8 +1,8 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import json
 import sqlite3
-import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
@@ -94,7 +94,7 @@ def retrieval_report() -> dict[str, object]:
 
 class ReviewRepositoryTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = WorkspaceTemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.database = self.root / "review.db"
         self.generation_path = self.root / "generation.json"
@@ -150,7 +150,7 @@ class ReviewRepositoryTests(unittest.TestCase):
                 row[0] for row in connection.execute("SELECT version FROM schema_versions")
             }
         self.assertTrue(
-            {"citation_verdict", "completeness_verdict", "reviewer_slot"}
+            {"citation_verdict", "completeness_verdict", "reviewer_slot", "review_origin"}
             <= columns
         )
         self.assertIn(REVIEW_SCHEMA_VERSION, versions)
@@ -219,6 +219,7 @@ class ReviewRepositoryTests(unittest.TestCase):
             severity="none",
             error_categories=[],
             notes="Checked against source.",
+            review_origin="human_independent",
             database_path=self.database,
         )
         jsonl_path = self.root / "reviews.jsonl"
@@ -237,6 +238,7 @@ class ReviewRepositoryTests(unittest.TestCase):
         self.assertEqual(manifest["review_record_count"], 1)
         self.assertEqual(manifest["pending_item_count"], 0)
         self.assertEqual(exported[0]["review_status"], "reviewed")
+        self.assertEqual(exported[0]["review_origin"], "human_independent")
         self.assertEqual(exported[0]["evaluation_run_id"], "legacy-generation-extractive")
         self.assertTrue(csv_path.read_text(encoding="utf-8-sig").startswith("answer_verdict"))
         self.assertEqual(len(manifest["files"]["jsonl"]["sha256"]), 64)

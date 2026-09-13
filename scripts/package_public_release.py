@@ -1,0 +1,306 @@
+"""Package a verified public database and retrieval index for direct download.
+
+The archive is an external release artifact. SQLite, raw responses and index
+files remain ignored by Git; this command only packages files the caller has
+explicitly selected and records their checksums.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import sqlite3
+import uuid
+import zipfile
+from pathlib import Path
+
+from adc_evidence.rag.documents import retrieval_corpus_version
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATABASE = ROOT / "data" / "processed" / "adc_public_2026-09-30.db"
+DEFAULT_INDEX = ROOT / "artifacts" / "vector_index" / "public_2026-09-30"
+DEFAULT_CATALOG = ROOT / "data" / "public" / "marketed_adc_catalog.csv"
+DEFAULT_CATALOG_AUDIT = ROOT / "data" / "public" / "marketed_adc_catalog.audit.json"
+DEFAULT_BENCHMARK = ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json"
+DEFAULT_BENCHMARK_QUESTIONS = ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
+DEFAULT_OUTPUT = ROOT / "artifacts" / "releases" / "adc-public-2026-09-30.zip"
+
+
+def _sha256(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _require_file(path: Path, label: str) -> Path:
+    path = path.resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"{label} not found: {path}")
+    return path
+
+
+def _index_files(index_path: Path) -> list[Path]:
+    required = ("manifest.json", "chunk_ids.json", "embeddings.npy")
+    missing = [name for name in required if not (index_path / name).is_file()]
+    if missing:
+        raise FileNotFoundError(f"Index is incomplete: {', '.join(missing)}")
+    return sorted(item for item in index_path.rglob("*") if item.is_file())
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    value = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(value, dict):
+        raise ValueError(f"Expected JSON object: {path}")
+    return value
+
+
+def _dataset_summary(database: Path) -> dict[str, object]:
+    """Read public, non-content counts without exposing raw paths or text."""
+    uri = f"file:{database.as_posix()}?mode=ro"
+    connection = sqlite3.connect(uri, uri=True)
+    try:
+        connection.row_factory = sqlite3.Row
+        counts: dict[str, int] = {}
+        for name in ("adcs", "trials", "documents", "entity_links", "evidence"):
+            counts[name] = int(connection.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0])
+        abstract_count = int(connection.execute(
+            "SELECT COUNT(*) FROM documents WHERE abstract IS NOT NULL AND abstract <> ''"
+        ).fetchone()[0])
+        topic_counts = {
+            str(row[0]): int(row[1])
+            for row in connection.execute(
+                "SELECT topic, COUNT(*) FROM literature_topics GROUP BY topic ORDER BY topic"
+            ).fetchall()
+        }
+        latest = connection.execute(
+            "SELECT run_id, started_at, finished_at, status FROM ingestion_runs ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+    finally:
+        connection.close()
+    document_count = counts["documents"]
+    return {
+        "schema_version": "public-adc-dataset-summary-v1",
+        "counts": counts,
+        "document_with_abstract_count": abstract_count,
+        "abstract_coverage": round(abstract_count / document_count, 4) if document_count else 0.0,
+        "literature_topic_counts": topic_counts,
+        "latest_ingestion_run": dict(latest) if latest is not None else None,
+    }
+
+
+def _redact_local_paths(value: object) -> object:
+    """Remove machine-specific absolute paths from JSON run parameters."""
+    if isinstance(value, dict):
+        return {str(key): _redact_local_paths(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_local_paths(item) for item in value]
+    if isinstance(value, str):
+        return re.sub(r"(?:[A-Za-z]:[\\/]|/Users/|/home/|\\\\)[^\"']+", "<local-path-redacted>", value)
+    return value
+
+
+def _sanitize_database_for_release(source: Path, destination: Path) -> Path:
+    """Copy a database and remove local filesystem paths from the copy only."""
+    # The managed Windows sandbox can reject creating a new file with a
+    # `.db` suffix. Stage as a neutral binary file, then rename it before
+    # opening SQLite.
+    staged = destination.with_suffix(destination.suffix + ".tmpbin")
+    with source.open("rb") as source_handle, staged.open("wb") as destination_handle:
+        shutil.copyfileobj(source_handle, destination_handle, length=1024 * 1024)
+    shutil.copystat(source, staged)
+    os.replace(staged, destination)
+    connection = sqlite3.connect(destination)
+    try:
+        connection.row_factory = sqlite3.Row
+        for table in ("source_records", "source_snapshots", "trials", "documents"):
+            columns = {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
+            if "raw_path" not in columns:
+                continue
+            rows = connection.execute(f"SELECT rowid, raw_path FROM {table}").fetchall()
+            for row in rows:
+                raw = str(row["raw_path"] or "")
+                basename = re.split(r"[\\/]", raw)[-1] or "unavailable"
+                connection.execute(
+                    f"UPDATE {table} SET raw_path=? WHERE rowid=?",
+                    (f"raw/{table}/{basename}", row["rowid"]),
+                )
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ingestion_runs'").fetchone():
+            rows = connection.execute("SELECT rowid, parameters_json FROM ingestion_runs").fetchall()
+            for row in rows:
+                try:
+                    value = json.loads(str(row["parameters_json"]))
+                    redacted = json.dumps(_redact_local_paths(value), ensure_ascii=False, sort_keys=True)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    redacted = "<local-parameters-redacted>"
+                connection.execute(
+                    "UPDATE ingestion_runs SET parameters_json=? WHERE rowid=?",
+                    (redacted, row["rowid"]),
+                )
+        connection.commit()
+    finally:
+        connection.close()
+    return destination
+
+
+def build_release_inventory(
+    *,
+    database: Path,
+    index_path: Path,
+    catalog: Path,
+    benchmark_manifest: Path,
+    as_of: str,
+    database_archive_name: str | None = None,
+    catalog_audit: Path | None = None,
+    benchmark_questions: Path | None = None,
+) -> tuple[list[tuple[Path, str]], dict[str, object]]:
+    database = _require_file(database, "database")
+    catalog = _require_file(catalog, "catalog")
+    if catalog_audit is not None:
+        catalog_audit = _require_file(catalog_audit, "catalog audit")
+    benchmark_manifest = _require_file(benchmark_manifest, "benchmark manifest")
+    if benchmark_questions is not None:
+        benchmark_questions = _require_file(benchmark_questions, "benchmark questions")
+    index_path = index_path.resolve()
+    if not index_path.is_dir():
+        raise FileNotFoundError(f"index not found: {index_path}")
+    index_manifest = _read_json(_require_file(index_path / "manifest.json", "index manifest"))
+    corpus_version = retrieval_corpus_version(database)
+    if index_manifest.get("retrieval_corpus_version") != corpus_version:
+        raise ValueError("Database and vector index use different retrieval corpus versions")
+
+    files: list[tuple[Path, str]] = [
+        (database, f"data/processed/{database_archive_name or database.name}"),
+        (catalog, f"data/public/{catalog.name}"),
+    ]
+    if catalog_audit is not None:
+        files.append((catalog_audit, f"data/public/{catalog_audit.name}"))
+    files.extend([
+        (benchmark_manifest, f"data/annotations/{benchmark_manifest.name}"),
+    ])
+    if benchmark_questions is not None:
+        files.append((benchmark_questions, f"data/annotations/{benchmark_questions.name}"))
+    files.extend(
+        (path, f"artifacts/vector_index/{index_path.name}/{path.relative_to(index_path).as_posix()}")
+        for path in _index_files(index_path)
+    )
+    inventory = {
+        "schema_version": "public-adc-release-v1",
+        "dataset_as_of": as_of,
+        "retrieval_corpus_version": corpus_version,
+        "dataset_summary": _dataset_summary(database),
+        "benchmark_manifest": _read_json(benchmark_manifest),
+        "files": [
+            {"archive_path": archive_path, "size_bytes": path.stat().st_size, "sha256": _sha256(path)}
+            for path, archive_path in files
+        ],
+        "redistribution_note": "Verify source licenses for abstracts and trial payloads before redistribution.",
+    }
+    return files, inventory
+
+
+def _release_readme(as_of: str) -> str:
+    return f"""# ADC-Evidence public release ({as_of})
+
+This archive contains a public SQLite snapshot, its matching retrieval index,
+the public ADC catalog and its source audit, the benchmark questions and manifest. `RELEASE_MANIFEST.json`
+binds every file to a SHA-256 checksum.
+
+After extracting at the repository root, configure:
+
+```powershell
+$env:ADC_DATABASE_PATH = "data/processed/adc_public_{as_of}.db"
+$env:ADC_SEED_PATH = "data/public/marketed_adc_catalog.csv"
+$env:ADC_VECTOR_INDEX_PATH = "artifacts/vector_index/public_{as_of}"
+$env:ADC_OFFLINE_ONLY = "true"
+$env:ADC_LLM_BACKEND = "extractive"
+streamlit run src/adc_evidence/app.py
+```
+
+Abstract and full-text redistribution remains subject to the original source
+license. Raw response files are not included; local paths stored in the source
+database are redacted in this archive. Use the catalog builder to reproduce or
+refresh the snapshot.
+"""
+
+
+def package_release(
+    *,
+    database: Path,
+    index_path: Path,
+    catalog: Path,
+    benchmark_manifest: Path,
+    output: Path,
+    as_of: str,
+    catalog_audit: Path | None = None,
+    benchmark_questions: Path | None = None,
+) -> dict[str, object]:
+    output = output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    release_database = database
+    cleanup_paths: list[Path] = []
+    if database.is_file():
+        # Keep the staging copy beside the output because managed Windows
+        # sandboxes may deny writes inside newly-created temporary folders.
+        release_database = output.parent / f"adc_release_{uuid.uuid4().hex}.db"
+        cleanup_paths.extend((release_database, release_database.with_suffix(release_database.suffix + ".tmpbin")))
+        _sanitize_database_for_release(database.resolve(), release_database)
+    try:
+        files, inventory = build_release_inventory(
+            database=release_database,
+            index_path=index_path,
+            catalog=catalog,
+            catalog_audit=catalog_audit,
+            benchmark_manifest=benchmark_manifest,
+            benchmark_questions=benchmark_questions,
+            as_of=as_of,
+            database_archive_name=database.name,
+        )
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path, archive_path in files:
+                info = zipfile.ZipInfo(archive_path, date_time=(2020, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(info, path.read_bytes())
+            manifest_info = zipfile.ZipInfo("RELEASE_MANIFEST.json", date_time=(2020, 1, 1, 0, 0, 0))
+            manifest_info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(manifest_info, json.dumps(inventory, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+            readme_info = zipfile.ZipInfo("RELEASE_README.md", date_time=(2020, 1, 1, 0, 0, 0))
+            readme_info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(readme_info, _release_readme(as_of))
+    finally:
+        for path in cleanup_paths:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+    return {"output": str(output), "size_bytes": output.stat().st_size, **inventory}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
+    parser.add_argument("--index-path", type=Path, default=DEFAULT_INDEX)
+    parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    parser.add_argument("--catalog-audit", type=Path, default=DEFAULT_CATALOG_AUDIT)
+    parser.add_argument("--benchmark-manifest", type=Path, default=DEFAULT_BENCHMARK)
+    parser.add_argument("--benchmark-questions", type=Path, default=DEFAULT_BENCHMARK_QUESTIONS)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--as-of", default="2026-09-30")
+    args = parser.parse_args()
+    result = package_release(
+        database=args.database,
+        index_path=args.index_path,
+        catalog=args.catalog,
+        catalog_audit=args.catalog_audit,
+        benchmark_manifest=args.benchmark_manifest,
+        benchmark_questions=args.benchmark_questions,
+        output=args.output,
+        as_of=args.as_of,
+    )
+    print(json.dumps({key: result[key] for key in ("output", "size_bytes", "dataset_as_of", "retrieval_corpus_version")}, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

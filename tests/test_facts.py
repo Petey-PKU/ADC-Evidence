@@ -1,7 +1,7 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
 import hashlib
-import tempfile
 import unittest
 from argparse import Namespace
 from contextlib import closing
@@ -30,7 +30,7 @@ from adc_evidence.repository import upsert_source_records
 
 class TemporalFactTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = WorkspaceTemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.database = self.root / "facts.db"
 

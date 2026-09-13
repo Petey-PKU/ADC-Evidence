@@ -1,6 +1,6 @@
 from __future__ import annotations
+from tests.support import WorkspaceTemporaryDirectory
 
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from adc_evidence.deploy import ensure_runtime_assets
 
 class DeploymentBootstrapTests(unittest.TestCase):
     def test_clean_runtime_bootstraps_demo_without_overwriting_on_second_run(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             database = root / "processed" / "adc.db"
             index = root / "index"

@@ -47,6 +47,7 @@ def main() -> None:
     args = parser.parse_args()
     metrics = data_quality_metrics(args.database)
     report = {
+        "report_scope": "current_committed_demo_seed",
         "generated_at": utc_now(),
         "database_metrics": metrics,
         "collection_scope": collection_scope(args.database, metrics),
