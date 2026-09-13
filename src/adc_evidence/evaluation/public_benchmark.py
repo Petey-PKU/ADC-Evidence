@@ -142,6 +142,10 @@ def _source_id_matches(actual: object, expected: object) -> bool:
 
 def _value_matches(actual: object, expected: object, allowed: list[object]) -> bool:
     """Compare scalar/list answer values while preserving the benchmark's aliases."""
+    if isinstance(actual, list) and isinstance(expected, list):
+        return [str(item).strip().casefold() for item in actual] == [
+            str(item).strip().casefold() for item in expected
+        ]
     candidates = [expected, *allowed]
     if isinstance(actual, list):
         return any(_value_matches(item, candidate, []) for item in actual for candidate in candidates)
