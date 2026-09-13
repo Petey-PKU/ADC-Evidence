@@ -22,7 +22,8 @@ DEFAULT_MANIFEST = PROJECT_ROOT / "data" / "annotations" / "public_benchmark_v1.
 
 
 def _file_hash(path: Path) -> str:
-    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
 def _catalog_hash(path: Path) -> str:

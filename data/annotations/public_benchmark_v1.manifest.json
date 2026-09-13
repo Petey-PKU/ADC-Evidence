@@ -61,6 +61,6 @@
     "candidate_cap_per_question": 50,
     "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims."
   },
-  "question_file_sha256": "sha256:88e2cf7d74a0c6ec0e3cf8b83151e970a8c044ce7e722f90b72736feeb998605",
+  "question_file_sha256": "sha256:96796631ab688ce9268f8162cac89da20f5488cd0aa6a7757463814443e4ba1d",
   "question_provenance": "auto_derived_from_public_database_snapshot"
 }
