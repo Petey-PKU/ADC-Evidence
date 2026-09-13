@@ -15,7 +15,7 @@
     "trial_lookup": 12
   },
   "question_set_sha256": "sha256:b3877f9f56a1699466b5ede76dbf7f4d644fb500a8a4e1c156cec6770901b18d",
-  "catalog_sha256": "sha256:a8235c33654a55044e56516a802cf502c6cddf5ffa9688a1a9ffdb0c57817f7e",
+  "catalog_sha256": "sha256:76b1ef5ef869bcc8254bbb21f7b8370bd57037f746bc78813329411482e87744",
   "database_data_version": {
     "data_version": "data_cf0c057134e4440eff28353b5a1e6989d8a5c7a90e3af44b5978f1506cbf0cbe",
     "schema_version": "0.6-refresh-v1",

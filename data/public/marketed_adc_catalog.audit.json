@@ -1,6 +1,6 @@
 {
   "schema_version": "public-adc-catalog-audit-v1",
-  "catalog_sha256": "sha256:a8235c33654a55044e56516a802cf502c6cddf5ffa9688a1a9ffdb0c57817f7e",
+  "catalog_sha256": "sha256:76b1ef5ef869bcc8254bbb21f7b8370bd57037f746bc78813329411482e87744",
   "requested_as_of": "2026-09-30",
   "row_count": 23,
   "status_counts": {
@@ -9,10 +9,10 @@
   },
   "required_field_count": 21,
   "rows_with_missing_required_fields": 4,
-  "generic_source_url_count": 8,
+  "generic_source_url_count": 6,
   "source_specificity_counts": {
-    "specific": 15,
-    "generic": 8,
+    "specific": 17,
+    "generic": 6,
     "invalid": 0
   },
   "source_host_counts": {
@@ -187,7 +187,6 @@
       "adc_id": "adc_019",
       "adc_name": "Pivekimab sunirine",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
@@ -203,7 +202,6 @@
       "adc_id": "adc_021",
       "adc_name": "Cetuximab sarotalocan",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
