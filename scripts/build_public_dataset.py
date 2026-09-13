@@ -11,6 +11,7 @@ import argparse
 import csv
 import hashlib
 import json
+import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,83 @@ from adc_evidence.ingestion.pipeline import run_pipeline
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 DEFAULT_AS_OF = "2026-09-30"
+
+LITERATURE_TOPIC_RULE_VERSION = "literature-topic-rule-v1"
+LITERATURE_TOPIC_RULES: dict[str, tuple[str, ...]] = {
+    "mechanism": (
+        "mechanism", "internalization", "internalisation", "bystander",
+        "linker", "payload", "release", "resistance", "pharmacokinetic",
+        "pharmacodynamics", "preclinical",
+    ),
+    "efficacy": (
+        "efficacy", "antitumor", "anti-tumor", "objective response",
+        "response rate", "progression-free survival", "overall survival",
+        "clinical activity", "tumor regression", "tumour regression", "orr", "pfs", "os",
+    ),
+    "safety": (
+        "safety", "adverse event", "toxicity", "tolerability", "neutropenia",
+        "thrombocytopenia", "interstitial lung disease", "pneumonitis", "neuropathy",
+        "ocular", "keratopathy",
+    ),
+}
+
+
+def classify_literature_text(title: str, abstract: str | None) -> dict[str, list[str]]:
+    """Apply transparent lexical rules to a PubMed title and abstract."""
+    text = f"{title} {abstract or ''}".casefold()
+    matched = {
+        topic: [term for term in terms if term.casefold() in text]
+        for topic, terms in LITERATURE_TOPIC_RULES.items()
+    }
+    return {topic: list(dict.fromkeys(terms)) for topic, terms in matched.items() if terms}
+
+
+def classify_public_literature(database: Path) -> dict[str, object]:
+    """Persist topic labels without changing the canonical document records."""
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS literature_topics (
+                document_id TEXT NOT NULL,
+                source_record_id TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                matched_terms_json TEXT NOT NULL,
+                review_status TEXT NOT NULL,
+                PRIMARY KEY (document_id, topic)
+            )
+            """
+        )
+        connection.execute("DELETE FROM literature_topics")
+        topic_counts = {topic: 0 for topic in LITERATURE_TOPIC_RULES}
+        classified_documents = 0
+        rows = connection.execute(
+            "SELECT document_id, source_record_id, title, abstract FROM documents WHERE source='pubmed'"
+        ).fetchall()
+        for document_id, source_record_id, title, abstract in rows:
+            matched = classify_literature_text(str(title), abstract)
+            if matched:
+                classified_documents += 1
+            for topic, terms in matched.items():
+                topic_counts[topic] += 1
+                connection.execute(
+                    """
+                    INSERT INTO literature_topics
+                      (document_id, source_record_id, topic, rule_version,
+                       matched_terms_json, review_status)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (document_id, source_record_id, topic, LITERATURE_TOPIC_RULE_VERSION,
+                     json.dumps(terms, ensure_ascii=False), "needs_review"),
+                )
+        connection.commit()
+    return {
+        "rule_version": LITERATURE_TOPIC_RULE_VERSION,
+        "topic_counts": topic_counts,
+        "classified_document_count": classified_documents,
+        "unclassified_document_count": max(0, len(rows) - classified_documents),
+        "review_status": "needs_review",
+    }
 
 
 def _sha256(path: Path) -> str:
@@ -108,6 +186,7 @@ def build_public_dataset(args: argparse.Namespace) -> dict[str, object]:
         source_retry_delay=args.source_retry_delay,
     )
     summary = run_pipeline(pipeline_args)
+    literature_topics = classify_public_literature(database)
     manifest = {
         "schema_version": "public-adc-dataset-v1",
         "dataset_id": f"adc-public-{as_of.isoformat()}",
@@ -122,11 +201,13 @@ def build_public_dataset(args: argparse.Namespace) -> dict[str, object]:
         "raw_root": str(raw_root),
         "quality_report_path": str(quality_report),
         "pipeline_summary": summary,
+        "literature_topic_summary": literature_topics,
         "redistribution_status": "candidate_pending_primary_source_and_license_review",
         "model_api_used": False,
         "notes": [
             "The target window may be later than the build date; no future records are inferred.",
             "The catalog contains structured candidates; primary regulator checks remain required.",
+            "Literature topics are lexical rule labels for mechanism, efficacy, and safety triage; they are not human relevance judgments.",
             "Raw responses and generated SQLite files are local ignored artifacts.",
         ],
     }

@@ -31,6 +31,10 @@ python scripts/build_public_dataset.py `
 来源运行状态、数量和哈希。PubMed 结果可能因解析或来源使用限制而不适合直接再分发，
 所以发布前应按记录检查许可证，必要时只发布 PMID、标题、摘要 URL 和哈希。
 
+构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
+词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和
+`needs_review` 状态；它用于组织检索和人工复核队列，不代表论文相关性的最终判断。
+
 构建索引时必须指定同一个数据库，避免把演示库和公共快照混在一起：
 
 ```powershell

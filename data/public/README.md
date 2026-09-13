@@ -4,6 +4,11 @@ This directory contains a reproducible, redistributable catalog seed for the
 public ADC-Evidence application. It is deliberately separate from the private
 SQLite database and private expert-review exports.
 
+The public dataset builder also creates a `literature_topics` table. Its
+`literature-topic-rule-v1` lexical labels (`mechanism`, `efficacy`, `safety`)
+are triage metadata only and remain marked `needs_review` until a human checks
+the source and relevance.
+
 ## Scope
 
 `marketed_adc_catalog.csv` is a **candidate global regulatory catalog**. The

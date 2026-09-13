@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from scripts.build_public_dataset import classify_literature_text
 from adc_evidence.models import ADCRecord
 from scripts.build_public_dataset import (
     DEFAULT_CATALOG,
@@ -13,6 +14,14 @@ from scripts.build_public_dataset import (
 
 
 class PublicDatasetTests(unittest.TestCase):
+    def test_literature_topic_rules_cover_mechanism_efficacy_and_safety(self) -> None:
+        labels = classify_literature_text(
+            "Preclinical mechanism and efficacy study",
+            "Safety and adverse event results included.",
+        )
+        self.assertEqual(set(labels), {"mechanism", "efficacy", "safety"})
+        self.assertIn("mechanism", labels["mechanism"])
+
     def test_catalog_has_unique_valid_public_records(self) -> None:
         summary = _catalog_summary(DEFAULT_CATALOG)
         self.assertGreaterEqual(summary["row_count"], 20)
