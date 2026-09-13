@@ -60,7 +60,10 @@ SHA-256 为 `sha256:6a1dfb9b24015743b17b32bd7adf31aa3419f71b7e49803be0a03e324ce7
 
 ## GitHub 推送状态
 
-通过 `http://127.0.0.1:7890` 代理执行 `git ls-remote` 成功，证明网络代理可用；`git push origin research/v0.6-freeze` 在 Git Credential Manager 认证阶段未完成，远端分支仍停留在旧提交 `8b02e7f20648a04cfebc1a1df2cb4089c7fdc995`。认证可用后，在本仓库目录执行：
+此前代理下的 `git ls-remote` 成功，但受限执行环境中的推送未完成。后续在受限环境之外
+使用现有凭据推送成功，远端已更新到 `d02bf56`，该提交的 CI 已通过；详见
+[后续验证记录](standalone_release_2026-09-13.md)。该结果取代此前“需要用户手动推送”的阻塞记录。
+若之后再次需要手动推送，在本仓库目录执行：
 
 ```powershell
 $env:HTTP_PROXY="http://127.0.0.1:7890"
