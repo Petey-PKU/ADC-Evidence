@@ -33,6 +33,22 @@ jobs:
         run: python -m compileall -q src tests
       - name: Audit public repository hygiene
         run: python scripts/audit_public_hygiene.py --output /tmp/public_hygiene.json
+      - name: Audit public ADC catalog
+        run: |
+          python scripts/audit_public_catalog.py --output /tmp/public_catalog_audit.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = json.loads(Path('data/public/marketed_adc_catalog.audit.json').read_text())
+          actual = json.loads(Path('/tmp/public_catalog_audit.json').read_text())
+          assert actual == expected
+          PY
+      - name: Validate public benchmark manifest
+        run: >-
+          python scripts/validate_public_benchmark.py
+          --questions data/annotations/public_benchmark_v1.jsonl
+          --manifest data/annotations/public_benchmark_v1.manifest.json
+          --catalog data/public/marketed_adc_catalog.csv
       - name: Build public artifact manifest
         run: python scripts/build_public_artifact_manifest.py --output /tmp/public_artifact_manifest.json
       - name: Validate reproducibility manifest metadata

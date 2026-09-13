@@ -11,6 +11,7 @@ from adc_evidence.evaluation.public_benchmark import (
     score_public_benchmark,
 )
 from scripts.prepare_public_benchmark_review import prepare_packet
+from scripts.validate_public_benchmark import validate_public_benchmark
 from tests.support import WorkspaceTemporaryDirectory
 
 
@@ -39,6 +40,15 @@ class PublicBenchmarkTests(unittest.TestCase):
         )
         self.assertFalse(manifest["evaluation_use"]["eligible_for_unseen_test_claim"])
         self.assertIn("evidence_recall", manifest["metrics"])
+
+    def test_checked_in_manifest_binds_questions_and_catalog(self) -> None:
+        result = validate_public_benchmark(
+            BENCHMARK,
+            ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json",
+            catalog_path=ROOT / "data" / "public" / "marketed_adc_catalog.csv",
+        )
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(result["question_count"], 98)
 
     def test_automatic_scoring_requires_exact_question_identity(self) -> None:
         rows = load_public_benchmark(BENCHMARK)[:2]
