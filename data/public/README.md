@@ -21,12 +21,25 @@ withdrawn. Use `catalog_status` to distinguish `marketed`, `withdrawn`, and
 `approved_not_marketed` records.
 
 The catalog is a public starting point, not a claim that every field has been
-independently verified. `verification_status=pending_primary_check` means a
+independently verified. `verification_status=primary_check_pending` means a
 primary regulator label or registry record still needs to be checked before a
 paper uses the field as a gold-standard fact.
 `marketed_adc_catalog.audit.json` is a deterministic review queue for these
 checks; it reports generic regulator landing pages and missing required fields
 without containing private notes.
+
+要逐字段开展一级来源复核，可生成空白审核包（不会自动写入任何人工结论）：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/build_catalog_field_review_packet.py `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --output artifacts/evaluation/catalog_field_review.jsonl `
+  --manifest artifacts/evaluation/catalog_field_review.manifest.json
+```
+
+审核包中的 `candidate_source.source_url` 是候选来源链接，`verification.status` 初始为
+`pending_primary_check`；只有人工逐项检查后才可填写 verdict 和 confirmed value。
 
 ## Data policy
 
@@ -65,3 +78,39 @@ $env:ADC_SEED_PATH="data/public/marketed_adc_catalog.csv"
 $env:ADC_VECTOR_INDEX_PATH="artifacts/vector_index/public_2026-09-30"
 streamlit run src/adc_evidence/app.py
 ```
+
+## Use a downloaded release
+
+Download the ZIP artifact from the manual `Build public dataset release`
+workflow. Verify it before extraction, then expand it at the repository root:
+
+```powershell
+python scripts/verify_public_release.py .\adc-public-2026-09-30.zip
+Expand-Archive .\adc-public-2026-09-30.zip -DestinationPath . -Force
+$env:ADC_OFFLINE_ONLY="true"
+$env:ADC_DATABASE_PATH="data/processed/adc_public_2026-09-30.db"
+$env:ADC_SEED_PATH="data/public/marketed_adc_catalog.csv"
+$env:ADC_VECTOR_INDEX_PATH="artifacts/vector_index/public_2026-09-30"
+streamlit run src/adc_evidence/app.py
+```
+
+The release uses the offline extractive path and does not require a model API
+key. `RELEASE_MANIFEST.json` records the database, index, catalog, benchmark,
+and source-window hashes; retain it with the extracted files when reporting a
+reproduction.
+
+## Refresh entity links after alias edits
+
+The collectors search canonical ADC names and catalog aliases directly. After
+editing aliases, existing local snapshots can be relinked without downloading
+new records:
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/relink_public_snapshot.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --seed data/public/marketed_adc_catalog.csv
+```
+
+This command only rebuilds trial/document links and evidence from records
+already in SQLite; it does not call a model API or any network source.

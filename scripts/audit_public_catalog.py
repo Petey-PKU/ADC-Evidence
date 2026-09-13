@@ -70,18 +70,34 @@ def audit_catalog(catalog: Path, *, requested_as_of: str) -> dict[str, object]:
     generic_source_count = 0
     missing_field_count = 0
     future_approval_count = 0
+    field_coverage = {field: 0 for field in REQUIRED_FIELDS}
+    source_host_counts: dict[str, int] = {}
+    source_specificity_counts = {"specific": 0, "generic": 0, "invalid": 0}
     for row in rows:
         adc_id = str(row["adc_id"]).strip()
         reasons: list[str] = []
         status = str(row.get("catalog_status", "")).strip()
         status_counts[status] = status_counts.get(status, 0) + 1
         missing = [field for field in REQUIRED_FIELDS if not str(row.get(field, "")).strip()]
+        for field in REQUIRED_FIELDS:
+            if str(row.get(field, "")).strip():
+                field_coverage[field] += 1
         if missing:
             missing_field_count += 1
             reasons.append("missing_fields:" + ",".join(missing))
-        if _is_generic_source(str(row.get("source_url", ""))):
+        source_url = str(row.get("source_url", "")).strip()
+        parsed_source = urlparse(source_url)
+        host = parsed_source.netloc.lower()
+        if host:
+            source_host_counts[host] = source_host_counts.get(host, 0) + 1
+        if not parsed_source.scheme or not parsed_source.netloc:
+            source_specificity_counts["invalid"] += 1
+        elif _is_generic_source(source_url):
+            source_specificity_counts["generic"] += 1
             generic_source_count += 1
             reasons.append("generic_source_url")
+        else:
+            source_specificity_counts["specific"] += 1
         verification = str(row.get("verification_status", "")).strip()
         if verification != "reviewed_primary_source":
             reasons.append("verification_status:" + (verification or "missing"))
@@ -103,6 +119,9 @@ def audit_catalog(catalog: Path, *, requested_as_of: str) -> dict[str, object]:
         "required_field_count": len(REQUIRED_FIELDS),
         "rows_with_missing_required_fields": missing_field_count,
         "generic_source_url_count": generic_source_count,
+        "source_specificity_counts": source_specificity_counts,
+        "source_host_counts": dict(sorted(source_host_counts.items())),
+        "field_coverage_counts": field_coverage,
         "approval_after_requested_as_of_count": future_approval_count,
         "verification_status_counts": {
             value: sum(str(row.get("verification_status", "")).strip() == value for row in rows)

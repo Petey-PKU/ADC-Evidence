@@ -2,13 +2,40 @@ from __future__ import annotations
 
 import csv
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from scripts.audit_public_catalog import audit_catalog
+from scripts.audit_public_catalog_sources import audit_catalog_sources, source_class
 from tests.support import WorkspaceTemporaryDirectory
 
 
 class PublicCatalogAuditTests(unittest.TestCase):
+    def test_source_content_audit_is_triage_only_and_flags_structural_gaps(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            path = Path(temporary.name) / "catalog.csv"
+            path.write_text(
+                "adc_id,adc_name,aliases,source_url\n"
+                "adc_001,Example ADC,ExADC,https://www.fda.gov/example\n",
+                encoding="utf-8",
+            )
+            with patch(
+                "scripts.audit_public_catalog_sources._fetch",
+                return_value=(200, "text/html", "FDA approves Example ADC for cancer"),
+            ):
+                report = audit_catalog_sources(path)
+        finally:
+            temporary.cleanup()
+        self.assertEqual(source_class("https://www.fda.gov/example"), "regulator_fda")
+        self.assertEqual(report["name_or_alias_match_count"], 1)
+        self.assertEqual(report["field_level_source_missing_count"], 7)
+        self.assertEqual(report["review_status"], "triage_only_pending_human_source_locator_review")
+        self.assertFalse(report["ai_or_automatic_labels_are_gold"])
+        record = report["records"][0]
+        self.assertEqual(record["inspection_status"], "text_scanned")
+        self.assertEqual(record["field_assessment"]["dar"], "field_level_source_missing")
+        self.assertEqual(record["field_assessment"]["approval_date"], "candidate_support_only")
     def test_audit_reports_generic_sources_and_pending_primary_checks(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:
@@ -34,6 +61,9 @@ class PublicCatalogAuditTests(unittest.TestCase):
             temporary.cleanup()
         self.assertEqual(report["row_count"], 1)
         self.assertEqual(report["generic_source_url_count"], 1)
+        self.assertEqual(report["source_specificity_counts"]["generic"], 1)
+        self.assertEqual(report["field_coverage_counts"]["adc_name"], 1)
+        self.assertEqual(report["field_coverage_counts"]["dar"], 1)
         self.assertEqual(report["review_status"], "needs_primary_source_review")
         self.assertEqual(report["manual_review_queue"][0]["adc_id"], "adc_001")
 

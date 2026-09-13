@@ -6,7 +6,22 @@
 ## 评审前
 
 1. 在开发完成后，单独冻结题集、数据库/语料版本、代码提交和评测窗口。
-2. 运行 `benchmark assemble` 生成盲评包和身份映射。盲评包交给评审者；身份映射
+2. 将正式题集保存在公共仓库之外的访问受控路径，并生成不含题目内容的 manifest：
+
+```powershell
+python scripts/build_independent_holdout_manifest.py `
+  --questions D:\private-review\holdout_questions.jsonl `
+  --question-set-version holdout-v1 `
+  --evaluation-window-id window-1 `
+  --access-control-method "owner-controlled private ACL" `
+  --database-data-version <data-version> `
+  --code-commit <commit> `
+  --output D:\private-review\holdout_manifest.json
+```
+
+`access_control_method` 是操作者的声明，脚本不会伪造或自动证明文件系统权限；
+评测前必须由项目负责人独立确认权限和题集未泄露。之后运行 `benchmark assemble`
+生成盲评包和身份映射。盲评包交给评审者；身份映射
    只由项目负责人保存，评审完成和分歧裁决前不得打开。
 3. 两名评审者分别使用 `primary` 和 `secondary` 槽位，各自完成预先指定的全部高风险题
    和普通题抽样。评审者应先看问题、答案、引用和原始证据，再填写判断。

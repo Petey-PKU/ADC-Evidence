@@ -4,8 +4,8 @@
 
 公共目录位于 `data/public/marketed_adc_catalog.csv`，包含 23 个截至
 2026-06-30 已有监管批准记录的 ADC 候选（包括 1 个历史撤回记录）。在 2026-09-13
-构建的本地快照中，目录扩展为 23 个 ADC、1,750 条 ClinicalTrials.gov 试验和 998
-篇 PubMed 文献，其中 956 篇含摘要。请求的 `2026-09-30` 是未来目标窗口，因此本次
+构建的本地快照中，目录扩展为 23 个 ADC、3,503 条 ClinicalTrials.gov 试验和 1,410
+篇 PubMed 文献，其中 1,366 篇含摘要；23 个 ADC 均至少有一条文献实体关联。请求的 `2026-09-30` 是未来目标窗口，因此本次
 清单将 `as_of_status` 标为 `future_target_pending`，不把未来日期当作已观察数据。
 
 本目录是可审阅的公共种子，字段仍标为 `primary_check_pending`。每个字段在公开发布前
@@ -22,14 +22,50 @@ python scripts/build_public_dataset.py `
   --catalog data/public/marketed_adc_catalog.csv `
   --as-of 2026-09-30 `
   --pubmed-max 1000 `
-  --trial-page-size 1000 `
-  --trial-max-pages 10
+  --trial-page-size 100 `
+  --trial-max-pages 20
 ```
 
 命令只调用公开数据源，不调用生成模型。SQLite、原始响应和质量报告默认写入
 `data/processed` 与 `data/raw` 的忽略路径；manifest 记录请求日期、实际数据窗口、
 来源运行状态、数量和哈希。PubMed 结果可能因解析或来源使用限制而不适合直接再分发，
 所以发布前应按记录检查许可证，必要时只发布 PMID、标题、摘要 URL 和哈希。
+
+可对本地快照生成不含记录正文的去重、实体链接、字段事实覆盖和来源完整性审计：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_public_dataset.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --output artifacts/evaluation/public_dataset_audit.json
+```
+
+审计会将计划中的抓取上限记录为 `partial`，不会把部分 PubMed 结果解释为全集覆盖；
+`link_coverage_by_adc`、`missing_trial_link_adc_ids`、`missing_document_link_adc_ids` 和
+`orphan_link_counts` 用于发现实体关联缺口，
+不会把没有关联记录的 ADC 静默计入文献或试验覆盖率。
+其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
+链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
+审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
+计数；`adc_fact_source_quality_status=needs_review` 时，不能把该快照当作字段来源已核验。
+
+可对候选 URL 做一次带超时的内容预核验（不修改目录字段，也不生成人工 verdict）：
+
+```powershell
+$env:PYTHONPATH="src"
+$env:HTTP_PROXY="http://127.0.0.1:7890"
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
+python scripts/audit_public_catalog_sources.py `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --output artifacts/evaluation/public_catalog_source_content_audit.json
+```
+
+报告只记录 HTTP 状态、内容类型、ADC 名称/别名是否出现在响应文本中、来源类别和字段评估。
+`candidate_support_only` 是待人工定位的线索，`field_level_source_missing` 表示目录的单一
+候选 URL 尚不能支持结构字段；自动匹配永远不计入金标准。2026-09-13 的实际运行结果为
+23 行均返回 HTTP 响应（21 行为 200、1 行为 403、1 行为 412），16 行文本出现名称/别名，
+161 个结构字段仍缺字段级来源；PDF 只记录可访问性，不自动提取正文；
+状态为 `triage_only_pending_human_source_locator_review`。
 
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
 词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和
@@ -53,9 +89,29 @@ embedding 模型后重新构建。
 
 如果要提供“下载后直接查询”的版本，可运行 `scripts/package_public_release.py`。脚本会
 先验证 SQLite 与向量索引的 retrieval corpus 版本一致，再生成包含数据库、索引、公开目录、
-benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
+benchmark 题集与 manifest、查询程序、必要配置、README 和 SHA-256 清单的 v2 外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
+打包前还会逐条比较 SQLite 与目录中重叠的 ADC 字段；如果数据库仍是旧来源或旧值，打包会
+直接失败，避免发布包中的可查询数据库与目录清单不一致。
+
+程序只从已被 Git 跟踪的公开 Python 源码和明确列出的运行配置打包，并执行文本卫生检查；
+本地 `.env`、缓存、未跟踪源码和其他配置不会自动进入发布包。manifest 的 `application`
+记录代码提交、工作区是否存在改动、实际数据库/目录/索引路径和 Python 要求；所有程序
+文件也进入 SHA-256 清单。开发时打包的脏工作区不能被报告为对应提交的原样发布。
+
+将 v2 压缩包解压到独立文件夹后，按 `RELEASE_README.md` 创建 Python 3.11+ 虚拟环境，
+执行 `python -m pip install -e .` 安装基础依赖，再运行：
+
+```powershell
+python scripts/run_public_release.py --check
+python scripts/run_public_release.py --question "T-DXd 的靶点和载荷是什么？"
+python scripts/run_public_release.py
+```
+
+最后一条命令启动本机网页 `http://127.0.0.1:8501`。启动器不依赖调用者所在目录，自动选择
+解压包内的数据，并强制离线抽取式配置。无需另行克隆代码、采集数据或下载模型；首次
+Python 依赖安装需要联网或自行提供依赖 wheel。发布包未捆绑 Python 解释器和第三方依赖。
 
 公共仓库还提供手动触发的 `.github/workflows/public-release.yml`。在 GitHub Actions 中输入
 快照日期和抓取上限后，它会在干净的 Ubuntu runner 上重建数据库、hashing 索引和 benchmark，
@@ -63,7 +119,7 @@ Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字
 `workflow_dispatch` 入口，不会因普通代码 push 自动抓取或发布数据；下载者仍应先检查包内的
 `RELEASE_MANIFEST.json` 和来源许可。
 `RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
-最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 998 条。
+最近采集运行状态；本地快照当前为 `partial`，因为 ClinicalTrials.gov 与 PubMed 均设置了抓取上限，当前数据库分别包含 3,503 和 1,410 条记录。
 打包过程会对 SQLite 副本中的本机绝对路径做脱敏，原始数据库不会被修改；发布包不含原始
 响应文件，因此无法用这些路径恢复本地采集缓存。
 

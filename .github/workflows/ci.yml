@@ -15,6 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
+        dependency-profile: ["base", "generation"]
     env:
       ADC_OFFLINE_ONLY: "true"
     steps:
@@ -24,7 +25,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install package
-        run: python -m pip install -e ".[generation]"
+        run: |
+          if [ "${{ matrix.dependency-profile }}" = "generation" ]; then
+            python -m pip install -e ".[generation]"
+          else
+            python -m pip install -e .
+          fi
       - name: Record dependency versions
         run: python -m pip freeze > /tmp/pip-freeze.txt
       - name: Bootstrap public demo database
@@ -72,7 +78,7 @@ jobs:
           python scripts/run_public_holdout.py
           --database data/processed/adc_evidence.db
           --questions data/annotations/v0.6_public_holdout_questions.jsonl
-          --window-id ci-${{ matrix.python-version }}
+          --window-id ci-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
           --output /tmp/public_holdout.json
       - name: Validate public smoke holdout metadata
         run: |
@@ -107,29 +113,29 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paper-readiness-audit-${{ matrix.python-version }}
+          name: paper-readiness-audit-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
           path: /tmp/paper_readiness.json
       - name: Upload public hygiene audit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-hygiene-audit-${{ matrix.python-version }}
+          name: public-hygiene-audit-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
           path: /tmp/public_hygiene.json
       - name: Upload public artifact manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-artifact-manifest-${{ matrix.python-version }}
+          name: public-artifact-manifest-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
           path: /tmp/public_artifact_manifest.json
       - name: Upload dependency versions
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-versions-${{ matrix.python-version }}
+          name: dependency-versions-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
           path: /tmp/pip-freeze.txt
       - name: Upload public smoke holdout
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-smoke-holdout-${{ matrix.python-version }}
+          name: public-smoke-holdout-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
           path: /tmp/public_holdout.json

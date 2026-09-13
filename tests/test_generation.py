@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import importlib.util
 import unittest
 from unittest.mock import patch
 
@@ -17,6 +18,9 @@ from adc_evidence.generation.evaluate_generation import _aggregate_review_status
 from adc_evidence.generation.prompts import build_generation_input, extract_requested_items
 from adc_evidence.generation.service import EvidenceAnsweringService, infer_source_type
 from adc_evidence.rag.retriever import SearchResult
+
+
+HAS_OPENAI_SDK = importlib.util.find_spec("openai") is not None
 
 
 def sample_result() -> SearchResult:
@@ -239,6 +243,7 @@ class RoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "ADC_OFFLINE_ONLY"):
                 create_generator("openai")
 
+    @unittest.skipUnless(HAS_OPENAI_SDK, "optional generation extra is not installed")
     def test_auto_backend_honors_siliconflow_preference(self) -> None:
         with patch.dict(
             os.environ,
@@ -284,6 +289,7 @@ class PromptTests(unittest.TestCase):
         self.assertIn("不得静默省略", prompt)
 
 
+@unittest.skipUnless(HAS_OPENAI_SDK, "optional generation extra is not installed")
 class OpenAIAdapterTests(unittest.TestCase):
     def test_uses_responses_api_without_network(self) -> None:
         class Usage:
@@ -323,6 +329,7 @@ class OpenAIAdapterTests(unittest.TestCase):
         self.assertIn("evidence_sources", client.responses.arguments["input"])
 
 
+@unittest.skipUnless(HAS_OPENAI_SDK, "optional generation extra is not installed")
 class SiliconFlowAdapterTests(unittest.TestCase):
     def test_uses_chat_completions_without_network(self) -> None:
         class Usage:

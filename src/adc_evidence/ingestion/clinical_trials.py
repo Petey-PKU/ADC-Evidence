@@ -87,6 +87,11 @@ def collect_clinical_trials(
     str | None,
     dict[str, int | bool | None],
 ]:
+    # Large ClinicalTrials.gov pages can exceed proxy/read-buffer limits.  A
+    # bounded page also keeps each immutable source snapshot manageable while
+    # max_pages controls the explicit coverage window.
+    requested_page_size = page_size
+    effective_page_size = min(max(1, page_size), 100)
     source_records: list[SourceRecord] = []
     trial_records: list[TrialRecord] = []
     retrieved_at = utc_now()
@@ -116,7 +121,7 @@ def collect_clinical_trials(
     for page_number in range(1, max_pages + 1):
         parameters = {
             "format": "json",
-            "pageSize": str(page_size),
+            "pageSize": str(effective_page_size),
             "countTotal": "true",
             "query.term": query,
         }
@@ -156,6 +161,8 @@ def collect_clinical_trials(
         "total_count": total_count,
         "collected_count": len(unique_trials),
         "truncated": bool(next_page_token),
+        "requested_page_size": requested_page_size,
+        "page_size": effective_page_size,
     }
     return (
         list(unique_trials.values()),
