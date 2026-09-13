@@ -161,8 +161,8 @@ class IngestionTests(unittest.TestCase):
                     max_pages=1,
                 )
         self.assertEqual(info["requested_page_size"], 1000)
-        self.assertEqual(info["page_size"], 250)
-        self.assertIn("pageSize=250", fetched.call_args_list[1].args[0])
+        self.assertEqual(info["page_size"], 100)
+        self.assertIn("pageSize=100", fetched.call_args_list[1].args[0])
 
     def test_repository_round_trip_and_quality_metrics(self) -> None:
         documents = parse_pubmed_xml(

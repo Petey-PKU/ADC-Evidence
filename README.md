@@ -99,7 +99,7 @@ python -m adc_evidence.ingestion.pipeline
 默认范围：
 
 - ADCdb：10 个指定 ADC 的低频精确查询；
-- ClinicalTrials.gov：当前查询命中的全部记录，单页最多 250 条（通过多页游标继续抓取）；
+- ClinicalTrials.gov：当前查询命中的全部记录，单页最多 100 条（通过多页游标继续抓取）；
 - PubMed：按相关度取前 200 条。
 
 可单独跳过某个来源：

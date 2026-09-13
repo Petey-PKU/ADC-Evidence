@@ -14,10 +14,10 @@
     "structured_fact": 44,
     "trial_lookup": 12
   },
-  "question_set_sha256": "sha256:38ff39366378bacd67d3896b7495aaf0548edf35c1b199271e60d1ae4b2d533f",
+  "question_set_sha256": "sha256:af98dc6c050131ae89fb6ee9cf7e322f9e2ba5b62afe1c86a16177997435bdab",
   "catalog_sha256": "sha256:72b41e476906d6aafa1db96c717bdc9ae2b94da55a0425c2414f8a2883b59ac4",
   "database_data_version": {
-    "data_version": "data_3e2a53fb16a67fd8a42b30ac020656fc0375361843926276b22f5f686ea685be",
+    "data_version": "data_f649d58ecbf0d8821fa65fc7ce262346fca6bde4bd2b9f872b4f8a19724271a4",
     "schema_version": "0.6-refresh-v1",
     "schema_versions": [
       "0.6-benchmark-review-v2",
@@ -26,11 +26,11 @@
     ],
     "policy_version": "0.6.0",
     "latest_ingestion_run": {
-      "run_id": "20260913T122355Z",
-      "finished_at": "2026-09-13T12:24:56+00:00",
+      "run_id": "20260913T130423Z",
+      "finished_at": "2026-09-13T13:07:30+00:00",
       "status": "partial"
     },
-    "retrieval_corpus_version": "corpus_44772602fe3d3091c4cb51d44a511e429c0c9773704d94b89623a6254c65737b"
+    "retrieval_corpus_version": "corpus_935c87b85da21bb4da43f671a339c5adb46a805b4dc90beb8ecb467615702d95"
   },
   "evaluation_use": {
     "status": "development_exposed",
@@ -61,6 +61,6 @@
     "candidate_cap_per_question": 50,
     "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims."
   },
-  "question_file_sha256": "sha256:e642289cd463837c3fc96927739c119dfadd9dee40dd47d55c031cf2907f324f",
+  "question_file_sha256": "sha256:2ee7a9f5029ff9303d4b1f3e44487cee2a986ba0ce9e0cb1c36d0d58fc09ea74",
   "question_provenance": "auto_derived_from_public_database_snapshot"
 }

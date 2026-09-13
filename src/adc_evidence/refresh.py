@@ -203,7 +203,7 @@ def execute_refresh(
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     embedding_dimension: int = 384,
     pubmed_max: int = 200,
-    trial_page_size: int = 250,
+    trial_page_size: int = 100,
     trial_max_pages: int = 20,
     adcdb_limit: int = 10,
     skip_pubmed: bool = False,
@@ -342,7 +342,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--dimension", type=int, default=384)
     parser.add_argument("--pubmed-max", type=int, default=200)
-    parser.add_argument("--trial-page-size", type=int, default=250)
+    parser.add_argument("--trial-page-size", type=int, default=100)
     parser.add_argument("--trial-max-pages", type=int, default=20)
     parser.add_argument("--adcdb-limit", type=int, default=10)
     parser.add_argument("--skip-pubmed", action="store_true")

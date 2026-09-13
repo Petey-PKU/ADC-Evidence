@@ -46,7 +46,7 @@ jobs:
           --catalog data/public/marketed_adc_catalog.csv
           --as-of "${{ inputs.as_of }}"
           --pubmed-max "${{ inputs.pubmed_max }}"
-          --trial-page-size 250
+          --trial-page-size 100
           --trial-max-pages "${{ inputs.trial_max_pages }}"
       - name: Build matching retrieval index
         run: >-

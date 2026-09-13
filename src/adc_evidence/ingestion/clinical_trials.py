@@ -91,7 +91,7 @@ def collect_clinical_trials(
     # bounded page also keeps each immutable source snapshot manageable while
     # max_pages controls the explicit coverage window.
     requested_page_size = page_size
-    effective_page_size = min(max(1, page_size), 250)
+    effective_page_size = min(max(1, page_size), 100)
     source_records: list[SourceRecord] = []
     trial_records: list[TrialRecord] = []
     retrieved_at = utc_now()

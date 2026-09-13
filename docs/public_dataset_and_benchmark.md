@@ -22,7 +22,7 @@ python scripts/build_public_dataset.py `
   --catalog data/public/marketed_adc_catalog.csv `
   --as-of 2026-09-30 `
   --pubmed-max 1000 `
-  --trial-page-size 250 `
+  --trial-page-size 100 `
   --trial-max-pages 20
 ```
 
