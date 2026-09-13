@@ -4,7 +4,7 @@
 
 公共目录位于 `data/public/marketed_adc_catalog.csv`，包含 23 个截至
 2026-06-30 已有监管批准记录的 ADC 候选（包括 1 个历史撤回记录）。在 2026-09-13
-构建的本地快照中，目录扩展为 23 个 ADC、1,750 条 ClinicalTrials.gov 试验和 1,410
+构建的本地快照中，目录扩展为 23 个 ADC、3,503 条 ClinicalTrials.gov 试验和 1,410
 篇 PubMed 文献，其中 1,366 篇含摘要；23 个 ADC 均至少有一条文献实体关联。请求的 `2026-09-30` 是未来目标窗口，因此本次
 清单将 `as_of_status` 标为 `future_target_pending`，不把未来日期当作已观察数据。
 
@@ -81,7 +81,7 @@ Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字
 `workflow_dispatch` 入口，不会因普通代码 push 自动抓取或发布数据；下载者仍应先检查包内的
 `RELEASE_MANIFEST.json` 和来源许可。
 `RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
-最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 1,410 条。
+最近采集运行状态；本地快照当前为 `partial`，因为 ClinicalTrials.gov 与 PubMed 均设置了抓取上限，当前数据库分别包含 3,503 和 1,410 条记录。
 打包过程会对 SQLite 副本中的本机绝对路径做脱敏，原始数据库不会被修改；发布包不含原始
 响应文件，因此无法用这些路径恢复本地采集缓存。
 
