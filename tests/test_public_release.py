@@ -18,6 +18,8 @@ class PublicReleaseTests(unittest.TestCase):
         readme = _release_readme("2026-09-30")
         self.assertIn("ADC_DATABASE_PATH", readme)
         self.assertIn("ADC_VECTOR_INDEX_PATH", readme)
+        self.assertIn("ADC_OFFLINE_ONLY", readme)
+        self.assertIn('ADC_LLM_BACKEND = "extractive"', readme)
         self.assertIn("RELEASE_MANIFEST.json", readme)
 
     def test_package_contains_manifest_and_checksummed_files(self) -> None:

@@ -214,6 +214,8 @@ After extracting at the repository root, configure:
 $env:ADC_DATABASE_PATH = "data/processed/adc_public_{as_of}.db"
 $env:ADC_SEED_PATH = "data/public/marketed_adc_catalog.csv"
 $env:ADC_VECTOR_INDEX_PATH = "artifacts/vector_index/public_{as_of}"
+$env:ADC_OFFLINE_ONLY = "true"
+$env:ADC_LLM_BACKEND = "extractive"
 streamlit run src/adc_evidence/app.py
 ```
 

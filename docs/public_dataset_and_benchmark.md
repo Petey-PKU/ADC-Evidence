@@ -48,6 +48,8 @@ python -m adc_evidence.rag.build_index `
 `ADC_VECTOR_INDEX_PATH`，即可直接使用该快照。结构化问题和离线摘录路径不调用远程
 生成模型；索引中的本地 hashing 后端只用于可复现开发，语义检索可按许可下载本地
 embedding 模型后重新构建。
+发布包的示例配置同时设置 `ADC_OFFLINE_ONLY=true` 和
+`ADC_LLM_BACKEND=extractive`，确保下载者不配置 API 也能运行。
 
 如果要提供“下载后直接查询”的版本，可运行 `scripts/package_public_release.py`。脚本会
 先验证 SQLite 与向量索引的 retrieval corpus 版本一致，再生成包含数据库、索引、公开目录、
