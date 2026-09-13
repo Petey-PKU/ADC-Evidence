@@ -1,6 +1,6 @@
 {
   "schema_version": "public-adc-catalog-audit-v1",
-  "catalog_sha256": "sha256:a5a5eeeb8264c77ee0888a8772da49259ae6b9d85806b4cb5e7d2918590ae1d8",
+  "catalog_sha256": "sha256:01a6443b1e31cb34b39b8f6fa879c2e48bd6f46727d0265a21f45b0d484cffff",
   "requested_as_of": "2026-09-30",
   "row_count": 23,
   "status_counts": {
@@ -9,19 +9,20 @@
   },
   "required_field_count": 21,
   "rows_with_missing_required_fields": 4,
-  "generic_source_url_count": 2,
+  "generic_source_url_count": 0,
   "source_specificity_counts": {
-    "specific": 21,
-    "generic": 2,
+    "specific": 23,
+    "generic": 0,
     "invalid": 0
   },
   "source_host_counts": {
     "en.lepubiopharma.com": 1,
     "static.cninfo.com.cn": 1,
     "www.fda.gov": 16,
-    "www.hkexnews.hk": 1,
-    "www.nmpa.gov.cn": 3,
-    "www.pmda.go.jp": 1
+    "www.hkexnews.hk": 2,
+    "www.nmpa.gov.cn": 1,
+    "www.pmda.go.jp": 1,
+    "www.prnewswire.com": 1
   },
   "field_coverage_counts": {
     "adc_name": 23,
@@ -171,7 +172,6 @@
       "adc_id": "adc_017",
       "adc_name": "Trastuzumab botidotin",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
@@ -193,7 +193,6 @@
       "adc_id": "adc_020",
       "adc_name": "Izalontamab brengitecan",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
