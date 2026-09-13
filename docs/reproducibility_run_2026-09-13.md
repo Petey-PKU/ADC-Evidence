@@ -15,7 +15,7 @@ python scripts/audit_public_hygiene.py --output artifacts/evaluation/public_hygi
 python scripts/audit_paper_readiness.py --output artifacts/evaluation/paper_readiness.json
 ```
 
-结果：199 项标准库测试通过；发布包 `status=verified`，检查 8 个文件，数据库绝对路径为 0；公开仓库卫生审计为 `clean`。论文就绪审计仍按设计返回 `not_ready_for_submission`，保留两个硬门槛：真实独立人工标签和访问受控的独立冻结测试集。
+结果：200 项标准库测试通过；发布包 `status=verified`，检查 8 个文件，数据库绝对路径为 0；公开仓库卫生审计为 `clean`。论文就绪审计仍按设计返回 `not_ready_for_submission`，保留两个硬门槛：真实独立人工标签和访问受控的独立冻结测试集。
 
 从发布包解压后设置 `ADC_OFFLINE_ONLY=true`、`ADC_LLM_BACKEND=extractive`，执行结构化问题：
 
@@ -30,10 +30,10 @@ python -m adc_evidence.generation.answer "T-DXd 的靶点和载荷是什么？" 
 | 项目 | 值 |
 | --- | --- |
 | 数据库 | 23 ADC、3,503 条试验、1,410 篇 PubMed 文献 |
-| 数据库 SHA-256 | `sha256:f0cb11cbc85b948d96d3147ec13553f6c095ba3c3d5a7f2ec2440d037e2256be` |
+| 数据库 SHA-256 | `sha256:62995d3eb0180c8952b93d5c6fb3d5f2fccd3e9762ad25f4d8a08697edc3ff48` |
 | 检索语料版本 | `corpus_935c87b85da21bb4da43f671a339c5adb46a805b4dc90beb8ecb467615702d95` |
 | Benchmark | 98 道公开开发/烟雾测试题 |
-| 发布包 SHA-256 | `sha256:e30cb93dffbcf9667d62387b8c60bd7c700ef864e04201f4a9ef758a984e9231` |
+| 发布包 SHA-256 | `sha256:a68f4df3d1e948e8222e40c818bd559a1e8e934a7f9b31ad3f9617cec84103e2` |
 | 数据审计状态 | `partial`；两类来源均有计划上限，但 23 个 ADC 均已有至少一条文献和试验实体关联 |
 
 `partial` 是覆盖状态而非失败：它禁止把当前快照当作完整文献全集。长 PubMed 查询现在自动使用 POST；首轮结果缺少某个规范 ADC 时，会执行最多 50 条记录的精确名称补充。下一次完整抓取仍应重新生成数据库、索引、Benchmark、发布包及其哈希。
@@ -43,6 +43,10 @@ python -m adc_evidence.generation.answer "T-DXd 的靶点和载荷是什么？" 
 `sha256:ebe6e64cb0a105d61543933dcfb815c6ed783976c9f757462f9a70bc7f81f717`，manifest
 SHA-256 为 `sha256:6a1dfb9b24015743b17b32bd7adf31aa3419f71b7e49803be0a03e324ce7af33a`。
 包中不含评审身份，且明确拒绝把 AI 或自动标签计入论文主结果。
+
+本轮还修复了字段 evidence 的 URL 幂等判断，并用当前目录重新绑定 223 条 ADC 字段
+事实；当前快照中的 ADC 字段 evidence 不再使用通用 NMPA 首页 URL，均保留目录中的具体来源地址，
+状态仍为 `needs_review`，等待人工核验。
 
 本轮曾用每页 100 条、最多 140 页尝试扩大 ClinicalTrials.gov 覆盖。代理在读取分页响应时长时间无终止结果，人工中断；没有新试验写入。该次失败参数和堆栈保留在本地运行记录中，但未混入发布快照，因此当前发布包仍明确是 3,503 条试验的 `partial` 快照。
 
