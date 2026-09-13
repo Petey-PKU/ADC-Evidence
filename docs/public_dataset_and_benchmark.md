@@ -22,8 +22,8 @@ python scripts/build_public_dataset.py `
   --catalog data/public/marketed_adc_catalog.csv `
   --as-of 2026-09-30 `
   --pubmed-max 1000 `
-  --trial-page-size 1000 `
-  --trial-max-pages 10
+  --trial-page-size 250 `
+  --trial-max-pages 20
 ```
 
 命令只调用公开数据源，不调用生成模型。SQLite、原始响应和质量报告默认写入
@@ -81,7 +81,7 @@ Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字
 `workflow_dispatch` 入口，不会因普通代码 push 自动抓取或发布数据；下载者仍应先检查包内的
 `RELEASE_MANIFEST.json` 和来源许可。
 `RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
-最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 998 条。
+最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 1,410 条。
 打包过程会对 SQLite 副本中的本机绝对路径做脱敏，原始数据库不会被修改；发布包不含原始
 响应文件，因此无法用这些路径恢复本地采集缓存。
 

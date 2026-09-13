@@ -161,8 +161,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--quality-report", type=Path)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--pubmed-max", type=int, default=1000)
-    parser.add_argument("--trial-page-size", type=int, default=1000)
-    parser.add_argument("--trial-max-pages", type=int, default=10)
+    parser.add_argument("--trial-page-size", type=int, default=250)
+    parser.add_argument("--trial-max-pages", type=int, default=20)
     parser.add_argument("--source-retries", type=int, default=3)
     parser.add_argument("--source-retry-delay", type=float, default=1.0)
     parser.add_argument(

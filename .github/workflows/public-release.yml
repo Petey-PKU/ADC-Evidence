@@ -14,7 +14,7 @@ on:
       trial_max_pages:
         description: "Maximum ClinicalTrials.gov pages to collect"
         required: true
-        default: "10"
+        default: "20"
 
 permissions:
   contents: read
@@ -46,7 +46,7 @@ jobs:
           --catalog data/public/marketed_adc_catalog.csv
           --as-of "${{ inputs.as_of }}"
           --pubmed-max "${{ inputs.pubmed_max }}"
-          --trial-page-size 1000
+          --trial-page-size 250
           --trial-max-pages "${{ inputs.trial_max_pages }}"
       - name: Build matching retrieval index
         run: >-
