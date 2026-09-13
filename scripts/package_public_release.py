@@ -15,11 +15,13 @@ import os
 import re
 import shutil
 import sqlite3
+import subprocess
 import uuid
 import zipfile
 from pathlib import Path
 
 from adc_evidence.rag.documents import retrieval_corpus_version
+from adc_evidence.evaluation.public_hygiene import scan_public_text
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +32,41 @@ DEFAULT_CATALOG_AUDIT = ROOT / "data" / "public" / "marketed_adc_catalog.audit.j
 DEFAULT_BENCHMARK = ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json"
 DEFAULT_BENCHMARK_QUESTIONS = ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
 DEFAULT_OUTPUT = ROOT / "artifacts" / "releases" / "adc-public-2026-09-30.zip"
+
+
+def _runtime_files() -> tuple[list[tuple[Path, str]], dict[str, object]]:
+    """Bundle only tracked public application files, never local caches/config."""
+    tracked = set(subprocess.check_output(
+        ["git", "ls-files", "-z"], cwd=ROOT
+    ).decode().split("\0"))
+    required = {
+        "pyproject.toml", "README.md", "configs/entities.json", "configs/evidence_policy.json",
+        "scripts/run_public_release.py", "scripts/verify_public_release.py",
+        "src/adc_evidence/__init__.py", "src/adc_evidence/app.py",
+    }
+    if missing := required - tracked:
+        raise ValueError(f"Runtime files must be tracked before packaging: {sorted(missing)}")
+    paths = sorted(required | {
+        name for name in tracked if name.startswith("src/adc_evidence/") and name.endswith(".py")
+    })
+    files = []
+    for name in paths:
+        path = ROOT / name
+        if path.is_symlink() or not path.resolve().is_relative_to(ROOT) or not path.is_file():
+            raise ValueError(f"Invalid runtime source: {name}")
+        if scan_public_text(name, path.read_text(encoding="utf-8")):
+            raise ValueError(f"Public hygiene check failed for runtime source: {name}")
+        files.append((path, name))
+    metadata = {
+        "mode": "bundled_source",
+        "code_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "code_worktree_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
+        "runtime_file_count": len(files),
+        "launcher": "scripts/run_public_release.py",
+        "python_requires": ">=3.11",
+        "dependencies_bundled": False,
+    }
+    return files, metadata
 
 
 def _sha256(path: Path) -> str:
@@ -240,8 +277,16 @@ def build_release_inventory(
         (path, f"artifacts/vector_index/{index_path.name}/{path.relative_to(index_path).as_posix()}")
         for path in _index_files(index_path)
     )
+    runtime_files, application = _runtime_files()
+    files.extend(runtime_files)
+    application.update({
+        "database_path": f"data/processed/{database_archive_name or database.name}",
+        "catalog_path": f"data/public/{catalog.name}",
+        "index_path": f"artifacts/vector_index/{index_path.name}",
+    })
     inventory = {
-        "schema_version": "public-adc-release-v1",
+        "schema_version": "public-adc-release-v2",
+        "application": application,
         "dataset_as_of": as_of,
         "retrieval_corpus_version": corpus_version,
         "dataset_summary": _dataset_summary(database),
@@ -258,25 +303,37 @@ def build_release_inventory(
 def _release_readme(as_of: str) -> str:
     return f"""# ADC-Evidence public release ({as_of})
 
-This archive contains a public SQLite snapshot, its matching retrieval index,
-the public ADC catalog and its source audit, the benchmark questions and manifest. `RELEASE_MANIFEST.json`
+This archive contains the query application and required configuration, a public
+SQLite snapshot, its matching retrieval index, the public ADC catalog and source
+audit, and the benchmark questions and manifest. `RELEASE_MANIFEST.json`
 binds every file to a SHA-256 checksum.
 
-After extracting at the repository root, configure:
+Extract into a new folder. No Git clone, model account, or data rebuild is needed.
+Python 3.11+ is required. Install base Python dependencies once (this installation
+needs internet access unless you supply your own dependency wheelhouse):
 
 ```powershell
-$env:ADC_DATABASE_PATH = "data/processed/adc_public_{as_of}.db"
-$env:ADC_SEED_PATH = "data/public/marketed_adc_catalog.csv"
-$env:ADC_VECTOR_INDEX_PATH = "artifacts/vector_index/public_{as_of}"
-$env:ADC_OFFLINE_ONLY = "true"
-$env:ADC_LLM_BACKEND = "extractive"
-streamlit run src/adc_evidence/app.py
+python -m venv .venv
+.venv/Scripts/python -m pip install -e .
+.venv/Scripts/python scripts/run_public_release.py --check
+.venv/Scripts/python scripts/run_public_release.py --question "T-DXd 的靶点和载荷是什么？"
+.venv/Scripts/python scripts/run_public_release.py
 ```
 
+On Linux/macOS replace `.venv/Scripts/python` with `.venv/bin/python`.
+For the browser app, open http://127.0.0.1:8501 after launch.
+The launcher selects `ADC_DATABASE_PATH`, `ADC_SEED_PATH` and
+`ADC_VECTOR_INDEX_PATH` from this archive's manifest, regardless of the working
+directory. It enforces `ADC_OFFLINE_ONLY=true` and `ADC_LLM_BACKEND = "extractive"`.
+Queries use local data without a model API or model download. The source commit,
+working-tree status and file hashes are recorded under `application` and `files`.
+
+The dataset remains a partial, pending-review snapshot. A working query does not
+establish clinical validity, full source coverage, or independent human review.
 Abstract and full-text redistribution remains subject to the original source
 license. Raw response files are not included; local paths stored in the source
 database are redacted in this archive. Use the catalog builder to reproduce or
-refresh the snapshot.
+refresh the snapshot in the public source repository.
 """
 
 

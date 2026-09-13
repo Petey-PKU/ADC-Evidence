@@ -75,6 +75,19 @@ jobs:
         run: >-
           python scripts/verify_public_release.py
           "artifacts/releases/adc-public-${{ inputs.as_of }}.zip"
+      - name: Smoke test the extracted application
+        run: |
+          python -m zipfile -e "artifacts/releases/adc-public-${{ inputs.as_of }}.zip" "$RUNNER_TEMP/adc-release"
+          python -I "$RUNNER_TEMP/adc-release/scripts/run_public_release.py" --check
+          python -I "$RUNNER_TEMP/adc-release/scripts/run_public_release.py" --question "T-DXd 的靶点和载荷是什么？" > "$RUNNER_TEMP/release-answer.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          answer = json.loads((Path(os.environ['RUNNER_TEMP']) / 'release-answer.json').read_text())
+          assert answer['status'] == 'answered', answer
+          assert answer['generator_backend'] == 'structured', answer
+          assert answer['claim_validation']['valid'], answer
+          PY
       - name: Upload release archive
         uses: actions/upload-artifact@v4
         with:

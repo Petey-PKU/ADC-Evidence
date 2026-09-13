@@ -71,11 +71,29 @@ embedding 模型后重新构建。
 
 如果要提供“下载后直接查询”的版本，可运行 `scripts/package_public_release.py`。脚本会
 先验证 SQLite 与向量索引的 retrieval corpus 版本一致，再生成包含数据库、索引、公开目录、
-benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
+benchmark 题集与 manifest、查询程序、必要配置、README 和 SHA-256 清单的 v2 外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
 打包前还会逐条比较 SQLite 与目录中重叠的 ADC 字段；如果数据库仍是旧来源或旧值，打包会
 直接失败，避免发布包中的可查询数据库与目录清单不一致。
+
+程序只从已被 Git 跟踪的公开 Python 源码和明确列出的运行配置打包，并执行文本卫生检查；
+本地 `.env`、缓存、未跟踪源码和其他配置不会自动进入发布包。manifest 的 `application`
+记录代码提交、工作区是否存在改动、实际数据库/目录/索引路径和 Python 要求；所有程序
+文件也进入 SHA-256 清单。开发时打包的脏工作区不能被报告为对应提交的原样发布。
+
+将 v2 压缩包解压到独立文件夹后，按 `RELEASE_README.md` 创建 Python 3.11+ 虚拟环境，
+执行 `python -m pip install -e .` 安装基础依赖，再运行：
+
+```powershell
+python scripts/run_public_release.py --check
+python scripts/run_public_release.py --question "T-DXd 的靶点和载荷是什么？"
+python scripts/run_public_release.py
+```
+
+最后一条命令启动本机网页 `http://127.0.0.1:8501`。启动器不依赖调用者所在目录，自动选择
+解压包内的数据，并强制离线抽取式配置。无需另行克隆代码、采集数据或下载模型；首次
+Python 依赖安装需要联网或自行提供依赖 wheel。发布包未捆绑 Python 解释器和第三方依赖。
 
 公共仓库还提供手动触发的 `.github/workflows/public-release.yml`。在 GitHub Actions 中输入
 快照日期和抓取上限后，它会在干净的 Ubuntu runner 上重建数据库、hashing 索引和 benchmark，

@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import subprocess
+import sys
 import unittest
 import zipfile
 from pathlib import Path
@@ -10,15 +12,90 @@ from unittest.mock import patch
 
 from scripts.package_public_release import (
     _release_readme,
+    _runtime_files,
     _sanitize_database_for_release,
     _validate_database_catalog_binding,
     package_release,
 )
 from scripts.verify_public_release import _database_absolute_path_count, verify_release
+from scripts.build_public_dataset import classify_public_literature
 from tests.support import WorkspaceTemporaryDirectory
+from adc_evidence.database import initialize_database
+from adc_evidence.rag.documents import build_and_persist_corpus
+from adc_evidence.rag.vector_index import build_vector_index
+from adc_evidence.workbench import sync_public_seed_facts
 
 
 class PublicReleaseTests(unittest.TestCase):
+    def test_runtime_inventory_excludes_untracked_and_non_runtime_files(self) -> None:
+        from scripts import package_public_release as module
+
+        required = [
+            "pyproject.toml", "README.md", "configs/entities.json", "configs/evidence_policy.json",
+            "scripts/run_public_release.py", "scripts/verify_public_release.py",
+            "src/adc_evidence/__init__.py", "src/adc_evidence/app.py",
+        ]
+        with WorkspaceTemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in [*required, "src/adc_evidence/local_cache.py", "configs/local.json", ".env"]:
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("public fixture", encoding="utf-8")
+            with patch.object(module, "ROOT", root), patch.object(
+                module.subprocess, "check_output",
+                side_effect=[("\0".join([*required, "configs/local.json", ".env"]) + "\0").encode(), "abc\n", b""],
+            ):
+                files, metadata = _runtime_files()
+            self.assertEqual({name for _, name in files}, set(required))
+            self.assertFalse(metadata["dependencies_bundled"])
+
+    def test_extracted_release_answers_without_checkout_or_network(self) -> None:
+        project = Path(__file__).resolve().parents[1]
+        catalog = project / "data/sample/adcs.csv"
+        with WorkspaceTemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "custom.db"
+            index = root / "custom-index"
+            initialize_database(database, catalog)
+            sync_public_seed_facts(database, catalog)
+            classify_public_literature(database)
+            build_and_persist_corpus(database_path=database)
+            build_vector_index(database_path=database, index_path=index, backend="hashing")
+            benchmark = root / "benchmark.json"
+            benchmark.write_text('{}', encoding="utf-8")
+            archive_path = root / "release.zip"
+            package_release(
+                database=database, index_path=index, catalog=catalog,
+                benchmark_manifest=benchmark, output=archive_path, as_of="2026-09-13",
+            )
+            self.assertTrue(verify_release(archive_path)["bundled_application_present"])
+            extracted = root / "standalone"
+            with zipfile.ZipFile(archive_path) as archive:
+                archive.extractall(extracted)
+            # Isolated Python ignores PYTHONPATH; block sockets to prove the
+            # bundled CLI answers without a project/model network dependency.
+            command = (
+                "import os, runpy, socket, sys; "
+                "socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(AssertionError('network forbidden')); "
+                "os.environ['ADC_OFFLINE_ONLY']='false'; os.environ['ADC_LLM_BACKEND']='openai'; "
+                "sys.argv=[sys.argv[1], '--question', 'T-DXd 的靶点和载荷是什么？']; "
+                "runpy.run_path(sys.argv[0], run_name='__main__'); "
+                "import adc_evidence; from pathlib import Path; "
+                "assert Path(adc_evidence.__file__).resolve().is_relative_to(Path(sys.argv[0]).resolve().parents[1])"
+            )
+            completed = subprocess.run(
+                [sys.executable, "-I", "-c", command, str(extracted / "scripts/run_public_release.py")],
+                cwd=root, check=True, capture_output=True, text=True, encoding="utf-8", timeout=60,
+            )
+            answer = json.loads(completed.stdout)
+            self.assertEqual(answer["status"], "answered", answer)
+            self.assertEqual(answer["question"], "T-DXd 的靶点和载荷是什么？")
+            self.assertEqual(answer["generator_backend"], "structured")
+            self.assertEqual(
+                {claim["predicate"]: claim["value"] for claim in answer["claims"]},
+                {"adc.target": ["HER2"], "adc.payload_name": ["DXd"]},
+            )
+
     def test_database_catalog_binding_rejects_stale_source_url(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:
