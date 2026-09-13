@@ -116,7 +116,8 @@ def benchmark_manifest(
         "metrics": {
             "route_accuracy": "expected_route == system.route",
             "status_coverage": "system.status is in expected_status",
-            "answer_field_accuracy": "all required structured fields match standard_answer or allowed_answers",
+            "answer_field_accuracy": "mean answer credit; fractional credit is used only when allow_partial=true",
+            "answer_exact_accuracy": "proportion of questions whose required answer fields are all correct",
             "evidence_recall": "intersection(system cited source IDs, evidence_sources) is nonempty when evidence is required",
             "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
             "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI",
@@ -223,6 +224,14 @@ def _answer_field_hit(gold: dict[str, object], output: dict[str, object]) -> flo
     return 0.0
 
 
+def _answer_score(gold: dict[str, object], output: dict[str, object]) -> float:
+    """Apply the row's partial-answer policy to the raw field score."""
+    raw = _answer_field_hit(gold, output)
+    if bool(gold.get("allow_partial")):
+        return raw
+    return float(raw >= 1.0)
+
+
 def score_public_benchmark(
     system_rows: Iterable[dict[str, object]],
     benchmark_rows: list[dict[str, object]],
@@ -231,7 +240,8 @@ def score_public_benchmark(
     observed = {str(row.get("question_id", "")): row for row in system_rows}
     if set(observed) != set(expected):
         raise ValueError("System output IDs must exactly match the benchmark IDs")
-    route_hits = status_hits = answer_hits = evidence_hits = refusal_hits = 0
+    route_hits = status_hits = answer_exact_hits = evidence_hits = refusal_hits = 0
+    answer_scores = 0.0
     category_totals: Counter[str] = Counter()
     category_hits: dict[str, Counter[str]] = {}
     for question_id, gold in expected.items():
@@ -246,9 +256,12 @@ def score_public_benchmark(
         status_hit = int(output.get("status") in statuses)
         status_hits += status_hit
         hits["status"] += status_hit
-        answer_hit = _answer_field_hit(gold, output)
-        answer_hits += answer_hit
-        hits["answer"] += answer_hit
+        answer_score = _answer_score(gold, output)
+        answer_scores += answer_score
+        answer_exact_hit = int(answer_score >= 1.0)
+        answer_exact_hits += answer_exact_hit
+        hits["answer"] += answer_score
+        hits["answer_exact"] += answer_exact_hit
         if gold["evidence_sources"]:
             cited = output.get("citation_source_record_ids", [])
             evidence_hit = int(any(
@@ -271,6 +284,7 @@ def score_public_benchmark(
             "route_accuracy": values["route"] / category_totals[category],
             "status_coverage": values["status"] / category_totals[category],
             "answer_field_accuracy": values["answer"] / category_totals[category],
+            "answer_exact_accuracy": values["answer_exact"] / category_totals[category],
             "evidence_recall": values["evidence"] / category_totals[category],
             "refusal_correctness": values["refusal"] / category_totals[category],
         }
@@ -280,7 +294,8 @@ def score_public_benchmark(
         "question_count": total,
         "route_accuracy": route_hits / total,
         "status_coverage": status_hits / total,
-        "answer_field_accuracy": answer_hits / total,
+        "answer_field_accuracy": answer_scores / total,
+        "answer_exact_accuracy": answer_exact_hits / total,
         "evidence_recall": evidence_hits / total,
         "refusal_correctness": refusal_hits / total,
         "by_category": by_category,
@@ -311,7 +326,7 @@ def compare_public_benchmark_reports(
         return {
             "route": output.get("route") == gold["expected_route"],
             "status": output.get("status") in gold["expected_status"],
-            "answer": _answer_field_hit(gold, output) >= 1.0,
+            "answer": _answer_score(gold, output) >= 1.0,
             "evidence": evidence,
             "refusal": bool(output.get("status") == "refused") == bool(gold["should_refuse"]),
         }

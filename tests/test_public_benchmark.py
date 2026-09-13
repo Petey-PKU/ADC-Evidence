@@ -74,6 +74,36 @@ class PublicBenchmarkTests(unittest.TestCase):
         }
         score = score_public_benchmark([output], [row])
         self.assertEqual(score["answer_field_accuracy"], 1.0)
+        self.assertEqual(score["answer_exact_accuracy"], 1.0)
+
+    def test_partial_answer_policy_is_reflected_in_metrics(self) -> None:
+        row = {
+            "question_id": "partial-comparison",
+            "split": "dev",
+            "category": "comparison",
+            "question": "compare two payloads",
+            "expected_route": "comparison",
+            "expected_status": ["answered"],
+            "standard_answer": {"kind": "comparison", "field": "payload_name", "values": {"a": "MMAE", "b": "DM1"}},
+            "allowed_answers": [],
+            "evidence_sources": [],
+            "allow_partial": True,
+            "should_refuse": False,
+            "human_scoring": {"status": "pending", "primary": None, "secondary": None, "adjudicated": None},
+            "scoring": {"primary_metric": "answer_field_accuracy"},
+        }
+        output = {
+            "question_id": row["question_id"],
+            "route": "comparison",
+            "status": "answered",
+            "claims": [{"subject_id": "a", "predicate": "adc.payload_name", "value": "MMAE"}],
+        }
+        score = score_public_benchmark([output], [row])
+        self.assertEqual(score["answer_field_accuracy"], 0.5)
+        self.assertEqual(score["answer_exact_accuracy"], 0.0)
+        row["allow_partial"] = False
+        score = score_public_benchmark([output], [row])
+        self.assertEqual(score["answer_field_accuracy"], 0.0)
 
     def test_review_packet_leaves_human_verdicts_pending(self) -> None:
         rows = load_public_benchmark(BENCHMARK)[:2]

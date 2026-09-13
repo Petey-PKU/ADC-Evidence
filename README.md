@@ -286,10 +286,11 @@ python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/p
 
 ## 后续工作
 
-阶段 5 已完成 120 题版本化题集、三组同窗协议、答案与原子结论盲评对象、第二复核与
-裁决规则、人工汇总、Bad Case 和回归候选生成。8 题开发集已用硅基流动
-`deepseek-ai/DeepSeek-V4-Flash` 与 Tavily 完成三组真实链路验证并进入盲评队列；120 题
-正式运行和人工复核尚未执行，因此当前不宣称本系统优于通用模型。完整流程与发布门禁见
+历史阶段 5 记录了 120 题内部评测协议、三组同窗协议、盲评对象、第二复核与裁决规则。
+面向公开快照的当前 Benchmark v1 已独立生成 98 道开发/公开 smoke 题，并明确标记为
+`development_exposed`；它用于复现和回归检查，不能代替论文的独立人工复核和隐藏测试集。
+完整的公共数据范围、下载包和评测门禁见
+[公共数据集与 Benchmark 说明](docs/public_dataset_and_benchmark.md)及
 [阶段 5 说明](docs/v0.6_stage5_benchmark_review.md)。
 
 v0.6 将项目从带引用问答演示升级为 ADC 证据核查、比较和变化追踪工作台。阶段 0 已固定

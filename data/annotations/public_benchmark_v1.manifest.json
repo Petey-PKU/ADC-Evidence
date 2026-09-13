@@ -17,7 +17,7 @@
   "question_set_sha256": "sha256:d36c13e40ee0341437dc9743d3a564825ae8c82084d99fc54512b12d5d8dccef",
   "catalog_sha256": "sha256:c3396dccf5c73537c53deef2883a5d0ecbefe9e956e7620096689c6cf7185615",
   "database_data_version": {
-    "data_version": "data_1cf33bab6a96b56569372aa1240bfab1256d4b81518cb19e2a22dee054b0c597",
+    "data_version": "data_cf0c057134e4440eff28353b5a1e6989d8a5c7a90e3af44b5978f1506cbf0cbe",
     "schema_version": "0.6-refresh-v1",
     "schema_versions": [
       "0.6-benchmark-review-v2",
@@ -30,7 +30,7 @@
       "finished_at": "2026-09-13T03:08:45+00:00",
       "status": "partial"
     },
-    "retrieval_corpus_version": "corpus_0134ddfa8be277c52b4e66675839b081ed77ef4730cbe10e8d6ec2dd73008a55"
+    "retrieval_corpus_version": "corpus_c0c5d4adf458371bddf8cc75ac62c2f58fae5fa73da7e1b8c1b66f7646f5f16c"
   },
   "evaluation_use": {
     "status": "development_exposed",
@@ -50,7 +50,8 @@
   "metrics": {
     "route_accuracy": "expected_route == system.route",
     "status_coverage": "system.status is in expected_status",
-    "answer_field_accuracy": "all required structured fields match standard_answer or allowed_answers",
+    "answer_field_accuracy": "mean answer credit; fractional credit is used only when allow_partial=true",
+    "answer_exact_accuracy": "proportion of questions whose required answer fields are all correct",
     "evidence_recall": "intersection(system cited source IDs, evidence_sources) is nonempty when evidence is required",
     "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
     "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI"

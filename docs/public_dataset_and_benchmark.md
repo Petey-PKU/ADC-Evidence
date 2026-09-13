@@ -3,7 +3,7 @@
 ## 当前发布状态
 
 公共目录位于 `data/public/marketed_adc_catalog.csv`，包含 23 个截至
-2026-06-30 已有监管批准记录的 ADC 候选（包括 2 个历史撤回记录）。在 2026-09-13
+2026-06-30 已有监管批准记录的 ADC 候选（包括 1 个历史撤回记录）。在 2026-09-13
 构建的本地快照中，目录扩展为 23 个 ADC、1,750 条 ClinicalTrials.gov 试验和 998
 篇 PubMed 文献，其中 956 篇含摘要。请求的 `2026-09-30` 是未来目标窗口，因此本次
 清单将 `as_of_status` 标为 `future_target_pending`，不把未来日期当作已观察数据。
@@ -54,10 +54,19 @@ embedding 模型后重新构建。
 benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
 Git 仓库。
 
+下载者可以在解压前检查发布包：
+
+```powershell
+python scripts/verify_public_release.py artifacts/releases/adc-public-2026-09-30.zip
+```
+
+只有输出 `status: verified` 且 `checked_file_count` 与发布清单一致时，才应把数据库和索引
+接入应用。
+
 ## Benchmark v1
 
 `scripts/build_public_benchmark.py` 从公共快照生成
-`data/annotations/public_benchmark_v1.jsonl` 及其 manifest。本轮生成 86 道公开开发/烟
+`data/annotations/public_benchmark_v1.jsonl` 及其 manifest。本轮生成 98 道公开开发/烟
 雾测试题，覆盖：
 
 - 结构化 ADC 字段；
@@ -79,8 +88,9 @@ Git 仓库。
 Benchmark 还包含一小组机制、疗效和安全性主题题，来源是同一快照中的词法初筛标签，
 用于验证主题路由是否能找到相应证据。主题标签和候选文献都必须经过人工相关性复核。
 
-Benchmark 的自动指标包括路由准确率、状态覆盖率、答案字段准确率、证据来源召回率和
-拒答正确性。论文主指标还需要至少两名独立复核者按照相同评分表评估答案、证据、引用、
+Benchmark 的自动指标包括路由准确率、状态覆盖率、答案字段平均得分、完整答案准确率、
+证据来源召回率和拒答正确性。允许部分回答的题目按字段比例给分；不允许部分回答的题目
+必须全部满足标准答案才得分。论文主指标还需要至少两名独立复核者按照相同评分表评估答案、证据、引用、
 完整性和拒答合理性，并保存独立标签与裁决记录。
 
 可用 `scripts/prepare_public_benchmark_review.py` 从 benchmark 和运行报告生成逐题复核包；
