@@ -217,12 +217,24 @@ class EvidenceAnsweringService:
                 adc_filter = None
                 if plan is not None and plan.route == "literature_evidence" and len(plan.adc_ids) == 1:
                     adc_filter = plan.adc_ids[0]
+                topic_filter = None
+                if plan is not None and plan.route == "literature_evidence":
+                    lowered_question = question.casefold()
+                    for topic, terms in {
+                        "mechanism": ("机制", "mechanism", "内化", "旁观者"),
+                        "efficacy": ("疗效", "efficacy", "缓解率", "生存"),
+                        "safety": ("安全", "safety", "毒性", "不良事件"),
+                    }.items():
+                        if any(term.casefold() in lowered_question for term in terms):
+                            topic_filter = topic
+                            break
                 results = self.retriever.search(
                     question,
                     mode=retrieval_mode,
                     top_k=top_k,
                     source_type=source_type,
                     adc_id=adc_filter,
+                    topic=topic_filter,
                 )
         except Exception as exc:
             return AnswerResult(

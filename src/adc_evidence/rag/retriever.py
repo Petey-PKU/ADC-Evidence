@@ -99,6 +99,7 @@ class HybridRetriever:
         top_k: int = 10,
         source_type: str | None = None,
         adc_id: str | None = None,
+        topic: str | None = None,
     ) -> list[SearchResult]:
         expression = _fts_expression(query)
         if not expression:
@@ -111,6 +112,9 @@ class HybridRetriever:
         if adc_id:
             filters.append("chunk.metadata_json LIKE ?")
             parameters.append(f'%"{adc_id}"%')
+        if topic:
+            filters.append("chunk.metadata_json LIKE ?")
+            parameters.append(f'%"literature_topics": [%"{topic}"%')
         candidate_limit = max(top_k * 10, 60)
         parameters.append(candidate_limit)
         sql = f"""
@@ -126,6 +130,12 @@ class HybridRetriever:
         """
         with closing(connect(self.database_path)) as connection:
             rows = connection.execute(sql, parameters).fetchall()
+        if not rows and topic:
+            # Keep older/demo indexes usable when they predate the public
+            # literature topic metadata table.
+            return self.sparse_search(
+                query, top_k=top_k, source_type=source_type, adc_id=adc_id, topic=None
+            )
         matched_adc_ids = {
             match.entity_id
             for match in self._entity_normalizer.find_matches(query, entity_types=("adc",))
@@ -199,6 +209,7 @@ class HybridRetriever:
         top_k: int = 10,
         source_type: str | None = None,
         adc_id: str | None = None,
+        topic: str | None = None,
     ) -> list[SearchResult]:
         if not self.dense_available:
             raise RuntimeError("Vector index not found. Run the index builder first.")
@@ -216,6 +227,9 @@ class HybridRetriever:
         if adc_id:
             filters.append("chunk.metadata_json LIKE ?")
             parameters.append(f'%"{adc_id}"%')
+        if topic:
+            filters.append("chunk.metadata_json LIKE ?")
+            parameters.append(f'%"literature_topics": [%"{topic}"%')
         where = f"WHERE {' AND '.join(filters)}" if filters else ""
         with closing(connect(self.database_path)) as connection:
             rows = connection.execute(
@@ -229,6 +243,10 @@ class HybridRetriever:
                 """,
                 parameters,
             ).fetchall()
+        if not rows and topic:
+            return self.dense_search(
+                query, top_k=top_k, source_type=source_type, adc_id=adc_id, topic=None
+            )
         rows_by_id = {str(row["chunk_id"]): row for row in rows}
         results: list[SearchResult] = []
         seen_documents: set[str] = set()
@@ -254,6 +272,7 @@ class HybridRetriever:
         top_k: int = 10,
         source_type: str | None = None,
         adc_id: str | None = None,
+        topic: str | None = None,
         candidate_k: int = 60,
         sparse_weight: float = 6.0,
         dense_weight: float = 1.0,
@@ -263,12 +282,14 @@ class HybridRetriever:
             top_k=candidate_k,
             source_type=source_type,
             adc_id=adc_id,
+            topic=topic,
         )
         dense = self.dense_search(
             query,
             top_k=candidate_k,
             source_type=source_type,
             adc_id=adc_id,
+            topic=topic,
         )
         by_document: dict[str, SearchResult] = {}
         fused: dict[str, float] = {}

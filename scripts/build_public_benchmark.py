@@ -118,6 +118,26 @@ def _build_rows(catalog: list[dict[str, str]], database: Path) -> list[dict[str,
             """
         ).fetchall():
             document_rows.append(dict(link))
+        topic_rows: list[dict[str, object]] = []
+        try:
+            for link in connection.execute(
+                """
+                SELECT l.entity_id, t.topic, d.document_id, d.source_record_id,
+                       d.title, d.source_url
+                FROM literature_topics AS t
+                JOIN documents AS d ON d.document_id=t.document_id
+                JOIN entity_links AS l
+                  ON l.source_record_type='document'
+                 AND l.source_record_id=d.document_id
+                WHERE d.source='pubmed'
+                ORDER BY l.entity_id, t.topic, d.document_id
+                """
+            ).fetchall():
+                topic_rows.append(dict(link))
+        except sqlite3.OperationalError:
+            # A database built before literature-topic-rule-v1 remains usable;
+            # the topic-specific benchmark rows are simply omitted.
+            topic_rows = []
 
         def fact_source(adc_id: str, field: str, fallback: dict[str, str]) -> dict[str, str]:
             predicate = f"adc.{field}"
@@ -239,6 +259,32 @@ def _build_rows(catalog: list[dict[str, str]], database: Path) -> list[dict[str,
             standard_answer={"kind": "evidence_document", "document_id": accepted_ids[0], "title": candidates[0]["title"]},
             allowed_answers=accepted_ids[1:], evidence_sources=[
                 _source("pubmed", str(document["source_record_id"]), str(document["source_url"]), "abstract")
+                for document in candidates
+            ], allow_partial=True, should_refuse=False, primary_metric="evidence_recall",
+        ))
+
+    # Add a small topic-stratified slice so the benchmark exercises the
+    # mechanism/efficacy/safety triage labels rather than only generic papers.
+    topic_labels = {"mechanism": "机制", "efficacy": "疗效", "safety": "安全性"}
+    topic_by_entity: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for document in topic_rows:
+        topic_by_entity.setdefault((str(document["entity_id"]), str(document["topic"])), []).append(document)
+    for (entity_id, topic), entity_topic_documents in sorted(topic_by_entity.items()):
+        if topic not in topic_labels or entity_id not in by_id:
+            continue
+        if sum(1 for row in rows if row["category"] == "literature_evidence" and str(row["question_id"]).startswith("pb_v1_topic_")) >= 12:
+            break
+        candidates = entity_topic_documents[:50]
+        if not candidates:
+            continue
+        accepted_ids = [f"pubmed:{document['source_record_id']}" for document in candidates]
+        rows.append(_base(
+            f"pb_v1_topic_{topic}_{entity_id}", split="public_smoke", category="literature_evidence",
+            question=f"请给出一篇与 {by_id[entity_id]['adc_name']} 的{topic_labels[topic]}相关的文献证据。",
+            expected_route="literature_evidence", expected_status=["answered", "partial"],
+            standard_answer={"kind": "evidence_document", "document_id": accepted_ids[0], "title": candidates[0]["title"]},
+            allowed_answers=accepted_ids[1:], evidence_sources=[
+                _source("pubmed", str(document["source_record_id"]), str(document["source_url"]), f"{topic}_abstract")
                 for document in candidates
             ], allow_partial=True, should_refuse=False, primary_metric="evidence_recall",
         ))
