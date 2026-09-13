@@ -31,6 +31,17 @@ python scripts/build_public_dataset.py `
 来源运行状态、数量和哈希。PubMed 结果可能因解析或来源使用限制而不适合直接再分发，
 所以发布前应按记录检查许可证，必要时只发布 PMID、标题、摘要 URL 和哈希。
 
+可对本地快照生成不含记录正文的去重、实体链接、字段事实覆盖和来源完整性审计：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_public_dataset.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --output artifacts/evaluation/public_dataset_audit.json
+```
+
+审计会将计划中的抓取上限记录为 `partial`，不会把部分 PubMed 结果解释为全集覆盖。
+
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
 词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和
 `needs_review` 状态；它用于组织检索和人工复核队列，不代表论文相关性的最终判断。
