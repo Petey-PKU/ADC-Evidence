@@ -104,6 +104,62 @@ def validate_holdout_disjoint(
     }
 
 
+def validate_holdout_entity_mentions(
+    holdout_questions: list[dict[str, object]],
+    catalog_rows: list[dict[str, object]],
+) -> dict[str, object]:
+    """Check that each expected ADC is named in its public holdout question.
+
+    This is a lightweight dataset-integrity check, not a semantic annotation
+    judgment. It catches stale question-to-entity IDs when a catalog is
+    reordered or a benchmark is regenerated from a different snapshot.
+    """
+    entities: dict[str, set[str]] = {}
+    for row in catalog_rows:
+        adc_id = str(row.get("adc_id", "")).strip()
+        if not adc_id:
+            continue
+        names = {str(row.get("adc_name", ""))}
+        names.update(str(row.get("aliases", "")).split("|"))
+        names.add(str(row.get("brand_name", "")))
+        entities[adc_id] = {
+            _normalized_question(name)
+            for name in names
+            if _normalized_question(name)
+        }
+
+    failures: list[dict[str, object]] = []
+    checked = 0
+    for row in holdout_questions:
+        expected_ids = row.get("expected_adc_ids", [])
+        if not isinstance(expected_ids, list):
+            raise ValueError(f"{row.get('question_id')}: expected_adc_ids must be a list")
+        question_key = _normalized_question(row.get("question", ""))
+        for raw_id in expected_ids:
+            adc_id = str(raw_id).strip()
+            checked += 1
+            if adc_id not in entities:
+                failures.append({
+                    "question_id": str(row.get("question_id", "")),
+                    "adc_id": adc_id,
+                    "reason": "unknown_catalog_id",
+                })
+                continue
+            if not any(name in question_key for name in entities[adc_id]):
+                failures.append({
+                    "question_id": str(row.get("question_id", "")),
+                    "adc_id": adc_id,
+                    "reason": "entity_not_mentioned",
+                })
+    if failures:
+        raise ValueError(f"Holdout entity binding failed: {failures}")
+    return {
+        "status": "entity_bindings_verified",
+        "question_count": len(holdout_questions),
+        "expected_entity_count": checked,
+    }
+
+
 def holdout_manifest(questions: list[dict[str, object]]) -> dict[str, object]:
     return {
         "schema_version": HOLDOUT_SCHEMA_VERSION,

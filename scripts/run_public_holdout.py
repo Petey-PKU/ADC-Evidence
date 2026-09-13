@@ -8,7 +8,7 @@ from adc_evidence.evaluation.holdout import load_holdout_questions, run_public_h
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the public unseen holdout.")
+    parser = argparse.ArgumentParser(description="Run the public smoke holdout.")
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--questions", type=Path, required=True)
     parser.add_argument("--window-id", required=True)
