@@ -42,6 +42,10 @@ v1 发布包只提供数据和索引，运行时还依赖另行取得的代码�
   `/_stcore/health` 返回 HTTP 200 和 `ok`；验证结束后已停止临时服务。
 - `pip check` 无依赖冲突；compileall、公开题集校验和 20/120 题分离校验通过。
   公开卫生检查未发现问题。投稿门禁仍要求真实独立人工标签和受控冻结测试集。
+- 候选来源内容预核验脚本对 23 条目录 URL 的实际结果为 21 条 HTTP 200、1 条 HTTP 403、
+  1 条 HTTP 412；
+  16 条响应文本出现 ADC 名称/别名，161 个结构字段仍没有字段级来源。该脚本只生成
+  `triage_only_pending_human_source_locator_review` 队列，不改变 `primary_check_pending`。
 
 ## 复现命令
 

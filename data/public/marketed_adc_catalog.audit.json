@@ -1,6 +1,6 @@
 {
   "schema_version": "public-adc-catalog-audit-v1",
-  "catalog_sha256": "sha256:72b41e476906d6aafa1db96c717bdc9ae2b94da55a0425c2414f8a2883b59ac4",
+  "catalog_sha256": "sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c",
   "requested_as_of": "2026-09-30",
   "row_count": 23,
   "status_counts": {
@@ -17,8 +17,9 @@
   },
   "source_host_counts": {
     "en.lepubiopharma.com": 1,
+    "purplebooksearch.fda.gov": 2,
     "static.cninfo.com.cn": 1,
-    "www.fda.gov": 16,
+    "www.fda.gov": 14,
     "www.hkexnews.hk": 2,
     "www.nmpa.gov.cn": 1,
     "www.pmda.go.jp": 1,

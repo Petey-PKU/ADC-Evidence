@@ -49,6 +49,24 @@ python scripts/audit_public_dataset.py `
 审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
 计数；`adc_fact_source_quality_status=needs_review` 时，不能把该快照当作字段来源已核验。
 
+可对候选 URL 做一次带超时的内容预核验（不修改目录字段，也不生成人工 verdict）：
+
+```powershell
+$env:PYTHONPATH="src"
+$env:HTTP_PROXY="http://127.0.0.1:7890"
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
+python scripts/audit_public_catalog_sources.py `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --output artifacts/evaluation/public_catalog_source_content_audit.json
+```
+
+报告只记录 HTTP 状态、内容类型、ADC 名称/别名是否出现在响应文本中、来源类别和字段评估。
+`candidate_support_only` 是待人工定位的线索，`field_level_source_missing` 表示目录的单一
+候选 URL 尚不能支持结构字段；自动匹配永远不计入金标准。2026-09-13 的实际运行结果为
+23 行均返回 HTTP 响应（21 行为 200、1 行为 403、1 行为 412），16 行文本出现名称/别名，
+161 个结构字段仍缺字段级来源；PDF 只记录可访问性，不自动提取正文；
+状态为 `triage_only_pending_human_source_locator_review`。
+
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
 词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和
 `needs_review` 状态；它用于组织检索和人工复核队列，不代表论文相关性的最终判断。
