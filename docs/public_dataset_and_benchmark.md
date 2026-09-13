@@ -46,6 +46,8 @@ python scripts/audit_public_dataset.py `
 不会把没有关联记录的 ADC 静默计入文献或试验覆盖率。
 其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
 链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
+审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
+计数；`adc_fact_source_quality_status=needs_review` 时，不能把该快照当作字段来源已核验。
 
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
 词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和

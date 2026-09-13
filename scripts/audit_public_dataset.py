@@ -7,10 +7,15 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATABASE = ROOT / "data" / "processed" / "adc_public_2026-09-30.db"
+GENERIC_SOURCE_URLS = {
+    "https://www.nmpa.gov.cn",
+    "https://www.fda.gov/drugs/resources-information-approved-drugs",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -25,6 +30,16 @@ def _table_exists(connection: sqlite3.Connection, table: str) -> bool:
 
 def _count(connection: sqlite3.Connection, table: str) -> int:
     return int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+
+
+def _is_generic_source_url(value: str) -> bool:
+    normalized = value.strip().rstrip("/")
+    if not normalized:
+        return False
+    if normalized in GENERIC_SOURCE_URLS:
+        return True
+    parsed = urlparse(normalized)
+    return bool(parsed.netloc) and parsed.path in {"", "/"}
 
 
 def audit_database(database: Path) -> dict[str, object]:
@@ -129,6 +144,7 @@ def audit_database(database: Path) -> dict[str, object]:
 
         fact_coverage: dict[str, int] = {}
         fact_provenance: dict[str, dict[str, object]] = {}
+        fact_source_quality: dict[str, dict[str, int]] = {}
         if _table_exists(connection, "facts"):
             fact_coverage = {
                 str(row["predicate"]): int(row["value_count"])
@@ -167,6 +183,28 @@ def audit_database(database: Path) -> dict[str, object]:
                         "distinct_source_url_count": int(row["distinct_url_count"]),
                         "source_types": source_types,
                     }
+                url_rows = connection.execute(
+                    """
+                    SELECT f.predicate, e.source_url
+                    FROM facts AS f
+                    LEFT JOIN fact_evidence AS e
+                      ON e.fact_id=f.fact_id AND e.is_current=1 AND e.valid_to IS NULL
+                    WHERE f.subject_type='adc' AND f.valid_to IS NULL
+                    """
+                ).fetchall()
+                quality: dict[str, dict[str, int]] = {}
+                for url_row in url_rows:
+                    predicate = str(url_row["predicate"])
+                    value = str(url_row["source_url"] or "").strip()
+                    url_counts = quality.setdefault(
+                        predicate,
+                        {"missing_url_count": 0, "generic_url_count": 0},
+                    )
+                    if not value:
+                        url_counts["missing_url_count"] += 1
+                    elif _is_generic_source_url(value):
+                        url_counts["generic_url_count"] += 1
+                fact_source_quality = dict(sorted(quality.items()))
 
         source_runs: list[dict[str, object]] = []
         if _table_exists(connection, "ingestion_source_runs"):
@@ -231,6 +269,16 @@ def audit_database(database: Path) -> dict[str, object]:
         "match_method_counts": match_method_counts,
         "adc_fact_coverage": fact_coverage,
         "adc_fact_provenance": fact_provenance,
+        "adc_fact_source_quality": fact_source_quality,
+        "adc_fact_source_quality_status": (
+            "pass"
+            if all(
+                values["missing_url_count"] == 0
+                and values["generic_url_count"] == 0
+                for values in fact_source_quality.values()
+            )
+            else "needs_review"
+        ),
         "source_runs": source_runs,
         "incomplete_sources": incomplete_sources,
         "status": "partial" if incomplete_sources else "complete",

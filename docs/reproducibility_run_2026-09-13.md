@@ -15,7 +15,7 @@ python scripts/audit_public_hygiene.py --output artifacts/evaluation/public_hygi
 python scripts/audit_paper_readiness.py --output artifacts/evaluation/paper_readiness.json
 ```
 
-结果：200 项标准库测试通过；发布包 `status=verified`，检查 8 个文件，数据库绝对路径为 0；公开仓库卫生审计为 `clean`。论文就绪审计仍按设计返回 `not_ready_for_submission`，保留两个硬门槛：真实独立人工标签和访问受控的独立冻结测试集。
+结果：201 项标准库测试通过；发布包 `status=verified`，检查 8 个文件，数据库绝对路径为 0；公开仓库卫生审计为 `clean`。论文就绪审计仍按设计返回 `not_ready_for_submission`，保留两个硬门槛：真实独立人工标签和访问受控的独立冻结测试集。
 
 从发布包解压后设置 `ADC_OFFLINE_ONLY=true`、`ADC_LLM_BACKEND=extractive`，执行结构化问题：
 
@@ -47,6 +47,10 @@ SHA-256 为 `sha256:6a1dfb9b24015743b17b32bd7adf31aa3419f71b7e49803be0a03e324ce7
 本轮还修复了字段 evidence 的 URL 幂等判断，并用当前目录重新绑定 223 条 ADC 字段
 事实；当前快照中的 ADC 字段 evidence 不再使用通用 NMPA 首页 URL，均保留目录中的具体来源地址，
 状态仍为 `needs_review`，等待人工核验。
+
+公开数据审计现在还会输出 `adc_fact_source_quality_status`，对每个当前 ADC 字段
+统计空 URL 和通用首页 URL；本快照该状态为 `pass`（两项计数均为 0），但来源内容本身
+仍需人工核验。
 
 本轮曾用每页 100 条、最多 140 页尝试扩大 ClinicalTrials.gov 覆盖。代理在读取分页响应时长时间无终止结果，人工中断；没有新试验写入。该次失败参数和堆栈保留在本地运行记录中，但未混入发布快照，因此当前发布包仍明确是 3,503 条试验的 `partial` 快照。
 
