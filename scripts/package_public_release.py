@@ -8,6 +8,7 @@ explicitly selected and records their checksums.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import os
@@ -91,6 +92,58 @@ def _dataset_summary(database: Path) -> dict[str, object]:
     }
 
 
+def _validate_database_catalog_binding(database: Path, catalog: Path) -> None:
+    """Fail closed when the selected SQLite snapshot drifts from its catalog.
+
+    A release contains both files. Comparing the overlapping ADC fields here
+    prevents a manually packaged snapshot from silently serving stale source
+    URLs or structured values after the checked-in catalog has changed.
+    """
+    with catalog.open(encoding="utf-8-sig", newline="") as handle:
+        catalog_rows = {
+            str(row.get("adc_id", "")).strip(): row
+            for row in csv.DictReader(handle)
+        }
+    if not catalog_rows or any(not key for key in catalog_rows):
+        raise ValueError("Catalog must contain nonempty adc_id values")
+    connection = sqlite3.connect(database)
+    try:
+        connection.row_factory = sqlite3.Row
+        db_rows = {
+            str(row["adc_id"]): dict(row)
+            for row in connection.execute("SELECT * FROM adcs")
+        }
+    finally:
+        connection.close()
+    if set(db_rows) != set(catalog_rows):
+        missing = sorted(set(catalog_rows) - set(db_rows))
+        extra = sorted(set(db_rows) - set(catalog_rows))
+        raise ValueError(
+            "Database/catalog ADC IDs differ; "
+            f"missing_in_database={missing}, extra_in_database={extra}"
+        )
+    comparable_fields = (
+        "adc_name", "target", "antibody", "linker_name", "linker_type",
+        "payload_name", "payload_class", "dar", "indication",
+        "development_status", "company", "source_url", "data_review_status",
+    )
+    mismatches: list[str] = []
+    for adc_id in sorted(catalog_rows):
+        catalog_row = catalog_rows[adc_id]
+        db_row = db_rows[adc_id]
+        for field in comparable_fields:
+            expected = str(catalog_row.get(field, "") or "").strip()
+            actual = str(db_row.get(field, "") or "").strip()
+            if expected != actual:
+                mismatches.append(f"{adc_id}.{field}")
+    if mismatches:
+        raise ValueError(
+            "Database/catalog field binding drift detected: "
+            + ", ".join(mismatches[:20])
+            + (" ..." if len(mismatches) > 20 else "")
+        )
+
+
 def _redact_local_paths(value: object) -> object:
     """Remove machine-specific absolute paths from JSON run parameters."""
     if isinstance(value, dict):
@@ -158,6 +211,7 @@ def build_release_inventory(
 ) -> tuple[list[tuple[Path, str]], dict[str, object]]:
     database = _require_file(database, "database")
     catalog = _require_file(catalog, "catalog")
+    _validate_database_catalog_binding(database, catalog)
     if catalog_audit is not None:
         catalog_audit = _require_file(catalog_audit, "catalog audit")
     benchmark_manifest = _require_file(benchmark_manifest, "benchmark manifest")

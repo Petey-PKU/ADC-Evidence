@@ -8,12 +8,41 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.package_public_release import _release_readme, _sanitize_database_for_release, package_release
+from scripts.package_public_release import (
+    _release_readme,
+    _sanitize_database_for_release,
+    _validate_database_catalog_binding,
+    package_release,
+)
 from scripts.verify_public_release import _database_absolute_path_count, verify_release
 from tests.support import WorkspaceTemporaryDirectory
 
 
 class PublicReleaseTests(unittest.TestCase):
+    def test_database_catalog_binding_rejects_stale_source_url(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            root = Path(temporary.name)
+            catalog = root / "catalog.csv"
+            catalog.write_text(
+                "adc_id,adc_name,target,antibody,linker_name,linker_type,payload_name,payload_class,dar,indication,development_status,company,source_url,data_review_status\n"
+                "adc_001,Example,HER2,Ab,linker,cleavable,payload,class,4.0,cancer,approved,Company,https://new.example/source,needs_review\n",
+                encoding="utf-8",
+            )
+            database = root / "database.db"
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "CREATE TABLE adcs (adc_id TEXT, adc_name TEXT, target TEXT, antibody TEXT, linker_name TEXT, linker_type TEXT, payload_name TEXT, payload_class TEXT, dar TEXT, indication TEXT, development_status TEXT, company TEXT, source_url TEXT, data_review_status TEXT)"
+                )
+                connection.execute(
+                    "INSERT INTO adcs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    ("adc_001", "Example", "HER2", "Ab", "linker", "cleavable", "payload", "class", "4.0", "cancer", "approved", "Company", "https://old.example/source", "needs_review"),
+                )
+            with self.assertRaisesRegex(ValueError, "field binding drift"):
+                _validate_database_catalog_binding(database, catalog)
+        finally:
+            temporary.cleanup()
+
     def test_release_readme_contains_direct_use_paths(self) -> None:
         readme = _release_readme("2026-09-30")
         self.assertIn("ADC_DATABASE_PATH", readme)
