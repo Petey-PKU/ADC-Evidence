@@ -85,7 +85,8 @@ Benchmark 的自动指标包括路由准确率、状态覆盖率、答案字段�
 公开 runner 加上 `--disable-structured-routing` 可运行同一数据库、同一索引和同一问题集的
 离线 RAG baseline；该选项只关闭结构化路由，便于做配对消融，不引入第二个数据源。
 随后可用 `scripts/compare_public_benchmark.py` 计算逐题配对差值和按类别差值；这仍是
-自动诊断，论文主结论需要在隐藏题集上完成独立人工评分和统计检验。
+自动诊断，并附带 bootstrap 置信区间与精确 McNemar p 值；论文主结论需要在隐藏题集上
+完成独立人工评分和预注册统计检验。
 
 ## 下一步冻结规则
 

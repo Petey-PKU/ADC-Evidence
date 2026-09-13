@@ -8,6 +8,8 @@ from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 
+from adc_evidence.evaluation.statistics import paired_binary_summary
+
 
 PUBLIC_BENCHMARK_SCHEMA_VERSION = "public-adc-benchmark-v1"
 VALID_CATEGORIES = {
@@ -333,6 +335,12 @@ def compare_public_benchmark_reports(
                     metrics(expected[qid], baseline[qid])[metric]
                     and not metrics(expected[qid], system[qid])[metric]
                     for qid in ids
+                ),
+                "paired_statistics": paired_binary_summary(
+                    [metrics(expected[qid], system[qid])[metric] for qid in ids],
+                    [metrics(expected[qid], baseline[qid])[metric] for qid in ids],
+                    bootstrap_iterations=2000,
+                    seed=0,
                 ),
             }
         return result

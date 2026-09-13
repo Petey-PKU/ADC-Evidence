@@ -102,6 +102,7 @@ class PublicBenchmarkTests(unittest.TestCase):
         comparison = compare_public_benchmark_reports(system, baseline, rows)
         self.assertEqual(comparison["paired_metrics"]["route"]["difference"], 1.0)
         self.assertEqual(comparison["paired_metrics"]["answer"]["system_rate"], 1.0)
+        self.assertIn("mcnemar_exact_two_sided_pvalue", comparison["paired_metrics"]["route"]["paired_statistics"])
 
 
 if __name__ == "__main__":
