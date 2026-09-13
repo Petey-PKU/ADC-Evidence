@@ -89,15 +89,27 @@ def recover_stale_ingestion_runs(
                 """,
                 (finished_at, json.dumps(summary, ensure_ascii=False), error_text, run_id),
             )
-            connection.execute(
-                """
-                UPDATE ingestion_source_runs
-                SET finished_at = ?, status = 'failed', error_text = ?,
-                    details_json = json_set(details_json, '$.recovered_stale_run', 1)
-                WHERE run_id = ? AND status = 'running'
-                """,
-                (finished_at, error_text, run_id),
-            )
+            source_rows = connection.execute(
+                "SELECT source, details_json FROM ingestion_source_runs "
+                "WHERE run_id = ? AND status = 'running'",
+                (run_id,),
+            ).fetchall()
+            for source_row in source_rows:
+                try:
+                    details = json.loads(str(source_row[1] or "{}"))
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    details = {}
+                if not isinstance(details, dict):
+                    details = {}
+                details["recovered_stale_run"] = True
+                connection.execute(
+                    """
+                    UPDATE ingestion_source_runs
+                    SET finished_at = ?, status = 'failed', error_text = ?, details_json = ?
+                    WHERE run_id = ? AND source = ? AND status = 'running'
+                    """,
+                    (finished_at, error_text, json.dumps(details, ensure_ascii=False), run_id, source_row[0]),
+                )
             recovered.append(run_id)
     return recovered
 
