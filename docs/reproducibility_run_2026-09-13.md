@@ -30,10 +30,10 @@ python -m adc_evidence.generation.answer "T-DXd 的靶点和载荷是什么？" 
 | 项目 | 值 |
 | --- | --- |
 | 数据库 | 23 ADC、3,503 条试验、1,410 篇 PubMed 文献 |
-| 数据库 SHA-256 | `sha256:aab29dc036066ecf51077b3e5ac5ae220d751a82b1122031124ab32d647498c9` |
+| 数据库 SHA-256 | `sha256:d75250c76ebd319dbbf03b92313ae8b52f65913f707ebfa98f09121b567d3ca1` |
 | 检索语料版本 | `corpus_935c87b85da21bb4da43f671a339c5adb46a805b4dc90beb8ecb467615702d95` |
 | Benchmark | 98 道公开开发/烟雾测试题 |
-| 发布包 SHA-256 | `sha256:2366fda2691f13092f1e4b970474d3c1340554c611f985dcbaddcd4e9a803f2e` |
+| 发布包 SHA-256 | `sha256:2c6fbbbc0c30118f43a6f7aa06e97ae5e9949c81648d1fe5e6be6aa98a287364` |
 | 数据审计状态 | `partial`；两类来源均有计划上限，但 23 个 ADC 均已有至少一条文献和试验实体关联 |
 
 `partial` 是覆盖状态而非失败：它禁止把当前快照当作完整文献全集。长 PubMed 查询现在自动使用 POST；首轮结果缺少某个规范 ADC 时，会执行最多 50 条记录的精确名称补充。下一次完整抓取仍应重新生成数据库、索引、Benchmark、发布包及其哈希。
