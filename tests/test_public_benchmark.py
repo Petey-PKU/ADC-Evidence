@@ -9,6 +9,8 @@ from adc_evidence.evaluation.public_benchmark import (
     load_public_benchmark,
     score_public_benchmark,
 )
+from scripts.prepare_public_benchmark_review import prepare_packet
+from tests.support import WorkspaceTemporaryDirectory
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +73,25 @@ class PublicBenchmarkTests(unittest.TestCase):
         }
         score = score_public_benchmark([output], [row])
         self.assertEqual(score["answer_field_accuracy"], 1.0)
+
+    def test_review_packet_leaves_human_verdicts_pending(self) -> None:
+        rows = load_public_benchmark(BENCHMARK)[:2]
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            root = Path(temporary.name)
+            questions = root / "questions.jsonl"
+            report = root / "report.json"
+            questions.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
+            report.write_text(json.dumps({"questions": [
+                {"question_id": row["question_id"], "route": row["expected_route"], "status": "answered", "answer": "x"}
+                for row in rows
+            ]}), encoding="utf-8")
+            packet, manifest = prepare_packet(questions, report)
+        finally:
+            temporary.cleanup()
+        self.assertEqual(manifest["status"], "awaiting_independent_human_review")
+        self.assertTrue(all(item["review"]["status"] == "pending" for item in packet))
+        self.assertTrue(all(item["review"]["review_origin"] is None for item in packet))
 
 
 if __name__ == "__main__":

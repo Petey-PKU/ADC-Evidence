@@ -50,10 +50,11 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "route": result.route,
             "status": result.status,
             "refusal_reason": result.refusal_reason,
+            "answer": result.answer,
+            "claims": [claim.model_dump(mode="json") for claim in result.claims],
             "citation_source_record_ids": sorted(set(source_ids)),
             "citation_count": len(result.citations),
             "claim_count": len(result.claims),
-            "claims": [claim.model_dump(mode="json") for claim in result.claims],
             "latency_ms": result.latency_ms,
             "answer_hash": f"sha256:{_object_hash(result.answer)}",
         })
