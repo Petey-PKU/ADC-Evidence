@@ -24,6 +24,9 @@ The catalog is a public starting point, not a claim that every field has been
 independently verified. `verification_status=pending_primary_check` means a
 primary regulator label or registry record still needs to be checked before a
 paper uses the field as a gold-standard fact.
+`marketed_adc_catalog.audit.json` is a deterministic review queue for these
+checks; it reports generic regulator landing pages and missing required fields
+without containing private notes.
 
 ## Data policy
 

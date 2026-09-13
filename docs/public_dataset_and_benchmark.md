@@ -52,7 +52,8 @@ embedding 模型后重新构建。
 如果要提供“下载后直接查询”的版本，可运行 `scripts/package_public_release.py`。脚本会
 先验证 SQLite 与向量索引的 retrieval corpus 版本一致，再生成包含数据库、索引、公开目录、
 benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
-Git 仓库。
+Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
+待做的一级来源核验，不把待核验记录伪装成金标准。
 
 下载者可以在解压前检查发布包：
 

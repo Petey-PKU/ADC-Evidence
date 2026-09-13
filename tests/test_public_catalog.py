@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import csv
+import unittest
+from pathlib import Path
+
+from scripts.audit_public_catalog import audit_catalog
+from tests.support import WorkspaceTemporaryDirectory
+
+
+class PublicCatalogAuditTests(unittest.TestCase):
+    def test_audit_reports_generic_sources_and_pending_primary_checks(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            path = Path(temporary.name) / "catalog.csv"
+            fields = [
+                "adc_id", "adc_name", "aliases", "target", "antibody", "linker_name",
+                "linker_type", "payload_name", "payload_class", "dar", "indication", "development_status",
+                "company", "source_url", "data_review_status", "brand_name", "approval_date",
+                "approval_jurisdictions", "catalog_status", "dar_reported", "as_of_date", "verification_status",
+            ]
+            row = {field: "value" for field in fields}
+            row.update({
+                "adc_id": "adc_001", "adc_name": "Example ADC", "source_url": "https://www.nmpa.gov.cn/",
+                "approval_date": "2025-01-01", "as_of_date": "2026-06-30",
+                "catalog_status": "marketed", "verification_status": "primary_check_pending",
+            })
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fields)
+                writer.writeheader()
+                writer.writerow(row)
+            report = audit_catalog(path, requested_as_of="2026-09-30")
+        finally:
+            temporary.cleanup()
+        self.assertEqual(report["row_count"], 1)
+        self.assertEqual(report["generic_source_url_count"], 1)
+        self.assertEqual(report["review_status"], "needs_primary_source_review")
+        self.assertEqual(report["manual_review_queue"][0]["adc_id"], "adc_001")
+
+
+if __name__ == "__main__":
+    unittest.main()

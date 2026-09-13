@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATABASE = ROOT / "data" / "processed" / "adc_public_2026-09-30.db"
 DEFAULT_INDEX = ROOT / "artifacts" / "vector_index" / "public_2026-09-30"
 DEFAULT_CATALOG = ROOT / "data" / "public" / "marketed_adc_catalog.csv"
+DEFAULT_CATALOG_AUDIT = ROOT / "data" / "public" / "marketed_adc_catalog.audit.json"
 DEFAULT_BENCHMARK = ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json"
 DEFAULT_BENCHMARK_QUESTIONS = ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
 DEFAULT_OUTPUT = ROOT / "artifacts" / "releases" / "adc-public-2026-09-30.zip"
@@ -58,10 +59,13 @@ def build_release_inventory(
     catalog: Path,
     benchmark_manifest: Path,
     as_of: str,
+    catalog_audit: Path | None = None,
     benchmark_questions: Path | None = None,
 ) -> tuple[list[tuple[Path, str]], dict[str, object]]:
     database = _require_file(database, "database")
     catalog = _require_file(catalog, "catalog")
+    if catalog_audit is not None:
+        catalog_audit = _require_file(catalog_audit, "catalog audit")
     benchmark_manifest = _require_file(benchmark_manifest, "benchmark manifest")
     if benchmark_questions is not None:
         benchmark_questions = _require_file(benchmark_questions, "benchmark questions")
@@ -76,8 +80,12 @@ def build_release_inventory(
     files: list[tuple[Path, str]] = [
         (database, f"data/processed/{database.name}"),
         (catalog, f"data/public/{catalog.name}"),
-        (benchmark_manifest, f"data/annotations/{benchmark_manifest.name}"),
     ]
+    if catalog_audit is not None:
+        files.append((catalog_audit, f"data/public/{catalog_audit.name}"))
+    files.extend([
+        (benchmark_manifest, f"data/annotations/{benchmark_manifest.name}"),
+    ])
     if benchmark_questions is not None:
         files.append((benchmark_questions, f"data/annotations/{benchmark_questions.name}"))
     files.extend(
@@ -102,7 +110,7 @@ def _release_readme(as_of: str) -> str:
     return f"""# ADC-Evidence public release ({as_of})
 
 This archive contains a public SQLite snapshot, its matching retrieval index,
-the public ADC catalog, the benchmark questions and manifest. `RELEASE_MANIFEST.json`
+the public ADC catalog and its source audit, the benchmark questions and manifest. `RELEASE_MANIFEST.json`
 binds every file to a SHA-256 checksum.
 
 After extracting at the repository root, configure:
@@ -127,12 +135,14 @@ def package_release(
     benchmark_manifest: Path,
     output: Path,
     as_of: str,
+    catalog_audit: Path | None = None,
     benchmark_questions: Path | None = None,
 ) -> dict[str, object]:
     files, inventory = build_release_inventory(
         database=database,
         index_path=index_path,
         catalog=catalog,
+        catalog_audit=catalog_audit,
         benchmark_manifest=benchmark_manifest,
         benchmark_questions=benchmark_questions,
         as_of=as_of,
@@ -158,6 +168,7 @@ def main() -> None:
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--index-path", type=Path, default=DEFAULT_INDEX)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    parser.add_argument("--catalog-audit", type=Path, default=DEFAULT_CATALOG_AUDIT)
     parser.add_argument("--benchmark-manifest", type=Path, default=DEFAULT_BENCHMARK)
     parser.add_argument("--benchmark-questions", type=Path, default=DEFAULT_BENCHMARK_QUESTIONS)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -167,6 +178,7 @@ def main() -> None:
         database=args.database,
         index_path=args.index_path,
         catalog=args.catalog,
+        catalog_audit=args.catalog_audit,
         benchmark_manifest=args.benchmark_manifest,
         benchmark_questions=args.benchmark_questions,
         output=args.output,
