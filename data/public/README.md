@@ -21,7 +21,7 @@ withdrawn. Use `catalog_status` to distinguish `marketed`, `withdrawn`, and
 `approved_not_marketed` records.
 
 The catalog is a public starting point, not a claim that every field has been
-independently verified. `verification_status=pending_primary_check` means a
+independently verified. `verification_status=primary_check_pending` means a
 primary regulator label or registry record still needs to be checked before a
 paper uses the field as a gold-standard fact.
 `marketed_adc_catalog.audit.json` is a deterministic review queue for these
@@ -65,3 +65,23 @@ $env:ADC_SEED_PATH="data/public/marketed_adc_catalog.csv"
 $env:ADC_VECTOR_INDEX_PATH="artifacts/vector_index/public_2026-09-30"
 streamlit run src/adc_evidence/app.py
 ```
+
+## Use a downloaded release
+
+Download the ZIP artifact from the manual `Build public dataset release`
+workflow. Verify it before extraction, then expand it at the repository root:
+
+```powershell
+python scripts/verify_public_release.py .\adc-public-2026-09-30.zip
+Expand-Archive .\adc-public-2026-09-30.zip -DestinationPath . -Force
+$env:ADC_OFFLINE_ONLY="true"
+$env:ADC_DATABASE_PATH="data/processed/adc_public_2026-09-30.db"
+$env:ADC_SEED_PATH="data/public/marketed_adc_catalog.csv"
+$env:ADC_VECTOR_INDEX_PATH="artifacts/vector_index/public_2026-09-30"
+streamlit run src/adc_evidence/app.py
+```
+
+The release uses the offline extractive path and does not require a model API
+key. `RELEASE_MANIFEST.json` records the database, index, catalog, benchmark,
+and source-window hashes; retain it with the extracted files when reporting a
+reproduction.
