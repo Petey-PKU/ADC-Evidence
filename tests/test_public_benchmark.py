@@ -57,6 +57,21 @@ class PublicBenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             score_public_benchmark(outputs[:1], rows)
 
+    def test_answer_field_accuracy_scores_structured_claims(self) -> None:
+        row = load_public_benchmark(BENCHMARK)[0]
+        output = {
+            "question_id": row["question_id"],
+            "route": row["expected_route"],
+            "status": "answered",
+            "citation_source_record_ids": [item["source_record_id"] for item in row["evidence_sources"]],
+            "claims": [{
+                "predicate": "adc.target",
+                "value": [row["standard_answer"]["value"]],
+            }],
+        }
+        score = score_public_benchmark([output], [row])
+        self.assertEqual(score["answer_field_accuracy"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

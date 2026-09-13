@@ -130,6 +130,80 @@ def _source_ids(row: dict[str, object]) -> set[str]:
     }
 
 
+def _source_id_matches(actual: object, expected: object) -> bool:
+    left = str(actual).strip().casefold()
+    right = str(expected).strip().casefold()
+    if left == right:
+        return True
+    # PubMed retrieval documents commonly use a bare PMID while benchmark
+    # provenance uses the explicit ``pubmed:`` namespace.
+    return left.removeprefix("pubmed:") == right.removeprefix("pubmed:")
+
+
+def _value_matches(actual: object, expected: object, allowed: list[object]) -> bool:
+    """Compare scalar/list answer values while preserving the benchmark's aliases."""
+    candidates = [expected, *allowed]
+    if isinstance(actual, list):
+        return any(_value_matches(item, candidate, []) for item in actual for candidate in candidates)
+    actual_text = str(actual).strip().casefold()
+    return any(actual_text == str(candidate).strip().casefold() for candidate in candidates)
+
+
+def _answer_field_hit(gold: dict[str, object], output: dict[str, object]) -> float:
+    """Score answer content from serialized atomic claims, independently of prose wording."""
+    standard = gold.get("standard_answer")
+    if not isinstance(standard, dict):
+        return float(bool(output.get("status") == "refused") == bool(gold.get("should_refuse")))
+    claims = output.get("claims", [])
+    if not isinstance(claims, list):
+        return 0.0
+    kind = standard.get("kind")
+    if kind == "structured":
+        field = str(standard.get("field", ""))
+        expected = standard.get("value")
+        allowed = gold.get("allowed_answers", [])
+        return float(any(
+            isinstance(claim, dict)
+            and str(claim.get("predicate", "")).endswith(f".{field}")
+            and _value_matches(claim.get("value"), expected, allowed if isinstance(allowed, list) else [])
+            for claim in claims
+        ))
+    if kind == "comparison":
+        values = standard.get("values")
+        if not isinstance(values, dict) or not values:
+            return 0.0
+        matched = 0
+        for subject_id, expected in values.items():
+            field = str(standard.get("field", ""))
+            if any(
+                isinstance(claim, dict)
+                and str(claim.get("subject_id")) == str(subject_id)
+                and str(claim.get("predicate", "")).endswith(f".{field}")
+                and _value_matches(claim.get("value"), expected, [])
+                for claim in claims
+            ):
+                matched += 1
+        return matched / len(values)
+    if kind == "trial_record":
+        fields = standard.get("fields")
+        if not isinstance(fields, dict):
+            return 0.0
+        matched = sum(any(
+            isinstance(claim, dict)
+            and str(claim.get("subject_id")) == str(fields.get("nct_id"))
+            and str(claim.get("predicate", "")).endswith(f".{field}")
+            and _value_matches(claim.get("value"), expected, [])
+            for claim in claims
+        ) for field, expected in fields.items())
+        return matched / len(fields)
+    if kind == "evidence_document":
+        document_id = str(standard.get("document_id", ""))
+        return float(any(_source_id_matches(item, document_id) for item in output.get("citation_source_record_ids", [])))
+    if kind == "refusal":
+        return float(output.get("status") == "refused")
+    return 0.0
+
+
 def score_public_benchmark(
     system_rows: Iterable[dict[str, object]],
     benchmark_rows: list[dict[str, object]],
@@ -138,7 +212,7 @@ def score_public_benchmark(
     observed = {str(row.get("question_id", "")): row for row in system_rows}
     if set(observed) != set(expected):
         raise ValueError("System output IDs must exactly match the benchmark IDs")
-    route_hits = status_hits = evidence_hits = refusal_hits = 0
+    route_hits = status_hits = answer_hits = evidence_hits = refusal_hits = 0
     category_totals: Counter[str] = Counter()
     category_hits: dict[str, Counter[str]] = {}
     for question_id, gold in expected.items():
@@ -153,9 +227,16 @@ def score_public_benchmark(
         status_hit = int(output.get("status") in statuses)
         status_hits += status_hit
         hits["status"] += status_hit
+        answer_hit = _answer_field_hit(gold, output)
+        answer_hits += answer_hit
+        hits["answer"] += answer_hit
         if gold["evidence_sources"]:
-            cited = set(output.get("citation_source_record_ids", []))
-            evidence_hit = int(bool(cited & _source_ids(gold)))
+            cited = output.get("citation_source_record_ids", [])
+            evidence_hit = int(any(
+                _source_id_matches(actual, expected)
+                for actual in cited
+                for expected in _source_ids(gold)
+            ))
             evidence_hits += evidence_hit
         else:
             evidence_hit = 1
@@ -170,6 +251,7 @@ def score_public_benchmark(
             "question_count": category_totals[category],
             "route_accuracy": values["route"] / category_totals[category],
             "status_coverage": values["status"] / category_totals[category],
+            "answer_field_accuracy": values["answer"] / category_totals[category],
             "evidence_recall": values["evidence"] / category_totals[category],
             "refusal_correctness": values["refusal"] / category_totals[category],
         }
@@ -179,6 +261,7 @@ def score_public_benchmark(
         "question_count": total,
         "route_accuracy": route_hits / total,
         "status_coverage": status_hits / total,
+        "answer_field_accuracy": answer_hits / total,
         "evidence_recall": evidence_hits / total,
         "refusal_correctness": refusal_hits / total,
         "by_category": by_category,
