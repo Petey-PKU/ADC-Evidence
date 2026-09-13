@@ -1,6 +1,6 @@
 {
   "schema_version": "public-adc-catalog-audit-v1",
-  "catalog_sha256": "sha256:01a6443b1e31cb34b39b8f6fa879c2e48bd6f46727d0265a21f45b0d484cffff",
+  "catalog_sha256": "sha256:72b41e476906d6aafa1db96c717bdc9ae2b94da55a0425c2414f8a2883b59ac4",
   "requested_as_of": "2026-09-30",
   "row_count": 23,
   "status_counts": {

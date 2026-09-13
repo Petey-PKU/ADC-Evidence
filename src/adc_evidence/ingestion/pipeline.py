@@ -105,6 +105,14 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     seed_by_id = {record.adc_id: record for record in seed_records}
     normalizer = EntityNormalizer(seed_path=seed_path)
     adc_names = [record.adc_name for record in seed_records]
+    # Include canonical names and catalog aliases in PubMed queries. Aliases
+    # such as RM-1929/Akalux are often used without the generic "ADC" phrase.
+    adc_search_names = list(dict.fromkeys(
+        alias
+        for record in seed_records
+        for alias in (record.adc_name, *record.aliases)
+        if alias
+    ))
     errors: list[str] = []
     summary: dict[str, object] = {
         "run_id": run_id,
@@ -255,7 +263,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
                 attempts,
             ) = retry_call(
                 lambda: collect_clinical_trials(
-                    adc_names,
+                    adc_search_names,
                     run_directory / "clinicaltrials",
                     page_size=args.trial_page_size,
                     max_pages=args.trial_max_pages,
@@ -355,7 +363,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
                 attempts,
             ) = retry_call(
                 lambda: collect_pubmed(
-                    adc_names,
+                    adc_search_names,
                     run_directory / "pubmed",
                     max_records=args.pubmed_max,
                 ),

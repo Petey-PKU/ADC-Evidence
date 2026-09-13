@@ -14,7 +14,11 @@ API_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 
 def build_pubmed_query(adc_names: list[str]) -> str:
-    adc_terms = " OR ".join(f'"{name}"[Title/Abstract]' for name in adc_names)
+    # Search exact ADC names and aliases directly as well as through the broad
+    # ADC/target gate. Photoimmunotherapy papers, for example, may identify
+    # RM-1929 or Akalux without using the phrase "antibody-drug conjugate".
+    unique_names = list(dict.fromkeys(name.strip() for name in adc_names if name.strip()))
+    adc_terms = " OR ".join(f'"{name}"[Title/Abstract]' for name in unique_names)
     target_terms = " OR ".join(
         f'"{term}"[Title/Abstract]'
         for term in ("HER2", "ERBB2", "TROP2", "TROP-2", "TACSTD2")
@@ -23,7 +27,7 @@ def build_pubmed_query(adc_names: list[str]) -> str:
         '"antibody-drug conjugate"[Title/Abstract] OR '
         '"antibody drug conjugate"[Title/Abstract] OR ADC[Title/Abstract]'
     )
-    return f"({adc_concept}) AND (({target_terms}) OR ({adc_terms}))"
+    return f"(({adc_concept}) AND (({target_terms}) OR ({adc_terms}))) OR ({adc_terms})"
 
 
 def _text(element: ET.Element | None) -> str | None:

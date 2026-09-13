@@ -5,7 +5,7 @@ from pathlib import Path
 from adc_evidence.database import initialize_database
 from adc_evidence.ingestion.adcdb import parse_adcdb_detail, parse_adcdb_search_results
 from adc_evidence.ingestion.clinical_trials import parse_trials_page
-from adc_evidence.ingestion.pubmed import parse_pubmed_xml
+from adc_evidence.ingestion.pubmed import build_pubmed_query, parse_pubmed_xml
 from adc_evidence.processing.normalize import EntityNormalizer, normalize_text
 from adc_evidence.processing.standardize import (
     document_links_and_evidence,
@@ -173,6 +173,14 @@ class IngestionTests(unittest.TestCase):
     def test_normalize_text_is_punctuation_insensitive(self) -> None:
         self.assertEqual(normalize_text("TROP-2"), "trop 2")
         self.assertEqual(normalize_text("TROP 2"), "trop 2")
+
+    def test_pubmed_query_includes_aliases_outside_broad_adc_gate(self) -> None:
+        query = build_pubmed_query(["Cetuximab sarotalocan", "RM-1929", "Akalux"])
+        self.assertIn('"RM-1929"[Title/Abstract]', query)
+        self.assertIn('"Akalux"[Title/Abstract]', query)
+        # The direct alias clause is present after the broad ADC/target clause,
+        # so papers that omit the phrase "antibody-drug conjugate" are kept.
+        self.assertIn(") OR (\"Cetuximab sarotalocan\"[Title/Abstract]", query)
 
 
 if __name__ == "__main__":

@@ -98,3 +98,19 @@ The release uses the offline extractive path and does not require a model API
 key. `RELEASE_MANIFEST.json` records the database, index, catalog, benchmark,
 and source-window hashes; retain it with the extracted files when reporting a
 reproduction.
+
+## Refresh entity links after alias edits
+
+The collectors search canonical ADC names and catalog aliases directly. After
+editing aliases, existing local snapshots can be relinked without downloading
+new records:
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/relink_public_snapshot.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --seed data/public/marketed_adc_catalog.csv
+```
+
+This command only rebuilds trial/document links and evidence from records
+already in SQLite; it does not call a model API or any network source.
