@@ -1,6 +1,6 @@
 {
   "schema_version": "public-adc-catalog-audit-v1",
-  "catalog_sha256": "sha256:76b1ef5ef869bcc8254bbb21f7b8370bd57037f746bc78813329411482e87744",
+  "catalog_sha256": "sha256:a5a5eeeb8264c77ee0888a8772da49259ae6b9d85806b4cb5e7d2918590ae1d8",
   "requested_as_of": "2026-09-30",
   "row_count": 23,
   "status_counts": {
@@ -9,15 +9,18 @@
   },
   "required_field_count": 21,
   "rows_with_missing_required_fields": 4,
-  "generic_source_url_count": 6,
+  "generic_source_url_count": 2,
   "source_specificity_counts": {
-    "specific": 17,
-    "generic": 6,
+    "specific": 21,
+    "generic": 2,
     "invalid": 0
   },
   "source_host_counts": {
+    "en.lepubiopharma.com": 1,
+    "static.cninfo.com.cn": 1,
     "www.fda.gov": 16,
-    "www.nmpa.gov.cn": 6,
+    "www.hkexnews.hk": 1,
+    "www.nmpa.gov.cn": 3,
     "www.pmda.go.jp": 1
   },
   "field_coverage_counts": {
@@ -67,7 +70,6 @@
       "adc_id": "adc_003",
       "adc_name": "Disitamab vedotin",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
@@ -90,7 +92,6 @@
       "adc_name": "Sacituzumab tirumotecan",
       "reasons": [
         "missing_fields:dar",
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
@@ -163,7 +164,6 @@
       "adc_id": "adc_016",
       "adc_name": "Trastuzumab rezetecan",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
@@ -179,7 +179,6 @@
       "adc_id": "adc_018",
       "adc_name": "Becotatug vedotin",
       "reasons": [
-        "generic_source_url",
         "verification_status:primary_check_pending"
       ]
     },
