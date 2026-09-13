@@ -28,6 +28,19 @@ paper uses the field as a gold-standard fact.
 checks; it reports generic regulator landing pages and missing required fields
 without containing private notes.
 
+要逐字段开展一级来源复核，可生成空白审核包（不会自动写入任何人工结论）：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/build_catalog_field_review_packet.py `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --output artifacts/evaluation/catalog_field_review.jsonl `
+  --manifest artifacts/evaluation/catalog_field_review.manifest.json
+```
+
+审核包中的 `candidate_source.source_url` 是候选来源链接，`verification.status` 初始为
+`pending_primary_check`；只有人工逐项检查后才可填写 verdict 和 confirmed value。
+
 ## Data policy
 
 - The CSV contains structured facts and source links only; it contains no
