@@ -8,7 +8,7 @@ from contextlib import closing
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from adc_evidence.config import DEFAULT_DATABASE_PATH, VECTOR_INDEX_PATH
+from adc_evidence.config import DEFAULT_DATABASE_PATH, DEFAULT_SEED_PATH, VECTOR_INDEX_PATH
 from adc_evidence.database import connect
 from adc_evidence.processing.normalize import EntityNormalizer
 from adc_evidence.rag.query_expansion import expand_query
@@ -44,13 +44,14 @@ class HybridRetriever:
         self,
         database_path: Path = DEFAULT_DATABASE_PATH,
         index_path: Path = VECTOR_INDEX_PATH,
+        seed_path: Path | None = None,
     ) -> None:
         self.database_path = Path(database_path)
         self.index_path = Path(index_path)
         self._vector_index = None
         self._embedder = None
         self._loaded_asset_signature: tuple[object, ...] | None = None
-        self._entity_normalizer = EntityNormalizer()
+        self._entity_normalizer = EntityNormalizer(seed_path=seed_path or DEFAULT_SEED_PATH)
 
     @property
     def dense_available(self) -> bool:
@@ -305,8 +306,15 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--source-type", choices=("adc_profile", "pubmed", "clinical_trial"))
     parser.add_argument("--adc-id")
+    parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE_PATH)
+    parser.add_argument("--index-path", type=Path, default=VECTOR_INDEX_PATH)
+    parser.add_argument("--seed", type=Path, default=DEFAULT_SEED_PATH)
     args = parser.parse_args()
-    results = HybridRetriever().search(
+    results = HybridRetriever(
+        database_path=args.database,
+        index_path=args.index_path,
+        seed_path=args.seed,
+    ).search(
         args.query,
         mode=args.mode,
         top_k=args.top_k,

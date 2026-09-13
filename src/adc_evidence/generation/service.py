@@ -81,10 +81,11 @@ class EvidenceAnsweringService:
         generator: AnswerGenerator | None = None,
         guard: EvidenceGuard | None = None,
         database_path: Path | None = None,
+        seed_path: Path | None = None,
     ) -> None:
         if retriever is None:
             retriever = (
-                HybridRetriever(database_path=database_path)
+                HybridRetriever(database_path=database_path, seed_path=seed_path)
                 if database_path is not None
                 else HybridRetriever()
             )

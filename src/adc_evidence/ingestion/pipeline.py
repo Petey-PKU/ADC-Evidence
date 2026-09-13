@@ -75,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Collect and standardize ADC-Evidence public data sources."
     )
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE_PATH)
+    parser.add_argument(
+        "--seed",
+        type=Path,
+        default=DEFAULT_SEED_PATH,
+        help="CSV seed/catalog used to define the ADC scope for this run.",
+    )
     parser.add_argument("--raw-root", type=Path, default=RAW_DATA_PATH)
     parser.add_argument("--quality-report", type=Path, default=QUALITY_REPORT_PATH)
     parser.add_argument("--pubmed-max", type=int, default=200)
@@ -94,9 +100,10 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     run_id = getattr(args, "run_id", None) or _run_id()
     started_at = utc_now()
     run_directory = args.raw_root / run_id
-    seed_records = load_seed_records(DEFAULT_SEED_PATH)
+    seed_path = Path(getattr(args, "seed", DEFAULT_SEED_PATH))
+    seed_records = load_seed_records(seed_path)
     seed_by_id = {record.adc_id: record for record in seed_records}
-    normalizer = EntityNormalizer()
+    normalizer = EntityNormalizer(seed_path=seed_path)
     adc_names = [record.adc_name for record in seed_records]
     errors: list[str] = []
     summary: dict[str, object] = {
@@ -109,7 +116,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     parameters = vars(args).copy()
     parameters = {key: str(value) if isinstance(value, Path) else value for key, value in parameters.items()}
 
-    initialize_database(args.database, DEFAULT_SEED_PATH)
+    initialize_database(args.database, seed_path)
     upsert_entity_aliases(args.database, _alias_rows(normalizer))
     start_ingestion_run(args.database, run_id, started_at, parameters)
     summary["seed_fact_sync"] = record_fact_sets(

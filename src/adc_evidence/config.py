@@ -6,8 +6,15 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE_POLICY_PATH = PROJECT_ROOT / "configs" / "evidence_policy.json"
-DEFAULT_SEED_PATH = PROJECT_ROOT / "data" / "sample" / "adcs.csv"
-DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "processed" / "adc_evidence.db"
+DEFAULT_SEED_PATH = Path(
+    os.getenv("ADC_SEED_PATH", str(PROJECT_ROOT / "data" / "sample" / "adcs.csv"))
+)
+DEFAULT_DATABASE_PATH = Path(
+    os.getenv(
+        "ADC_DATABASE_PATH",
+        str(PROJECT_ROOT / "data" / "processed" / "adc_evidence.db"),
+    )
+)
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed"
 QUALITY_REPORT_PATH = PROCESSED_DATA_PATH / "data_quality_report.json"
@@ -17,7 +24,9 @@ GENERATION_QUESTIONS_PATH = ANNOTATIONS_PATH / "generation_questions.jsonl"
 FROZEN_BENCHMARK_QUESTIONS_PATH = (
     ANNOTATIONS_PATH / "v0.6_frozen_test_questions.jsonl"
 )
-VECTOR_INDEX_PATH = PROJECT_ROOT / "artifacts" / "vector_index"
+VECTOR_INDEX_PATH = Path(
+    os.getenv("ADC_VECTOR_INDEX_PATH", str(PROJECT_ROOT / "artifacts" / "vector_index"))
+)
 EVALUATION_PATH = PROJECT_ROOT / "artifacts" / "evaluation"
 GENERATION_REPORT_PATH = EVALUATION_PATH / "generation_report.json"
 RETRIEVAL_REPORT_PATH = EVALUATION_PATH / "retrieval_report.json"

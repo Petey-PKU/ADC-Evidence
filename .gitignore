@@ -13,6 +13,7 @@ __pycache__/
 data/raw/*
 data/interim/*
 data/processed/*.db
+data/processed/adc_public_*.json
 artifacts/vector_index/*
 artifacts/models/*
 artifacts/evaluation/*

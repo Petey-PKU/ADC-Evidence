@@ -1,0 +1,150 @@
+"""Build a public, source-traceable ADC database snapshot.
+
+The checked-in catalog is deliberately small and reviewable.  Literature and
+trial records are fetched into ignored local paths, while this command records
+their source windows and hashes in a manifest.  No generative model is called.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+from datetime import date, datetime, timezone
+from pathlib import Path
+
+from adc_evidence.ingestion.pipeline import run_pipeline
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CATALOG = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.csv"
+DEFAULT_AS_OF = "2026-09-30"
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _catalog_summary(path: Path) -> dict[str, object]:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    if not rows:
+        raise ValueError("Public ADC catalog must not be empty")
+    ids = [str(row.get("adc_id", "")).strip() for row in rows]
+    if any(not item for item in ids) or len(ids) != len(set(ids)):
+        raise ValueError("Public ADC catalog needs unique nonempty adc_id values")
+    names = [str(row.get("adc_name", "")).strip() for row in rows]
+    if any(not item for item in names) or len(names) != len(set(names)):
+        raise ValueError("Public ADC catalog needs unique nonempty adc_name values")
+    statuses = {}
+    for row in rows:
+        status = str(row.get("catalog_status", "")).strip()
+        if status not in {"marketed", "withdrawn", "approved_not_marketed"}:
+            raise ValueError(f"Unsupported catalog_status for {row.get('adc_id')}")
+        statuses[status] = statuses.get(status, 0) + 1
+    return {
+        "row_count": len(rows),
+        "catalog_sha256": f"sha256:{_sha256(path)}",
+        "status_counts": dict(sorted(statuses.items())),
+        "adc_ids": ids,
+    }
+
+
+def _parse_date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("--as-of must use YYYY-MM-DD") from exc
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    parser.add_argument("--as-of", default=DEFAULT_AS_OF)
+    parser.add_argument("--database", type=Path)
+    parser.add_argument("--raw-root", type=Path)
+    parser.add_argument("--quality-report", type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--pubmed-max", type=int, default=1000)
+    parser.add_argument("--trial-page-size", type=int, default=1000)
+    parser.add_argument("--trial-max-pages", type=int, default=10)
+    parser.add_argument("--source-retries", type=int, default=3)
+    parser.add_argument("--source-retry-delay", type=float, default=1.0)
+    parser.add_argument(
+        "--include-adcdb",
+        action="store_true",
+        help="Also query the undocumented ADCdb web pages; off by default.",
+    )
+    parser.add_argument("--strict", action="store_true")
+    return parser
+
+
+def build_public_dataset(args: argparse.Namespace) -> dict[str, object]:
+    catalog = args.catalog.resolve()
+    if not catalog.is_file():
+        raise FileNotFoundError(catalog)
+    catalog_info = _catalog_summary(catalog)
+    as_of = _parse_date(str(args.as_of))
+    observed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    database = (args.database or PROJECT_ROOT / "data" / "processed" / f"adc_public_{as_of.isoformat()}.db").resolve()
+    raw_root = (args.raw_root or PROJECT_ROOT / "data" / "raw" / f"public_{as_of.isoformat()}").resolve()
+    quality_report = (args.quality_report or PROJECT_ROOT / "data" / "processed" / f"adc_public_quality_{as_of.isoformat()}.json").resolve()
+    manifest_path = (args.manifest or PROJECT_ROOT / "data" / "processed" / f"adc_public_manifest_{as_of.isoformat()}.json").resolve()
+    pipeline_args = argparse.Namespace(
+        database=database,
+        seed=catalog,
+        raw_root=raw_root,
+        quality_report=quality_report,
+        pubmed_max=args.pubmed_max,
+        trial_page_size=args.trial_page_size,
+        trial_max_pages=args.trial_max_pages,
+        adcdb_limit=catalog_info["row_count"],
+        skip_pubmed=False,
+        skip_trials=False,
+        skip_adcdb=not args.include_adcdb,
+        strict=args.strict,
+        source_retries=args.source_retries,
+        source_retry_delay=args.source_retry_delay,
+    )
+    summary = run_pipeline(pipeline_args)
+    manifest = {
+        "schema_version": "public-adc-dataset-v1",
+        "dataset_id": f"adc-public-{as_of.isoformat()}",
+        "requested_as_of": as_of.isoformat(),
+        "observed_at": observed_at,
+        "source_data_available_through": min(as_of, date.fromisoformat(observed_at[:10])).isoformat(),
+        "as_of_status": "future_target_pending" if as_of > date.fromisoformat(observed_at[:10]) else "observed_window",
+        "catalog": catalog_info,
+        "catalog_path": str(catalog),
+        "database_path": str(database),
+        "database_sha256": f"sha256:{_sha256(database)}" if database.exists() else None,
+        "raw_root": str(raw_root),
+        "quality_report_path": str(quality_report),
+        "pipeline_summary": summary,
+        "redistribution_status": "candidate_pending_primary_source_and_license_review",
+        "model_api_used": False,
+        "notes": [
+            "The target window may be later than the build date; no future records are inferred.",
+            "The catalog contains structured candidates; primary regulator checks remain required.",
+            "Raw responses and generated SQLite files are local ignored artifacts.",
+        ],
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return manifest
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    manifest = build_public_dataset(args)
+    summary = manifest["pipeline_summary"]
+    print(f"Public dataset {manifest['dataset_id']}: {summary['status']}")
+    print(f"ADC catalog: {manifest['catalog']['row_count']}")
+    print(f"Clinical trials: {summary['trial_records']}")
+    print(f"PubMed documents: {summary['pubmed_documents']}")
+    print(f"Manifest: {manifest['database_path']}")
+
+
+if __name__ == "__main__":
+    main()

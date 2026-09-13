@@ -282,6 +282,8 @@ python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/p
 
 `data/sample/adcs.csv` 是项目范围与实体别名的种子数据。`aliases` 字段使用竖线 `|` 分隔多个别名。自动采集证据仍统一标记为 `needs_review`；只有人工复核后才能改为 `reviewed`。
 
+面向公开快照的 ADC 目录位于 `data/public/marketed_adc_catalog.csv`。它与 10 条演示种子分开维护，当前包含 23 条监管批准候选记录；使用 `scripts/build_public_dataset.py` 可在本地生成带文献和试验来源哈希的 SQLite 快照。详细范围、未来截止日处理和 Benchmark v1 见 [`docs/public_dataset_and_benchmark.md`](docs/public_dataset_and_benchmark.md)。
+
 ## 后续工作
 
 阶段 5 已完成 120 题版本化题集、三组同窗协议、答案与原子结论盲评对象、第二复核与

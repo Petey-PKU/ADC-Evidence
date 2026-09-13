@@ -1,0 +1,60 @@
+{
+  "schema_version": "public-adc-benchmark-v1",
+  "benchmark_id": "adc-public-benchmark-v1",
+  "requested_database_as_of": "2026-09-30",
+  "question_count": 86,
+  "split_counts": {
+    "dev": 54,
+    "public_smoke": 32
+  },
+  "category_counts": {
+    "comparison": 10,
+    "literature_evidence": 12,
+    "safety_refusal": 8,
+    "structured_fact": 44,
+    "trial_lookup": 12
+  },
+  "question_set_sha256": "sha256:ccb0bb58c673d888a6940be0d294223ba7b0feccfebbd3d7e28a70c25c908b11",
+  "catalog_sha256": "sha256:c3396dccf5c73537c53deef2883a5d0ecbefe9e956e7620096689c6cf7185615",
+  "database_data_version": {
+    "data_version": "data_e9c47bd93c39e15d4e4ee63fa335e457ac96cfab95ea5d1660399c36b9b89a67",
+    "schema_version": "0.6-refresh-v1",
+    "schema_versions": [
+      "0.6-benchmark-review-v2",
+      "0.6-facts-v1",
+      "0.6-refresh-v1"
+    ],
+    "policy_version": "0.6.0",
+    "latest_ingestion_run": {
+      "run_id": "20260913T030744Z",
+      "finished_at": "2026-09-13T03:08:45+00:00",
+      "status": "partial"
+    },
+    "retrieval_corpus_version": "corpus_f9e92aac3fcebad77a8e23343224032cbeaaa69fa32f6ebaaca02f3f14cc440b"
+  },
+  "evaluation_use": {
+    "status": "development_exposed",
+    "eligible_for_unseen_test_claim": false,
+    "reason": "Questions and answers are distributed for reproducible development and smoke checks.",
+    "confirmation_requires": "A separately frozen access-controlled question set with independent human review."
+  },
+  "human_review": {
+    "status": "pending",
+    "required_roles": [
+      "primary_independent",
+      "secondary_independent",
+      "adjudicator_if_disagreement"
+    ],
+    "ai_assisted_review_counts_as": "not_independent_human_review"
+  },
+  "metrics": {
+    "route_accuracy": "expected_route == system.route",
+    "status_coverage": "system.status is in expected_status",
+    "answer_field_accuracy": "all required structured fields match standard_answer or allowed_answers",
+    "evidence_recall": "intersection(system cited source IDs, evidence_sources) is nonempty when evidence is required",
+    "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
+    "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI"
+  },
+  "question_file_sha256": "sha256:9ada5b2b05abba952be93e8ea3016c22b334052097b33340e2597a77455882af",
+  "question_provenance": "auto_derived_from_public_database_snapshot"
+}

@@ -1,0 +1,187 @@
+"""Validation and deterministic scoring for the public ADC benchmark format."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections import Counter
+from collections.abc import Iterable
+from pathlib import Path
+
+
+PUBLIC_BENCHMARK_SCHEMA_VERSION = "public-adc-benchmark-v1"
+VALID_CATEGORIES = {
+    "structured_fact",
+    "comparison",
+    "trial_lookup",
+    "literature_evidence",
+    "safety_refusal",
+}
+VALID_SPLITS = {"dev", "public_smoke"}
+VALID_REVIEW_STATUSES = {"pending", "complete"}
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _sha256(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def load_public_benchmark(path: Path) -> list[dict[str, object]]:
+    rows = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    if not rows:
+        raise ValueError("Public benchmark must not be empty")
+    ids = [str(row.get("question_id", "")).strip() for row in rows]
+    if any(not item for item in ids) or len(ids) != len(set(ids)):
+        raise ValueError("Public benchmark needs unique nonempty question_id values")
+    for row in rows:
+        required = {
+            "question_id", "split", "category", "question", "expected_route",
+            "expected_status", "standard_answer", "allowed_answers",
+            "evidence_sources", "allow_partial", "should_refuse",
+            "human_scoring", "scoring",
+        }
+        missing = sorted(required - set(row))
+        if missing:
+            raise ValueError(f"{row.get('question_id')}: missing fields {missing}")
+        if row["split"] not in VALID_SPLITS:
+            raise ValueError(f"{row['question_id']}: invalid split")
+        if row["category"] not in VALID_CATEGORIES:
+            raise ValueError(f"{row['question_id']}: invalid category")
+        if not isinstance(row["question"], str) or not row["question"].strip():
+            raise ValueError(f"{row['question_id']}: question must be nonempty")
+        if row["expected_route"] not in {
+            "structured_fact", "comparison", "trial_lookup", "literature_evidence", "refusal"
+        }:
+            raise ValueError(f"{row['question_id']}: invalid expected_route")
+        statuses = row["expected_status"]
+        if not isinstance(statuses, list) or not statuses:
+            raise ValueError(f"{row['question_id']}: expected_status must be nonempty list")
+        if bool(row["should_refuse"]) != (row["expected_route"] == "refusal"):
+            raise ValueError(f"{row['question_id']}: refusal route/status mismatch")
+        if not isinstance(row["evidence_sources"], list):
+            raise ValueError(f"{row['question_id']}: evidence_sources must be a list")
+        review = row["human_scoring"]
+        if not isinstance(review, dict) or review.get("status") not in VALID_REVIEW_STATUSES:
+            raise ValueError(f"{row['question_id']}: invalid human_scoring status")
+        if review.get("status") == "pending" and any(
+            review.get(key) is not None for key in ("primary", "secondary", "adjudicated")
+        ):
+            raise ValueError(f"{row['question_id']}: pending review cannot contain scores")
+        if not isinstance(row["scoring"], dict) or not row["scoring"].get("primary_metric"):
+            raise ValueError(f"{row['question_id']}: scoring.primary_metric is required")
+    return rows
+
+
+def benchmark_manifest(
+    rows: list[dict[str, object]],
+    *,
+    catalog_sha256: str,
+    database_data_version: dict[str, object] | None,
+    requested_as_of: str,
+) -> dict[str, object]:
+    if not rows:
+        raise ValueError("Cannot build a manifest for an empty benchmark")
+    categories = Counter(str(row["category"]) for row in rows)
+    splits = Counter(str(row["split"]) for row in rows)
+    return {
+        "schema_version": PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        "benchmark_id": "adc-public-benchmark-v1",
+        "requested_database_as_of": requested_as_of,
+        "question_count": len(rows),
+        "split_counts": dict(sorted(splits.items())),
+        "category_counts": dict(sorted(categories.items())),
+        "question_set_sha256": f"sha256:{_sha256(rows)}",
+        "catalog_sha256": catalog_sha256,
+        "database_data_version": database_data_version,
+        "evaluation_use": {
+            "status": "development_exposed",
+            "eligible_for_unseen_test_claim": False,
+            "reason": "Questions and answers are distributed for reproducible development and smoke checks.",
+            "confirmation_requires": "A separately frozen access-controlled question set with independent human review.",
+        },
+        "human_review": {
+            "status": "pending",
+            "required_roles": ["primary_independent", "secondary_independent", "adjudicator_if_disagreement"],
+            "ai_assisted_review_counts_as": "not_independent_human_review",
+        },
+        "metrics": {
+            "route_accuracy": "expected_route == system.route",
+            "status_coverage": "system.status is in expected_status",
+            "answer_field_accuracy": "all required structured fields match standard_answer or allowed_answers",
+            "evidence_recall": "intersection(system cited source IDs, evidence_sources) is nonempty when evidence is required",
+            "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
+            "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI",
+        },
+    }
+
+
+def _source_ids(row: dict[str, object]) -> set[str]:
+    return {
+        str(source.get("source_record_id"))
+        for source in row.get("evidence_sources", [])
+        if isinstance(source, dict) and source.get("source_record_id")
+    }
+
+
+def score_public_benchmark(
+    system_rows: Iterable[dict[str, object]],
+    benchmark_rows: list[dict[str, object]],
+) -> dict[str, object]:
+    expected = {str(row["question_id"]): row for row in benchmark_rows}
+    observed = {str(row.get("question_id", "")): row for row in system_rows}
+    if set(observed) != set(expected):
+        raise ValueError("System output IDs must exactly match the benchmark IDs")
+    route_hits = status_hits = evidence_hits = refusal_hits = 0
+    category_totals: Counter[str] = Counter()
+    category_hits: dict[str, Counter[str]] = {}
+    for question_id, gold in expected.items():
+        output = observed[question_id]
+        category = str(gold["category"])
+        category_totals[category] += 1
+        hits = category_hits.setdefault(category, Counter())
+        route_hit = int(output.get("route") == gold["expected_route"])
+        route_hits += route_hit
+        hits["route"] += route_hit
+        statuses = gold["expected_status"]
+        status_hit = int(output.get("status") in statuses)
+        status_hits += status_hit
+        hits["status"] += status_hit
+        if gold["evidence_sources"]:
+            cited = set(output.get("citation_source_record_ids", []))
+            evidence_hit = int(bool(cited & _source_ids(gold)))
+            evidence_hits += evidence_hit
+        else:
+            evidence_hit = 1
+            evidence_hits += 1
+        hits["evidence"] += evidence_hit
+        refusal_hit = int(bool(output.get("status") == "refused") == bool(gold["should_refuse"]))
+        refusal_hits += refusal_hit
+        hits["refusal"] += refusal_hit
+    total = len(expected)
+    by_category = {
+        category: {
+            "question_count": category_totals[category],
+            "route_accuracy": values["route"] / category_totals[category],
+            "status_coverage": values["status"] / category_totals[category],
+            "evidence_recall": values["evidence"] / category_totals[category],
+            "refusal_correctness": values["refusal"] / category_totals[category],
+        }
+        for category, values in sorted(category_hits.items())
+    }
+    return {
+        "question_count": total,
+        "route_accuracy": route_hits / total,
+        "status_coverage": status_hits / total,
+        "evidence_recall": evidence_hits / total,
+        "refusal_correctness": refusal_hits / total,
+        "by_category": by_category,
+        "scoring_mode": "automatic_diagnostics_only",
+        "human_review_required": True,
+    }
