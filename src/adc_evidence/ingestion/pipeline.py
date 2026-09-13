@@ -36,6 +36,7 @@ from adc_evidence.repository import (
     data_quality_metrics,
     finish_ingestion_run,
     finish_source_run,
+    recover_stale_ingestion_runs,
     source_run_statuses,
     start_ingestion_run,
     start_source_run,
@@ -125,8 +126,11 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     parameters = {key: str(value) if isinstance(value, Path) else value for key, value in parameters.items()}
 
     initialize_database(args.database, seed_path)
+    recovered_runs = recover_stale_ingestion_runs(args.database)
     upsert_entity_aliases(args.database, _alias_rows(normalizer))
     start_ingestion_run(args.database, run_id, started_at, parameters)
+    if recovered_runs:
+        summary["recovered_stale_run_ids"] = recovered_runs
     summary["seed_fact_sync"] = record_fact_sets(
         args.database,
         [

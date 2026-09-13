@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from adc_evidence.database import connect, create_database
@@ -33,6 +34,72 @@ def start_ingestion_run(
             """,
             (run_id, started_at, json.dumps(parameters, ensure_ascii=False)),
         )
+
+
+def recover_stale_ingestion_runs(
+    database_path,
+    *,
+    now: str | None = None,
+    stale_after_seconds: int = 3600,
+) -> list[str]:
+    """Close old interrupted runs so a process stop cannot leave ``running`` rows.
+
+    A run is only recovered after the explicit age threshold.  This avoids
+    changing a run owned by another live process while making interrupted
+    command-line refreshes visible as terminal failures on the next start.
+    """
+    if stale_after_seconds < 0:
+        raise ValueError("stale_after_seconds cannot be negative")
+    now_value = datetime.now(timezone.utc) if now is None else datetime.fromisoformat(
+        now.replace("Z", "+00:00")
+    )
+    if now_value.tzinfo is None:
+        now_value = now_value.replace(tzinfo=timezone.utc)
+    finished_at = now_value.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+    cutoff = now_value - timedelta(seconds=stale_after_seconds)
+    create_database(database_path)
+    recovered: list[str] = []
+    with closing(connect(database_path)) as connection, connection:
+        rows = connection.execute(
+            "SELECT run_id, started_at FROM ingestion_runs WHERE status = 'running'"
+        ).fetchall()
+        for row in rows:
+            try:
+                started_at = datetime.fromisoformat(str(row[1]).replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            if started_at > cutoff:
+                continue
+            run_id = str(row[0])
+            error_text = "Run was interrupted or abandoned before completion; recovered on next start."
+            summary = {
+                "run_id": run_id,
+                "finished_at": finished_at,
+                "status": "failed",
+                "errors": [error_text],
+                "recovered_stale_run": True,
+            }
+            connection.execute(
+                """
+                UPDATE ingestion_runs
+                SET finished_at = ?, status = 'failed', summary_json = ?, error_text = ?
+                WHERE run_id = ? AND status = 'running'
+                """,
+                (finished_at, json.dumps(summary, ensure_ascii=False), error_text, run_id),
+            )
+            connection.execute(
+                """
+                UPDATE ingestion_source_runs
+                SET finished_at = ?, status = 'failed', error_text = ?,
+                    details_json = json_set(details_json, '$.recovered_stale_run', 1)
+                WHERE run_id = ? AND status = 'running'
+                """,
+                (finished_at, error_text, run_id),
+            )
+            recovered.append(run_id)
+    return recovered
 
 
 def finish_ingestion_run(
