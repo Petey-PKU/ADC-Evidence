@@ -10,7 +10,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import re
+import shutil
 import sqlite3
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -56,7 +60,8 @@ def _read_json(path: Path) -> dict[str, object]:
 def _dataset_summary(database: Path) -> dict[str, object]:
     """Read public, non-content counts without exposing raw paths or text."""
     uri = f"file:{database.as_posix()}?mode=ro"
-    with sqlite3.connect(uri, uri=True) as connection:
+    connection = sqlite3.connect(uri, uri=True)
+    try:
         connection.row_factory = sqlite3.Row
         counts: dict[str, int] = {}
         for name in ("adcs", "trials", "documents", "entity_links", "evidence"):
@@ -73,6 +78,8 @@ def _dataset_summary(database: Path) -> dict[str, object]:
         latest = connection.execute(
             "SELECT run_id, started_at, finished_at, status FROM ingestion_runs ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
+    finally:
+        connection.close()
     document_count = counts["documents"]
     return {
         "schema_version": "public-adc-dataset-summary-v1",
@@ -84,6 +91,60 @@ def _dataset_summary(database: Path) -> dict[str, object]:
     }
 
 
+def _redact_local_paths(value: object) -> object:
+    """Remove machine-specific absolute paths from JSON run parameters."""
+    if isinstance(value, dict):
+        return {str(key): _redact_local_paths(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_local_paths(item) for item in value]
+    if isinstance(value, str):
+        return re.sub(r"(?:[A-Za-z]:[\\/]|/Users/|/home/|\\\\)[^\"']+", "<local-path-redacted>", value)
+    return value
+
+
+def _sanitize_database_for_release(source: Path, destination: Path) -> Path:
+    """Copy a database and remove local filesystem paths from the copy only."""
+    # The managed Windows sandbox can reject creating a new file with a
+    # `.db` suffix. Stage as a neutral binary file, then rename it before
+    # opening SQLite.
+    staged = destination.with_suffix(destination.suffix + ".tmpbin")
+    with source.open("rb") as source_handle, staged.open("wb") as destination_handle:
+        shutil.copyfileobj(source_handle, destination_handle, length=1024 * 1024)
+    shutil.copystat(source, staged)
+    os.replace(staged, destination)
+    connection = sqlite3.connect(destination)
+    try:
+        connection.row_factory = sqlite3.Row
+        for table in ("source_records", "source_snapshots", "trials", "documents"):
+            columns = {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
+            if "raw_path" not in columns:
+                continue
+            rows = connection.execute(f"SELECT rowid, raw_path FROM {table}").fetchall()
+            for row in rows:
+                raw = str(row["raw_path"] or "")
+                basename = re.split(r"[\\/]", raw)[-1] or "unavailable"
+                connection.execute(
+                    f"UPDATE {table} SET raw_path=? WHERE rowid=?",
+                    (f"raw/{table}/{basename}", row["rowid"]),
+                )
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ingestion_runs'").fetchone():
+            rows = connection.execute("SELECT rowid, parameters_json FROM ingestion_runs").fetchall()
+            for row in rows:
+                try:
+                    value = json.loads(str(row["parameters_json"]))
+                    redacted = json.dumps(_redact_local_paths(value), ensure_ascii=False, sort_keys=True)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    redacted = "<local-parameters-redacted>"
+                connection.execute(
+                    "UPDATE ingestion_runs SET parameters_json=? WHERE rowid=?",
+                    (redacted, row["rowid"]),
+                )
+        connection.commit()
+    finally:
+        connection.close()
+    return destination
+
+
 def build_release_inventory(
     *,
     database: Path,
@@ -91,6 +152,7 @@ def build_release_inventory(
     catalog: Path,
     benchmark_manifest: Path,
     as_of: str,
+    database_archive_name: str | None = None,
     catalog_audit: Path | None = None,
     benchmark_questions: Path | None = None,
 ) -> tuple[list[tuple[Path, str]], dict[str, object]]:
@@ -110,7 +172,7 @@ def build_release_inventory(
         raise ValueError("Database and vector index use different retrieval corpus versions")
 
     files: list[tuple[Path, str]] = [
-        (database, f"data/processed/{database.name}"),
+        (database, f"data/processed/{database_archive_name or database.name}"),
         (catalog, f"data/public/{catalog.name}"),
     ]
     if catalog_audit is not None:
@@ -156,7 +218,9 @@ streamlit run src/adc_evidence/app.py
 ```
 
 Abstract and full-text redistribution remains subject to the original source
-license. Use the catalog builder to reproduce or refresh the snapshot.
+license. Raw response files are not included; local paths stored in the source
+database are redacted in this archive. Use the catalog builder to reproduce or
+refresh the snapshot.
 """
 
 
@@ -171,28 +235,44 @@ def package_release(
     catalog_audit: Path | None = None,
     benchmark_questions: Path | None = None,
 ) -> dict[str, object]:
-    files, inventory = build_release_inventory(
-        database=database,
-        index_path=index_path,
-        catalog=catalog,
-        catalog_audit=catalog_audit,
-        benchmark_manifest=benchmark_manifest,
-        benchmark_questions=benchmark_questions,
-        as_of=as_of,
-    )
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        for path, archive_path in files:
-            info = zipfile.ZipInfo(archive_path, date_time=(2020, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(info, path.read_bytes())
-        manifest_info = zipfile.ZipInfo("RELEASE_MANIFEST.json", date_time=(2020, 1, 1, 0, 0, 0))
-        manifest_info.compress_type = zipfile.ZIP_DEFLATED
-        archive.writestr(manifest_info, json.dumps(inventory, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
-        readme_info = zipfile.ZipInfo("RELEASE_README.md", date_time=(2020, 1, 1, 0, 0, 0))
-        readme_info.compress_type = zipfile.ZIP_DEFLATED
-        archive.writestr(readme_info, _release_readme(as_of))
+    release_database = database
+    cleanup_paths: list[Path] = []
+    if database.is_file():
+        # Keep the staging copy beside the output because managed Windows
+        # sandboxes may deny writes inside newly-created temporary folders.
+        release_database = output.parent / f"adc_release_{uuid.uuid4().hex}.db"
+        cleanup_paths.extend((release_database, release_database.with_suffix(release_database.suffix + ".tmpbin")))
+        _sanitize_database_for_release(database.resolve(), release_database)
+    try:
+        files, inventory = build_release_inventory(
+            database=release_database,
+            index_path=index_path,
+            catalog=catalog,
+            catalog_audit=catalog_audit,
+            benchmark_manifest=benchmark_manifest,
+            benchmark_questions=benchmark_questions,
+            as_of=as_of,
+            database_archive_name=database.name,
+        )
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path, archive_path in files:
+                info = zipfile.ZipInfo(archive_path, date_time=(2020, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(info, path.read_bytes())
+            manifest_info = zipfile.ZipInfo("RELEASE_MANIFEST.json", date_time=(2020, 1, 1, 0, 0, 0))
+            manifest_info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(manifest_info, json.dumps(inventory, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+            readme_info = zipfile.ZipInfo("RELEASE_README.md", date_time=(2020, 1, 1, 0, 0, 0))
+            readme_info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(readme_info, _release_readme(as_of))
+    finally:
+        for path in cleanup_paths:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
     return {"output": str(output), "size_bytes": output.stat().st_size, **inventory}
 
 
