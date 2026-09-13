@@ -196,11 +196,11 @@ def audit_database(database: Path) -> dict[str, object]:
                     **details,
                 })
 
-    incomplete_sources = [
+    incomplete_sources = sorted({
         str(row["source"])
         for row in source_runs
         if row["status"] != "complete" or not row["is_complete"]
-    ]
+    })
     return {
         "schema_version": "public-adc-dataset-audit-v1",
         "database_sha256": _sha256(database),
