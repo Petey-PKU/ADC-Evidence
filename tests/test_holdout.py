@@ -12,6 +12,7 @@ from adc_evidence.evaluation.holdout import (
     load_holdout_questions,
     run_public_holdout,
     validate_holdout_disjoint,
+    validate_holdout_entity_mentions,
 )
 
 
@@ -49,6 +50,18 @@ class PublicHoldoutTests(unittest.TestCase):
         self.assertEqual(result["status"], "disjoint")
         self.assertEqual(result["overlap_count"], 0)
         self.assertEqual(result["question_id_overlap_count"], 0)
+
+    def test_holdout_entity_bindings_match_public_catalog(self) -> None:
+        import csv
+
+        path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
+        catalog_path = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.csv"
+        questions = load_holdout_questions(path)
+        with catalog_path.open(encoding="utf-8-sig", newline="") as handle:
+            catalog = list(csv.DictReader(handle))
+        result = validate_holdout_entity_mentions(questions, catalog)
+        self.assertEqual(result["status"], "entity_bindings_verified")
+        self.assertGreater(result["expected_entity_count"], 0)
 
     def test_holdout_runs_both_local_arms_without_network(self) -> None:
         path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"

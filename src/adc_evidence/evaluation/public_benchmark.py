@@ -21,6 +21,8 @@ VALID_CATEGORIES = {
 }
 VALID_SPLITS = {"dev", "public_smoke"}
 VALID_REVIEW_STATUSES = {"pending", "complete"}
+VALID_EXPECTED_STATUSES = {"answered", "partial", "refused", "error"}
+VALID_ANSWER_KINDS = {"structured", "comparison", "trial_record", "evidence_document", "refusal", "gap"}
 
 
 def _canonical(value: object) -> str:
@@ -63,12 +65,28 @@ def load_public_benchmark(path: Path) -> list[dict[str, object]]:
         }:
             raise ValueError(f"{row['question_id']}: invalid expected_route")
         statuses = row["expected_status"]
-        if not isinstance(statuses, list) or not statuses:
+        if not isinstance(statuses, list) or not statuses or any(
+            not isinstance(status, str) or status not in VALID_EXPECTED_STATUSES
+            for status in statuses
+        ):
             raise ValueError(f"{row['question_id']}: expected_status must be nonempty list")
         if bool(row["should_refuse"]) != (row["expected_route"] == "refusal"):
             raise ValueError(f"{row['question_id']}: refusal route/status mismatch")
+        if not isinstance(row["allowed_answers"], list):
+            raise ValueError(f"{row['question_id']}: allowed_answers must be a list")
+        standard = row["standard_answer"]
+        if not isinstance(standard, dict) or standard.get("kind") not in VALID_ANSWER_KINDS:
+            raise ValueError(f"{row['question_id']}: standard_answer.kind is invalid")
         if not isinstance(row["evidence_sources"], list):
             raise ValueError(f"{row['question_id']}: evidence_sources must be a list")
+        for source in row["evidence_sources"]:
+            if not isinstance(source, dict) or any(
+                not str(source.get(field, "")).strip()
+                for field in ("source_type", "source_record_id", "source_url", "field")
+            ):
+                raise ValueError(
+                    f"{row['question_id']}: each evidence source needs type, ID, URL, and field"
+                )
         review = row["human_scoring"]
         if not isinstance(review, dict) or review.get("status") not in VALID_REVIEW_STATUSES:
             raise ValueError(f"{row['question_id']}: invalid human_scoring status")
@@ -78,6 +96,10 @@ def load_public_benchmark(path: Path) -> list[dict[str, object]]:
             raise ValueError(f"{row['question_id']}: pending review cannot contain scores")
         if not isinstance(row["scoring"], dict) or not row["scoring"].get("primary_metric"):
             raise ValueError(f"{row['question_id']}: scoring.primary_metric is required")
+        if not isinstance(row["scoring"].get("automatic_fields"), list) or not isinstance(
+            row["scoring"].get("human_fields"), list
+        ):
+            raise ValueError(f"{row['question_id']}: scoring field lists are required")
     return rows
 
 

@@ -29,7 +29,11 @@ GENERIC_SOURCE_URLS = {
 
 
 def _sha256(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    # Git checks out text files with the platform's native newline convention
+    # (for example CRLF on Windows and LF on Ubuntu).  Hash the canonical LF
+    # representation so the audit is reproducible on every CI runner.
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return "sha256:" + hashlib.sha256(content).hexdigest()
 
 
 def _is_generic_source(url: str) -> bool:

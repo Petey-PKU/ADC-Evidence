@@ -50,6 +50,41 @@ class PublicBenchmarkTests(unittest.TestCase):
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["question_count"], 98)
 
+    def test_manifest_question_hash_is_stable_across_newline_conventions(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            root = Path(temporary.name)
+            crlf_questions = root / "questions-crlf.jsonl"
+            canonical = BENCHMARK.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            crlf_questions.write_bytes(canonical.replace(b"\n", b"\r\n"))
+            manifest = root / "manifest.json"
+            manifest.write_text(
+                (ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            result = validate_public_benchmark(
+                crlf_questions,
+                manifest,
+                catalog_path=ROOT / "data" / "public" / "marketed_adc_catalog.csv",
+            )
+        finally:
+            temporary.cleanup()
+        self.assertEqual(result["status"], "verified")
+
+    def test_loader_rejects_incomplete_evidence_provenance(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            path = Path(temporary.name) / "invalid.jsonl"
+            row = load_public_benchmark(BENCHMARK)[0]
+            row["evidence_sources"] = [{"source_record_id": "fact:x"}]
+            path.write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "evidence source"):
+                load_public_benchmark(path)
+        finally:
+            temporary.cleanup()
+
     def test_automatic_scoring_requires_exact_question_identity(self) -> None:
         rows = load_public_benchmark(BENCHMARK)[:2]
         outputs = [

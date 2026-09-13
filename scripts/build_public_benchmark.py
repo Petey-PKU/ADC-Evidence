@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -21,7 +22,14 @@ DEFAULT_MANIFEST = PROJECT_ROOT / "data" / "annotations" / "public_benchmark_v1.
 
 
 def _file_hash(path: Path) -> str:
-    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def _catalog_hash(path: Path) -> str:
+    """Hash catalog text independently of the checkout newline convention."""
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
 def _catalog_rows(path: Path) -> list[dict[str, str]]:
@@ -233,7 +241,10 @@ def _build_rows(catalog: list[dict[str, str]], database: Path) -> list[dict[str,
             continue
         seen_entities.add(entity_id)
         catalog_row = by_id.get(entity_id, {})
-        names = [str(catalog_row.get("adc_name", "")), *str(catalog_row.get("aliases", "")).split(";")]
+        names = [
+            str(catalog_row.get("adc_name", "")),
+            *re.split(r"[;|]", str(catalog_row.get("aliases", ""))),
+        ]
         names = [name.casefold().strip() for name in names if name.strip()]
 
         def relevance(document: dict[str, object]) -> tuple[int, int, str]:
@@ -321,7 +332,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
     validated = load_public_benchmark(args.output)
     manifest = benchmark_manifest(
         validated,
-        catalog_sha256=_file_hash(catalog),
+        catalog_sha256=_catalog_hash(catalog),
         database_data_version=evidence_data_version(database),
         requested_as_of=args.requested_as_of,
     )

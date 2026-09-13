@@ -37,6 +37,22 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(report["review_status"], "needs_primary_source_review")
         self.assertEqual(report["manual_review_queue"][0]["adc_id"], "adc_001")
 
+    def test_catalog_hash_is_stable_across_newline_conventions(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            lf = Path(temporary.name) / "catalog-lf.csv"
+            crlf = Path(temporary.name) / "catalog-crlf.csv"
+            content = "adc_id,adc_name\nadc_001,Example ADC\n"
+            lf.write_bytes(content.encode("utf-8"))
+            crlf.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+            # The minimal fixture is intentionally incomplete; the audit still
+            # computes provenance before reporting its review queue.
+            lf_report = audit_catalog(lf, requested_as_of="2026-09-30")
+            crlf_report = audit_catalog(crlf, requested_as_of="2026-09-30")
+        finally:
+            temporary.cleanup()
+        self.assertEqual(lf_report["catalog_sha256"], crlf_report["catalog_sha256"])
+
 
 if __name__ == "__main__":
     unittest.main()

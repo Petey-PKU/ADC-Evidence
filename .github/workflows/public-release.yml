@@ -1,0 +1,84 @@
+name: Build public dataset release
+
+on:
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Requested dataset snapshot date (YYYY-MM-DD)"
+        required: true
+        default: "2026-09-30"
+      pubmed_max:
+        description: "Maximum PubMed records to collect"
+        required: true
+        default: "1000"
+      trial_max_pages:
+        description: "Maximum ClinicalTrials.gov pages to collect"
+        required: true
+        default: "10"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ADC_OFFLINE_ONLY: "true"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package
+        run: python -m pip install -e ".[generation]"
+      - name: Audit catalog for requested snapshot date
+        run: >-
+          python scripts/audit_public_catalog.py
+          --catalog data/public/marketed_adc_catalog.csv
+          --requested-as-of "${{ inputs.as_of }}"
+          --output .test_tmp/marketed_adc_catalog.audit.json
+      - name: Build public database snapshot
+        run: >-
+          python scripts/build_public_dataset.py
+          --catalog data/public/marketed_adc_catalog.csv
+          --as-of "${{ inputs.as_of }}"
+          --pubmed-max "${{ inputs.pubmed_max }}"
+          --trial-page-size 1000
+          --trial-max-pages "${{ inputs.trial_max_pages }}"
+      - name: Build matching retrieval index
+        run: >-
+          python -m adc_evidence.rag.build_index
+          --database "data/processed/adc_public_${{ inputs.as_of }}.db"
+          --index-path "artifacts/vector_index/public_${{ inputs.as_of }}"
+          --backend hashing
+      - name: Build benchmark bound to snapshot
+        run: >-
+          python scripts/build_public_benchmark.py
+          --catalog data/public/marketed_adc_catalog.csv
+          --database "data/processed/adc_public_${{ inputs.as_of }}.db"
+          --requested-as-of "${{ inputs.as_of }}"
+      - name: Package and verify release
+        run: >-
+          python scripts/package_public_release.py
+          --database "data/processed/adc_public_${{ inputs.as_of }}.db"
+          --index-path "artifacts/vector_index/public_${{ inputs.as_of }}"
+          --catalog data/public/marketed_adc_catalog.csv
+          --catalog-audit .test_tmp/marketed_adc_catalog.audit.json
+          --benchmark-manifest data/annotations/public_benchmark_v1.manifest.json
+          --benchmark-questions data/annotations/public_benchmark_v1.jsonl
+          --output "artifacts/releases/adc-public-${{ inputs.as_of }}.zip"
+          --as-of "${{ inputs.as_of }}"
+      - name: Verify release archive
+        run: >-
+          python scripts/verify_public_release.py
+          "artifacts/releases/adc-public-${{ inputs.as_of }}.zip"
+      - name: Upload release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: adc-public-${{ inputs.as_of }}
+          path: artifacts/releases/adc-public-${{ inputs.as_of }}.zip
+          if-no-files-found: error
+          retention-days: 30
