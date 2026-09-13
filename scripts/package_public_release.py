@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sqlite3
 import zipfile
 from pathlib import Path
 
@@ -50,6 +51,37 @@ def _read_json(path: Path) -> dict[str, object]:
     if not isinstance(value, dict):
         raise ValueError(f"Expected JSON object: {path}")
     return value
+
+
+def _dataset_summary(database: Path) -> dict[str, object]:
+    """Read public, non-content counts without exposing raw paths or text."""
+    uri = f"file:{database.as_posix()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as connection:
+        connection.row_factory = sqlite3.Row
+        counts: dict[str, int] = {}
+        for name in ("adcs", "trials", "documents", "entity_links", "evidence"):
+            counts[name] = int(connection.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0])
+        abstract_count = int(connection.execute(
+            "SELECT COUNT(*) FROM documents WHERE abstract IS NOT NULL AND abstract <> ''"
+        ).fetchone()[0])
+        topic_counts = {
+            str(row[0]): int(row[1])
+            for row in connection.execute(
+                "SELECT topic, COUNT(*) FROM literature_topics GROUP BY topic ORDER BY topic"
+            ).fetchall()
+        }
+        latest = connection.execute(
+            "SELECT run_id, started_at, finished_at, status FROM ingestion_runs ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+    document_count = counts["documents"]
+    return {
+        "schema_version": "public-adc-dataset-summary-v1",
+        "counts": counts,
+        "document_with_abstract_count": abstract_count,
+        "abstract_coverage": round(abstract_count / document_count, 4) if document_count else 0.0,
+        "literature_topic_counts": topic_counts,
+        "latest_ingestion_run": dict(latest) if latest is not None else None,
+    }
 
 
 def build_release_inventory(
@@ -96,6 +128,7 @@ def build_release_inventory(
         "schema_version": "public-adc-release-v1",
         "dataset_as_of": as_of,
         "retrieval_corpus_version": corpus_version,
+        "dataset_summary": _dataset_summary(database),
         "benchmark_manifest": _read_json(benchmark_manifest),
         "files": [
             {"archive_path": archive_path, "size_bytes": path.stat().st_size, "sha256": _sha256(path)}

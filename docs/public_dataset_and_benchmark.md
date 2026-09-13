@@ -54,6 +54,8 @@ embedding 模型后重新构建。
 benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
+`RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
+最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 998 条。
 
 下载者可以在解压前检查发布包：
 
