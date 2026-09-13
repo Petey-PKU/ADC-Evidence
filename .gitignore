@@ -17,6 +17,7 @@ data/processed/adc_public_*.json
 artifacts/vector_index/*
 artifacts/models/*
 artifacts/evaluation/*
+artifacts/releases/*
 
 # Keep directory placeholders
 !data/raw/.gitkeep
