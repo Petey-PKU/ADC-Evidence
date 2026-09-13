@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -233,7 +234,10 @@ def _build_rows(catalog: list[dict[str, str]], database: Path) -> list[dict[str,
             continue
         seen_entities.add(entity_id)
         catalog_row = by_id.get(entity_id, {})
-        names = [str(catalog_row.get("adc_name", "")), *str(catalog_row.get("aliases", "")).split(";")]
+        names = [
+            str(catalog_row.get("adc_name", "")),
+            *re.split(r"[;|]", str(catalog_row.get("aliases", ""))),
+        ]
         names = [name.casefold().strip() for name in names if name.strip()]
 
         def relevance(document: dict[str, object]) -> tuple[int, int, str]:

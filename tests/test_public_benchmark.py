@@ -50,6 +50,18 @@ class PublicBenchmarkTests(unittest.TestCase):
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["question_count"], 98)
 
+    def test_loader_rejects_incomplete_evidence_provenance(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            path = Path(temporary.name) / "invalid.jsonl"
+            row = load_public_benchmark(BENCHMARK)[0]
+            row["evidence_sources"] = [{"source_record_id": "fact:x"}]
+            path.write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "evidence source"):
+                load_public_benchmark(path)
+        finally:
+            temporary.cleanup()
+
     def test_automatic_scoring_requires_exact_question_identity(self) -> None:
         rows = load_public_benchmark(BENCHMARK)[:2]
         outputs = [
