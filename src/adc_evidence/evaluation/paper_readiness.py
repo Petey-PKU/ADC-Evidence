@@ -115,6 +115,65 @@ def validate_independent_holdout_file(
     }
 
 
+def build_independent_holdout_manifest(
+    questions_path: Path,
+    *,
+    question_set_version: str,
+    evaluation_window_id: str,
+    access_control_method: str,
+    database_data_version: str | None = None,
+    code_commit: str | None = None,
+) -> dict[str, object]:
+    """Create content-free integrity metadata for an external confirmation set.
+
+    The caller must attest how the question file is access controlled.  This
+    function records that attestation but cannot prove filesystem permissions;
+    the question bytes are never copied into the manifest.
+    """
+    if not question_set_version.strip() or not evaluation_window_id.strip():
+        raise ValueError("question_set_version and evaluation_window_id must be nonempty")
+    if not access_control_method.strip():
+        raise ValueError("access_control_method must be nonempty")
+    questions_path = questions_path.resolve()
+    raw = questions_path.read_bytes()
+    rows = [
+        json.loads(line)
+        for line in raw.decode("utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    if not rows or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("Independent holdout must contain at least one JSON object row")
+    question_ids = [str(row.get("question_id", "")).strip() for row in rows]
+    if any(not value for value in question_ids) or len(question_ids) != len(set(question_ids)):
+        raise ValueError("Independent holdout question IDs must be unique and nonempty")
+    for row in rows:
+        validate_question_text(row.get("question"))
+    canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    manifest: dict[str, object] = {
+        "schema_version": "v0.6-independent-holdout-manifest-v1",
+        "question_set_version": question_set_version,
+        "question_set_hash": "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        "question_id_sha256": question_id_sha256(question_ids),
+        "question_file_sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        "question_count": len(rows),
+        "evaluation_window_id": evaluation_window_id,
+        "access_controlled": True,
+        "access_control_method": access_control_method,
+        "access_control_attestation": "operator_asserted; verify independently before publication",
+        "evaluation_use": {
+            "status": "unseen_holdout",
+            "eligible_for_unseen_test_claim": True,
+            "reason": "Question content was frozen outside the public development repository before evaluation.",
+        },
+        "privacy_note": "Only hashes and metadata are included; question content and local paths remain external.",
+    }
+    if database_data_version:
+        manifest["database_data_version"] = database_data_version
+    if code_commit:
+        manifest["code_commit"] = code_commit
+    return manifest
+
+
 def validate_human_review_manifest(manifest: object) -> dict[str, object]:
     """Validate content-free integrity metadata for a human-label export."""
     if not isinstance(manifest, dict):

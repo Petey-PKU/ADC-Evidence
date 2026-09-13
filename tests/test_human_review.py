@@ -9,6 +9,7 @@ from adc_evidence.evaluation.human_review import (
 )
 from adc_evidence.evaluation.paper_readiness import (
     audit_public_paper_readiness,
+    build_independent_holdout_manifest,
     build_human_review_manifest,
     validate_independent_holdout_file,
     validate_independent_holdout_manifest,
@@ -144,6 +145,31 @@ class HumanReviewTests(unittest.TestCase):
         invalid_ids = dict(manifest, question_id_sha256="sha256:" + "0" * 64)
         with self.assertRaisesRegex(ValueError, "question ID hash mismatch"):
             validate_independent_holdout_file(questions_path, invalid_ids)
+
+    def test_independent_holdout_manifest_builder_binds_external_file(self) -> None:
+        rows = [
+            {"question_id": "holdout-1", "question": "T-DXd 的靶点是什么？"},
+            {"question_id": "holdout-2", "question": "T-DM1 的载荷是什么？"},
+        ]
+        with WorkspaceTemporaryDirectory() as directory:
+            questions_path = Path(directory) / "private_holdout.jsonl"
+            questions_path.write_text(
+                "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            manifest = build_independent_holdout_manifest(
+                questions_path,
+                question_set_version="holdout-v1",
+                evaluation_window_id="window-1",
+                access_control_method="private ACL",
+                database_data_version="data-v1",
+                code_commit="abc123",
+            )
+            self.assertTrue(manifest["access_controlled"])
+            self.assertEqual(validate_independent_holdout_manifest(manifest), manifest)
+            bound = validate_independent_holdout_file(questions_path, manifest)
+            self.assertEqual(bound["question_count"], 2)
+            self.assertNotIn("private_holdout.jsonl", json.dumps(manifest))
 
     def test_readiness_does_not_pass_manifest_without_question_file(self) -> None:
         manifest = {
