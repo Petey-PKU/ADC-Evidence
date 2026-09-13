@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+import sqlite3
 import zipfile
 from pathlib import PurePosixPath
 from pathlib import Path
@@ -12,6 +14,36 @@ from pathlib import Path
 
 def _sha256(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def _database_absolute_path_count(payload: bytes) -> int:
+    """Count machine-specific paths in path-bearing SQLite text columns."""
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.deserialize(payload)
+        pattern = re.compile(r"(?:[A-Za-z]:[\\/]|/Users/|/home/|\\\\)")
+        count = 0
+        tables = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+        ]
+        for table in tables:
+            quoted_table = '"' + table.replace('"', '""') + '"'
+            columns = [
+                (str(row[1]), str(row[2]).upper())
+                for row in connection.execute(f"PRAGMA table_info({quoted_table})").fetchall()
+                if "TEXT" in str(row[2]).upper()
+                and ("path" in str(row[1]).casefold() or str(row[1]).casefold() == "parameters_json")
+            ]
+            for column, _ in columns:
+                quoted_column = '"' + column.replace('"', '""') + '"'
+                for value, in connection.execute(f"SELECT {quoted_column} FROM {quoted_table} WHERE {quoted_column} IS NOT NULL"):
+                    count += int(pattern.search(str(value)) is not None)
+        return count
+    finally:
+        connection.close()
 
 
 def verify_release(path: Path) -> dict[str, object]:
@@ -32,6 +64,7 @@ def verify_release(path: Path) -> dict[str, object]:
 
         checked: list[str] = []
         seen: set[str] = set()
+        database_absolute_path_count = 0
         for entry in manifest["files"]:
             if not isinstance(entry, dict):
                 raise ValueError("release manifest contains a non-object file entry")
@@ -51,6 +84,12 @@ def verify_release(path: Path) -> dict[str, object]:
             expected_hash = str(entry.get("sha256", ""))
             if expected_hash != _sha256(payload):
                 raise ValueError(f"checksum mismatch for {archive_path}")
+            if archive_path.startswith("data/processed/") and archive_path.endswith(".db"):
+                database_absolute_path_count = _database_absolute_path_count(payload)
+                if database_absolute_path_count:
+                    raise ValueError(
+                        f"database contains {database_absolute_path_count} absolute local paths"
+                    )
             checked.append(archive_path)
         allowed_names = seen | {"RELEASE_MANIFEST.json", "RELEASE_README.md"}
         unexpected = sorted(names - allowed_names)
@@ -65,6 +104,7 @@ def verify_release(path: Path) -> dict[str, object]:
             "dataset_as_of": manifest.get("dataset_as_of"),
             "retrieval_corpus_version": manifest.get("retrieval_corpus_version"),
             "checked_file_count": len(checked),
+            "database_absolute_path_count": database_absolute_path_count,
             "benchmark_question_file_present": "data/annotations/public_benchmark_v1.jsonl" in names,
         }
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.package_public_release import _release_readme, _sanitize_database_for_release, package_release
-from scripts.verify_public_release import verify_release
+from scripts.verify_public_release import _database_absolute_path_count, verify_release
 from tests.support import WorkspaceTemporaryDirectory
 
 
@@ -113,6 +113,18 @@ class PublicReleaseTests(unittest.TestCase):
                 self.assertNotIn("Users", connection.execute("SELECT parameters_json FROM ingestion_runs").fetchone()[0])
         finally:
             temporary.cleanup()
+
+    def test_release_verifier_detects_database_absolute_paths(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            source = Path(temporary.name) / "source.db"
+            with sqlite3.connect(source) as connection:
+                connection.execute("CREATE TABLE source_records (raw_path TEXT)")
+                connection.execute("INSERT INTO source_records VALUES (?)", (r"C:\\Users\\example\\raw.json",))
+            count = _database_absolute_path_count(source.read_bytes())
+        finally:
+            temporary.cleanup()
+        self.assertEqual(count, 1)
 
 
 if __name__ == "__main__":
