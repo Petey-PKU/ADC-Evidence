@@ -40,7 +40,10 @@ python scripts/audit_public_dataset.py `
   --output artifacts/evaluation/public_dataset_audit.json
 ```
 
-审计会将计划中的抓取上限记录为 `partial`，不会把部分 PubMed 结果解释为全集覆盖。
+审计会将计划中的抓取上限记录为 `partial`，不会把部分 PubMed 结果解释为全集覆盖；
+`link_coverage_by_adc`、`missing_trial_link_adc_ids`、`missing_document_link_adc_ids` 和
+`orphan_link_counts` 用于发现实体关联缺口，
+不会把没有关联记录的 ADC 静默计入文献或试验覆盖率。
 其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
 链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
 

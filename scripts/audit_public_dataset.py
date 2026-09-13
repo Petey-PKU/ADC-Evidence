@@ -82,6 +82,50 @@ def audit_database(database: Path) -> dict[str, object]:
               ON l.source_record_type='document' AND l.source_record_id=d.document_id
             """
         ).fetchone()[0])
+        link_coverage_by_adc = {
+            str(row["adc_id"]): {
+                "trial_record_count": int(row["trial_record_count"]),
+                "document_record_count": int(row["document_record_count"]),
+            }
+            for row in connection.execute(
+                """
+                SELECT a.adc_id,
+                       COUNT(DISTINCT CASE WHEN l.source_record_type='trial' THEN l.source_record_id END) AS trial_record_count,
+                       COUNT(DISTINCT CASE WHEN l.source_record_type='document' THEN l.source_record_id END) AS document_record_count
+                FROM adcs AS a
+                LEFT JOIN entity_links AS l
+                  ON l.entity_type='adc' AND l.entity_id=a.adc_id
+                GROUP BY a.adc_id ORDER BY a.adc_id
+                """
+            )
+        }
+        orphan_link_counts = {
+            "trial": int(connection.execute(
+                """
+                SELECT COUNT(*) FROM entity_links AS l
+                LEFT JOIN trials AS t ON t.nct_id=l.source_record_id
+                WHERE l.source_record_type='trial' AND t.nct_id IS NULL
+                """
+            ).fetchone()[0]),
+            "document": int(connection.execute(
+                """
+                SELECT COUNT(*) FROM entity_links AS l
+                LEFT JOIN documents AS d ON d.document_id=l.source_record_id
+                WHERE l.source_record_type='document' AND d.document_id IS NULL
+                """
+            ).fetchone()[0]),
+        }
+        match_method_counts = {
+            f"{row['source_record_type']}:{row['match_method']}": int(row["count"])
+            for row in connection.execute(
+                """
+                SELECT source_record_type, match_method, COUNT(*) AS count
+                FROM entity_links
+                GROUP BY source_record_type, match_method
+                ORDER BY source_record_type, match_method
+                """
+            )
+        }
 
         fact_coverage: dict[str, int] = {}
         fact_provenance: dict[str, dict[str, object]] = {}
@@ -170,6 +214,21 @@ def audit_database(database: Path) -> dict[str, object]:
             "trials": linked_trial_count,
             "documents": linked_document_count,
         },
+        "link_coverage_by_adc": link_coverage_by_adc,
+        "zero_link_adc_ids": sorted(
+            adc_id for adc_id, values in link_coverage_by_adc.items()
+            if not values["trial_record_count"] and not values["document_record_count"]
+        ),
+        "missing_trial_link_adc_ids": sorted(
+            adc_id for adc_id, values in link_coverage_by_adc.items()
+            if not values["trial_record_count"]
+        ),
+        "missing_document_link_adc_ids": sorted(
+            adc_id for adc_id, values in link_coverage_by_adc.items()
+            if not values["document_record_count"]
+        ),
+        "orphan_link_counts": orphan_link_counts,
+        "match_method_counts": match_method_counts,
         "adc_fact_coverage": fact_coverage,
         "adc_fact_provenance": fact_provenance,
         "source_runs": source_runs,

@@ -21,7 +21,8 @@ class PublicDatasetAuditTests(unittest.TestCase):
                     CREATE TABLE documents (document_id TEXT PRIMARY KEY);
                     CREATE TABLE entity_links (
                         entity_type TEXT, entity_id TEXT,
-                        source_record_type TEXT, source_record_id TEXT
+                        source_record_type TEXT, source_record_id TEXT,
+                        match_method TEXT
                     );
                     CREATE TABLE facts (
                         fact_id TEXT PRIMARY KEY, predicate TEXT,
@@ -39,8 +40,8 @@ class PublicDatasetAuditTests(unittest.TestCase):
                     INSERT INTO adcs VALUES ('adc_001');
                     INSERT INTO trials VALUES ('NCT000001');
                     INSERT INTO documents VALUES ('doc_001');
-                    INSERT INTO entity_links VALUES ('adc','adc_001','trial','NCT000001');
-                    INSERT INTO entity_links VALUES ('adc','adc_001','document','doc_001');
+                    INSERT INTO entity_links VALUES ('adc','adc_001','trial','NCT000001','normalized_alias');
+                    INSERT INTO entity_links VALUES ('adc','adc_001','document','doc_001','normalized_alias');
                     INSERT INTO facts VALUES ('fact_1','adc.target','adc',NULL);
                     INSERT INTO fact_evidence VALUES
                       ('fact_1','curated_seed','https://example.test/source',1,NULL);
@@ -56,6 +57,12 @@ class PublicDatasetAuditTests(unittest.TestCase):
         self.assertEqual(report["status"], "partial")
         self.assertEqual(report["duplicate_identifier_counts"]["trials"], 0)
         self.assertEqual(report["linked_record_counts"], {"trials": 1, "documents": 1})
+        self.assertEqual(report["link_coverage_by_adc"]["adc_001"], {"trial_record_count": 1, "document_record_count": 1})
+        self.assertEqual(report["zero_link_adc_ids"], [])
+        self.assertEqual(report["missing_trial_link_adc_ids"], [])
+        self.assertEqual(report["missing_document_link_adc_ids"], [])
+        self.assertEqual(report["orphan_link_counts"], {"trial": 0, "document": 0})
+        self.assertEqual(report["match_method_counts"], {"document:normalized_alias": 1, "trial:normalized_alias": 1})
         self.assertEqual(report["adc_fact_coverage"]["adc.target"], 1)
         self.assertEqual(report["adc_fact_provenance"]["adc.target"]["with_source_url_count"], 1)
         self.assertEqual(report["adc_fact_provenance"]["adc.target"]["source_types"], ["curated_seed"])
