@@ -15,7 +15,7 @@ python scripts/audit_public_hygiene.py --output artifacts/evaluation/public_hygi
 python scripts/audit_paper_readiness.py --output artifacts/evaluation/paper_readiness.json
 ```
 
-结果：196 项标准库测试通过；发布包 `status=verified`，检查 8 个文件，数据库绝对路径为 0；公开仓库卫生审计为 `clean`。论文就绪审计仍按设计返回 `not_ready_for_submission`，保留两个硬门槛：真实独立人工标签和访问受控的独立冻结测试集。
+结果：197 项标准库测试通过；发布包 `status=verified`，检查 8 个文件，数据库绝对路径为 0；公开仓库卫生审计为 `clean`。论文就绪审计仍按设计返回 `not_ready_for_submission`，保留两个硬门槛：真实独立人工标签和访问受控的独立冻结测试集。
 
 从发布包解压后设置 `ADC_OFFLINE_ONLY=true`、`ADC_LLM_BACKEND=extractive`，执行结构化问题：
 
@@ -47,3 +47,4 @@ $env:HTTP_PROXY="http://127.0.0.1:7890"
 $env:HTTPS_PROXY="http://127.0.0.1:7890"
 git push origin research/v0.6-freeze
 ```
+
