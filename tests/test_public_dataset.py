@@ -22,6 +22,10 @@ class PublicDatasetTests(unittest.TestCase):
         self.assertEqual(set(labels), {"mechanism", "efficacy", "safety"})
         self.assertIn("mechanism", labels["mechanism"])
 
+    def test_short_efficacy_acronyms_use_word_boundaries(self) -> None:
+        labels = classify_literature_text("Most patients improved", "")
+        self.assertNotIn("os", labels.get("efficacy", []))
+
     def test_catalog_has_unique_valid_public_records(self) -> None:
         summary = _catalog_summary(DEFAULT_CATALOG)
         self.assertGreaterEqual(summary["row_count"], 20)

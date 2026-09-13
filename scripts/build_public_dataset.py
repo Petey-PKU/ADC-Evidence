@@ -11,6 +11,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -45,8 +46,18 @@ LITERATURE_TOPIC_RULES: dict[str, tuple[str, ...]] = {
 def classify_literature_text(title: str, abstract: str | None) -> dict[str, list[str]]:
     """Apply transparent lexical rules to a PubMed title and abstract."""
     text = f"{title} {abstract or ''}".casefold()
+
+    def matches(term: str) -> bool:
+        normalized = term.casefold()
+        # Acronyms must be standalone tokens; substring matching would mark
+        # ordinary words such as ``most`` as containing the efficacy acronym
+        # ``OS``.
+        if re.fullmatch(r"[a-z0-9]{2,4}", normalized):
+            return re.search(rf"\b{re.escape(normalized)}\b", text) is not None
+        return normalized in text
+
     matched = {
-        topic: [term for term in terms if term.casefold() in text]
+        topic: [term for term in terms if matches(term)]
         for topic, terms in LITERATURE_TOPIC_RULES.items()
     }
     return {topic: list(dict.fromkeys(terms)) for topic, terms in matched.items() if terms}

@@ -14,7 +14,7 @@
     "structured_fact": 44,
     "trial_lookup": 12
   },
-  "question_set_sha256": "sha256:ccd570619260ef6013243a5584ce1834075573333658325ea5cb766e08dd3c23",
+  "question_set_sha256": "sha256:d36c13e40ee0341437dc9743d3a564825ae8c82084d99fc54512b12d5d8dccef",
   "catalog_sha256": "sha256:c3396dccf5c73537c53deef2883a5d0ecbefe9e956e7620096689c6cf7185615",
   "database_data_version": {
     "data_version": "data_1cf33bab6a96b56569372aa1240bfab1256d4b81518cb19e2a22dee054b0c597",
@@ -60,6 +60,6 @@
     "candidate_cap_per_question": 50,
     "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims."
   },
-  "question_file_sha256": "sha256:0caa80d685161eeb989d65aacb10465a1e97b57724612814231759d215cb6386",
+  "question_file_sha256": "sha256:01b3d7940f3b47ad693a549930b54c83e0c5ef2439f82b023c24b79f7e5075aa",
   "question_provenance": "auto_derived_from_public_database_snapshot"
 }
