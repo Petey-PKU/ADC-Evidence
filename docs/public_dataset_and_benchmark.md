@@ -56,6 +56,12 @@ embedding 模型后重新构建。
 benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
+
+公共仓库还提供手动触发的 `.github/workflows/public-release.yml`。在 GitHub Actions 中输入
+快照日期和抓取上限后，它会在干净的 Ubuntu runner 上重建数据库、hashing 索引和 benchmark，
+执行脱敏、语料版本绑定及发布包校验，并将 zip 作为 Actions artifact 提供下载。工作流只有
+`workflow_dispatch` 入口，不会因普通代码 push 自动抓取或发布数据；下载者仍应先检查包内的
+`RELEASE_MANIFEST.json` 和来源许可。
 `RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
 最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 998 条。
 打包过程会对 SQLite 副本中的本机绝对路径做脱敏，原始数据库不会被修改；发布包不含原始
