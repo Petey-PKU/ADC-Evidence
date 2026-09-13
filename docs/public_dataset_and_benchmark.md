@@ -4,8 +4,8 @@
 
 公共目录位于 `data/public/marketed_adc_catalog.csv`，包含 23 个截至
 2026-06-30 已有监管批准记录的 ADC 候选（包括 1 个历史撤回记录）。在 2026-09-13
-构建的本地快照中，目录扩展为 23 个 ADC、1,750 条 ClinicalTrials.gov 试验和 998
-篇 PubMed 文献，其中 956 篇含摘要。请求的 `2026-09-30` 是未来目标窗口，因此本次
+构建的本地快照中，目录扩展为 23 个 ADC、1,750 条 ClinicalTrials.gov 试验和 1,410
+篇 PubMed 文献，其中 1,366 篇含摘要；23 个 ADC 均至少有一条文献实体关联。请求的 `2026-09-30` 是未来目标窗口，因此本次
 清单将 `as_of_status` 标为 `future_target_pending`，不把未来日期当作已观察数据。
 
 本目录是可审阅的公共种子，字段仍标为 `primary_check_pending`。每个字段在公开发布前

@@ -118,6 +118,7 @@ def collect_pubmed(
     *,
     max_records: int = 200,
     batch_size: int = 100,
+    coverage_names: list[str] | None = None,
 ) -> tuple[list[DocumentRecord], list[SourceRecord], str, int]:
     query = build_pubmed_query(adc_names)
     common = {
@@ -136,8 +137,22 @@ def collect_pubmed(
         "retmax": str(max_records),
         "sort": "relevance",
     }
-    search_url = f"{API_BASE}/esearch.fcgi?{urlencode(search_parameters)}"
-    search_content = fetch_bytes(search_url, timeout=45)
+    encoded_search = urlencode(search_parameters)
+    search_endpoint = f"{API_BASE}/esearch.fcgi"
+    # A catalog containing canonical names and aliases can exceed common URL
+    # limits.  Use POST for long searches while retaining the exact encoded
+    # query in the run summary and source snapshot metadata.
+    if len(encoded_search) > 1800:
+        search_url = search_endpoint
+        search_content = fetch_bytes(
+            search_url,
+            timeout=45,
+            data=encoded_search.encode("ascii"),
+            extra_headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+    else:
+        search_url = f"{search_endpoint}?{encoded_search}"
+        search_content = fetch_bytes(search_url, timeout=45)
     search_path, search_checksum = write_snapshot(
         raw_directory / "esearch.json", search_content
     )
@@ -188,4 +203,96 @@ def collect_pubmed(
             )
 
     unique_documents = {document.document_id: document for document in documents}
+
+    # Relevance-ranked broad queries can exhaust the capture budget on a few
+    # prolific ADCs and silently leave a marketed ADC with zero literature
+    # links.  For canonical names that are absent from the first capture,
+    # perform a small exact-name supplement.  This keeps the normal bounded
+    # query while making per-entity coverage explicit and reproducible.
+    supplement_limit = min(50, max_records)
+    missing_names = [
+        name.strip()
+        for name in dict.fromkeys(coverage_names or [])
+        if name.strip()
+        and not any(
+            name.casefold() in " ".join(
+                item for item in (document.title, document.abstract or "") if item
+            ).casefold()
+            for document in unique_documents.values()
+        )
+    ]
+    for supplement_number, name in enumerate(missing_names, start=1):
+        supplement_parameters = {
+            **common,
+            "term": f'"{name}"[Title/Abstract]',
+            "retmode": "json",
+            "retmax": str(supplement_limit),
+            "sort": "relevance",
+        }
+        encoded_supplement = urlencode(supplement_parameters)
+        supplement_endpoint = f"{API_BASE}/esearch.fcgi"
+        if len(encoded_supplement) > 1800:
+            supplement_url = supplement_endpoint
+            supplement_content = fetch_bytes(
+                supplement_url,
+                timeout=45,
+                data=encoded_supplement.encode("ascii"),
+                extra_headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+        else:
+            supplement_url = f"{supplement_endpoint}?{encoded_supplement}"
+            supplement_content = fetch_bytes(supplement_url, timeout=45)
+        supplement_path, supplement_checksum = write_snapshot(
+            raw_directory / f"supplement_{supplement_number:03d}_esearch.json",
+            supplement_content,
+        )
+        supplement_payload = json.loads(supplement_content)
+        supplement_result = supplement_payload.get("esearchresult", {})
+        supplement_pmids = supplement_result.get("idlist", [])
+        supplement_source_id = f"esearch:coverage:{supplement_number:03d}"
+        source_records.append(
+            SourceRecord(
+                source="pubmed",
+                source_record_id=supplement_source_id,
+                retrieved_at=retrieved_at,
+                source_url=supplement_url,
+                raw_path=supplement_path,
+                sha256=supplement_checksum,
+                dataset_version=retrieved_at,
+            )
+        )
+        for batch_number, start in enumerate(
+            range(0, len(supplement_pmids), batch_size), start=1
+        ):
+            batch = supplement_pmids[start : start + batch_size]
+            fetch_parameters = {
+                **common,
+                "id": ",".join(batch),
+                "retmode": "xml",
+            }
+            fetch_url = f"{API_BASE}/efetch.fcgi?{urlencode(fetch_parameters)}"
+            content = fetch_bytes(fetch_url, timeout=60)
+            checksum = sha256_bytes(content)
+            path, _ = write_snapshot(
+                raw_directory
+                / f"supplement_{supplement_number:03d}_efetch_{batch_number:03d}.xml",
+                content,
+            )
+            batch_documents = parse_pubmed_xml(content, raw_path=path, checksum=checksum)
+            documents.extend(batch_documents)
+            for document in batch_documents:
+                source_records.append(
+                    SourceRecord(
+                        source="pubmed",
+                        source_record_id=document.source_record_id,
+                        retrieved_at=retrieved_at,
+                        source_url=document.source_url,
+                        raw_path=path,
+                        sha256=checksum,
+                        dataset_version=retrieved_at,
+                    )
+                )
+        unique_documents.update(
+            {document.document_id: document for document in documents}
+        )
     return list(unique_documents.values()), source_records, query, total_count

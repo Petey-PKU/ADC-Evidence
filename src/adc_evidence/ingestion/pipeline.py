@@ -366,6 +366,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
                     adc_search_names,
                     run_directory / "pubmed",
                     max_records=args.pubmed_max,
+                    coverage_names=adc_names,
                 ),
                 max_attempts=source_retries,
                 base_delay_seconds=source_retry_delay,
@@ -404,6 +405,9 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
             upsert_evidence(args.database, evidence)
             summary["pubmed_documents"] = len(documents)
             summary["pubmed_query"] = query
+            summary["pubmed_query_transport"] = (
+                "POST" if len(query.encode("utf-8")) > 1800 else "GET"
+            )
             summary["pubmed_total_matches"] = total_count
             summary["pubmed_truncated"] = total_count > len(documents)
             pubmed_complete = total_count == len(documents)

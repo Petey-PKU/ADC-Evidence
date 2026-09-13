@@ -21,7 +21,13 @@ def _database_absolute_path_count(payload: bytes) -> int:
     connection = sqlite3.connect(":memory:")
     try:
         connection.deserialize(payload)
-        pattern = re.compile(r"(?:[A-Za-z]:[\\/]|/Users/|/home/|\\\\)")
+        # A doubled backslash is also how JSON encodes ordinary Windows
+        # separators (for example ``data\\processed``).  Treat it as an
+        # absolute path only at the beginning of a value or after a quote/
+        # whitespace, where it can denote a UNC path such as ``\\\\server``.
+        pattern = re.compile(
+            r"(?:[A-Za-z]:[\\/]|/Users/|/home/|(?:^|[\s\"'])\\\\)"
+        )
         count = 0
         tables = [
             str(row[0])

@@ -155,6 +155,21 @@ class PublicReleaseTests(unittest.TestCase):
             temporary.cleanup()
         self.assertEqual(count, 1)
 
+    def test_release_verifier_allows_relative_windows_parameters(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            source = Path(temporary.name) / "source.db"
+            with sqlite3.connect(source) as connection:
+                connection.execute("CREATE TABLE ingestion_runs (parameters_json TEXT)")
+                connection.execute(
+                    "INSERT INTO ingestion_runs VALUES (?)",
+                    (json.dumps({"database": r"data\\processed\\snapshot.db"}),),
+                )
+            count = _database_absolute_path_count(source.read_bytes())
+        finally:
+            temporary.cleanup()
+        self.assertEqual(count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
