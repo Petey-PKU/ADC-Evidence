@@ -285,3 +285,72 @@ def score_public_benchmark(
         "scoring_mode": "automatic_diagnostics_only",
         "human_review_required": True,
     }
+
+
+def compare_public_benchmark_reports(
+    system_rows: Iterable[dict[str, object]],
+    baseline_rows: Iterable[dict[str, object]],
+    benchmark_rows: list[dict[str, object]],
+) -> dict[str, object]:
+    """Compute paired diagnostic differences for two public benchmark arms."""
+    expected = {str(row["question_id"]): row for row in benchmark_rows}
+    system = {str(row.get("question_id", "")): row for row in system_rows}
+    baseline = {str(row.get("question_id", "")): row for row in baseline_rows}
+    if set(system) != set(expected) or set(baseline) != set(expected):
+        raise ValueError("Both reports must contain exactly the benchmark question IDs")
+
+    def metrics(gold: dict[str, object], output: dict[str, object]) -> dict[str, bool]:
+        cited = output.get("citation_source_record_ids", [])
+        evidence = not gold["evidence_sources"] or any(
+            _source_id_matches(actual, expected_id)
+            for actual in cited
+            for expected_id in _source_ids(gold)
+        )
+        return {
+            "route": output.get("route") == gold["expected_route"],
+            "status": output.get("status") in gold["expected_status"],
+            "answer": _answer_field_hit(gold, output) >= 1.0,
+            "evidence": evidence,
+            "refusal": bool(output.get("status") == "refused") == bool(gold["should_refuse"]),
+        }
+
+    def summarize(ids: list[str]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for metric in ("route", "status", "answer", "evidence", "refusal"):
+            system_hits = sum(metrics(expected[qid], system[qid])[metric] for qid in ids)
+            baseline_hits = sum(metrics(expected[qid], baseline[qid])[metric] for qid in ids)
+            result[metric] = {
+                "question_count": len(ids),
+                "system_rate": system_hits / len(ids),
+                "baseline_rate": baseline_hits / len(ids),
+                "difference": (system_hits - baseline_hits) / len(ids),
+                "system_only": sum(
+                    metrics(expected[qid], system[qid])[metric]
+                    and not metrics(expected[qid], baseline[qid])[metric]
+                    for qid in ids
+                ),
+                "baseline_only": sum(
+                    metrics(expected[qid], baseline[qid])[metric]
+                    and not metrics(expected[qid], system[qid])[metric]
+                    for qid in ids
+                ),
+            }
+        return result
+
+    all_ids = sorted(expected)
+    by_category: dict[str, list[str]] = {}
+    for row in benchmark_rows:
+        by_category.setdefault(str(row["category"]), []).append(str(row["question_id"]))
+    return {
+        "schema_version": "public-adc-benchmark-comparison-v1",
+        "question_count": len(all_ids),
+        "system_variant": "adc_evidence_public",
+        "baseline_variant": "offline_rag_baseline",
+        "paired_metrics": summarize(all_ids),
+        "by_category": {
+            category: summarize(sorted(ids))
+            for category, ids in sorted(by_category.items())
+        },
+        "human_review_required": True,
+        "method_note": "Automatic paired diagnostics only; semantic correctness and publication claims require independent human review on a hidden holdout.",
+    }

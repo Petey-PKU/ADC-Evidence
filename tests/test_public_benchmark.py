@@ -6,6 +6,7 @@ from pathlib import Path
 
 from adc_evidence.evaluation.public_benchmark import (
     benchmark_manifest,
+    compare_public_benchmark_reports,
     load_public_benchmark,
     score_public_benchmark,
 )
@@ -92,6 +93,15 @@ class PublicBenchmarkTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "awaiting_independent_human_review")
         self.assertTrue(all(item["review"]["status"] == "pending" for item in packet))
         self.assertTrue(all(item["review"]["review_origin"] is None for item in packet))
+
+    def test_paired_comparison_reports_differences(self) -> None:
+        rows = load_public_benchmark(BENCHMARK)[:1]
+        gold = rows[0]
+        system = [{"question_id": gold["question_id"], "route": gold["expected_route"], "status": "answered", "citation_source_record_ids": [], "claims": [{"predicate": "adc.target", "value": [gold["standard_answer"]["value"]]}]}]
+        baseline = [{"question_id": gold["question_id"], "route": "literature_evidence", "status": "answered", "citation_source_record_ids": [], "claims": []}]
+        comparison = compare_public_benchmark_reports(system, baseline, rows)
+        self.assertEqual(comparison["paired_metrics"]["route"]["difference"], 1.0)
+        self.assertEqual(comparison["paired_metrics"]["answer"]["system_rate"], 1.0)
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     )
     service = EvidenceAnsweringService(
         retriever=retriever,
-        database_path=args.database,
+        database_path=(None if getattr(args, "disable_structured_routing", False) else args.database),
         generator=ExtractiveGenerator(),
     )
     outputs: list[dict[str, object]] = []
@@ -67,6 +67,11 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "evaluated_at": datetime.now(UTC).isoformat(),
         "network_enabled": False,
         "model": "extractive-offline-v1",
+        "system_variant": (
+            "offline_rag_baseline"
+            if getattr(args, "disable_structured_routing", False)
+            else "adc_evidence_public"
+        ),
         "database_data_version": evidence_data_version(args.database),
         "automatic_scoring": scored,
         "human_review": {"status": "pending", "required": True},
@@ -81,6 +86,11 @@ def main() -> None:
     parser.add_argument("--index-path", type=Path, default=DEFAULT_INDEX)
     parser.add_argument("--seed", type=Path, default=DEFAULT_SEED)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--disable-structured-routing",
+        action="store_true",
+        help="Run the same retriever/generator with structured routing disabled as a paired baseline.",
+    )
     args = parser.parse_args()
     report = run(args)
     args.output.parent.mkdir(parents=True, exist_ok=True)
