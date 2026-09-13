@@ -34,6 +34,9 @@ class PublicCatalogAuditTests(unittest.TestCase):
             temporary.cleanup()
         self.assertEqual(report["row_count"], 1)
         self.assertEqual(report["generic_source_url_count"], 1)
+        self.assertEqual(report["source_specificity_counts"]["generic"], 1)
+        self.assertEqual(report["field_coverage_counts"]["adc_name"], 1)
+        self.assertEqual(report["field_coverage_counts"]["dar"], 1)
         self.assertEqual(report["review_status"], "needs_primary_source_review")
         self.assertEqual(report["manual_review_queue"][0]["adc_id"], "adc_001")
 

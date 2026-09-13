@@ -10,6 +10,39 @@
   "required_field_count": 21,
   "rows_with_missing_required_fields": 4,
   "generic_source_url_count": 8,
+  "source_specificity_counts": {
+    "specific": 15,
+    "generic": 8,
+    "invalid": 0
+  },
+  "source_host_counts": {
+    "www.fda.gov": 16,
+    "www.nmpa.gov.cn": 6,
+    "www.pmda.go.jp": 1
+  },
+  "field_coverage_counts": {
+    "adc_name": 23,
+    "aliases": 23,
+    "target": 23,
+    "antibody": 23,
+    "linker_name": 22,
+    "linker_type": 23,
+    "payload_name": 23,
+    "payload_class": 23,
+    "dar": 19,
+    "indication": 23,
+    "development_status": 23,
+    "company": 23,
+    "source_url": 23,
+    "data_review_status": 23,
+    "brand_name": 23,
+    "approval_date": 23,
+    "approval_jurisdictions": 23,
+    "catalog_status": 23,
+    "dar_reported": 22,
+    "as_of_date": 23,
+    "verification_status": 23
+  },
   "approval_after_requested_as_of_count": 0,
   "verification_status_counts": {
     "primary_check_pending": 23
