@@ -6,33 +6,32 @@ v1 发布包只提供数据和索引，运行时还依赖另行取得的代码�
 
 ## 制品与版本
 
-发布包生成于提交 `4309a6ff9d0d499e08652a01823fae6644ca29eb`，打包时
+当前发布包生成于提交 `12c8d2c45986ae88e7a732d0e89a6a887c518f60`，打包时
 `code_worktree_dirty=false`。文件为忽略路径下的
-`artifacts/releases/adc-public-2026-09-30-standalone.zip`，大小 42,099,721 字节。
-后续对 CI 安装矩阵和可选 SDK 测试条件的调整不改变此包的程序内容。
+`artifacts/releases/adc-public-2026-09-30.zip`，大小 42,141,071 字节；它包含本轮修复后的
+目录和重新生成的索引、benchmark。
 
 | 制品 | SHA-256（未加前缀） |
 | --- | --- |
-| v2 ZIP | `7827c23b563b422926043de33fe04c42e20687423e4c8ec79407664fe45adc29` |
-| 原始公开 SQLite | `62995d3eb0180c8952b93d5c6fb3d5f2fccd3e9762ad25f4d8a08697edc3ff48` |
-| 包内脱敏 SQLite | `8fcfcd227be0b9c32ba866cb086d86830ac6ec2f2ef9bd4ec04477656967b4d7` |
-| Benchmark JSONL 原始字节 | `284e222ca2b6b557db15a3a531197917781355b8833e26ec57de8fc609ddb831` |
-| Benchmark JSONL 规范化换行 | `2ee7a9f5029ff9303d4b1f3e44487cee2a986ba0ce9e0cb1c36d0d58fc09ea74` |
-| Benchmark question set | `af98dc6c050131ae89fb6ee9cf7e322f9e2ba5b62afe1c86a16177997435bdab` |
-| 索引 manifest | `070adb47988e410ff0e065cac2f237e037ea0ea816c7b598d44462a18360db7e` |
+| v2 ZIP | `4f0d95223a6cee3abc16dbdae226cadda7373ad61ced4ba31045049b48143ffe` |
+| 原始公开 SQLite | `8bae13afacf3fbb7a88bfb5720413a4e1e3524092bed59db1323a6f04f619f40` |
+| 包内脱敏 SQLite | `2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
+| Benchmark JSONL 原始字节 | `7169601cf37bfd61ca3e9d36a417ba419ff8f38c829351475dae8884449efc5f` |
+| Benchmark question set | `b22f528867cf6197df1b48f2e328e812abcc16e8f03f480e13fb04cb357aeec0` |
+| 索引 manifest | `93abc3f6a7ee2587168544a8a6d917be8569df3029aafbb5a5c2cd8155313655` |
 | 干净环境依赖记录 JSON | `7742b80a8c6de6ba380237cdb219370fff32dc972b41707cc6619fff1a6f0fe0` |
 
 检索语料版本仍为
-`corpus_935c87b85da21bb4da43f671a339c5adb46a805b4dc90beb8ecb467615702d95`。
+`corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca`。
 公开快照仍有 23 个 ADC、3,503 条试验、1,410 篇文献及 6,754 条实体关联；状态为
 `partial`。目录字段仍需一手来源内容核验，未来目标日期尚未完成收录。
 
 ## 验证结果
 
-- 标准开发环境：203 项测试全部通过；调整 SDK 测试条件后，相关 27 项生成测试再次全部通过。
-- 全新 Python 3.12.4 基础环境：发现 203 项测试，199 项通过，4 项可选 SDK 测试明确跳过。
+- 标准开发环境：204 项测试全部通过；生成模块 27 项测试再次全部通过。
+- 全新 Python 3.12.4 基础环境：发现 204 项测试，200 项通过，4 项可选 SDK 测试明确跳过。
   未安装 `openai` 和 `sentence-transformers`。CI 新增 base/generation 两种安装方式，均覆盖
-  Python 3.11/3.12；generation 环境继续执行全部适配测试，远端结果尚需推送后核验。
+  Python 3.11/3.12；generation 环境继续执行全部适配测试。
 - ZIP 校验：77 个有哈希的文件（其中 69 个程序/配置文件），包内数据库绝对路径计数为 0。
 - 解压目录查询：`--check` 成功；“T-DXd 的靶点和载荷是什么？”返回 `answered`、
   `generator_backend=structured`、HER2 和 Dxd，两个结论均有来源引用。
