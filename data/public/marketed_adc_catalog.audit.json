@@ -7,8 +7,8 @@
     "marketed": 22,
     "withdrawn": 1
   },
-  "required_field_count": 17,
-  "rows_with_missing_required_fields": 1,
+  "required_field_count": 21,
+  "rows_with_missing_required_fields": 4,
   "generic_source_url_count": 8,
   "approval_after_requested_as_of_count": 0,
   "verification_status_counts": {
@@ -56,6 +56,7 @@
       "adc_id": "adc_006",
       "adc_name": "Sacituzumab tirumotecan",
       "reasons": [
+        "missing_fields:dar",
         "generic_source_url",
         "verification_status:primary_check_pending"
       ]
@@ -64,6 +65,7 @@
       "adc_id": "adc_007",
       "adc_name": "Gemtuzumab ozogamicin",
       "reasons": [
+        "missing_fields:dar",
         "verification_status:primary_check_pending"
       ]
     },
@@ -78,6 +80,7 @@
       "adc_id": "adc_009",
       "adc_name": "Inotuzumab ozogamicin",
       "reasons": [
+        "missing_fields:dar",
         "verification_status:primary_check_pending"
       ]
     },
@@ -182,7 +185,7 @@
       "adc_id": "adc_023",
       "adc_name": "Moxetumomab pasudotox",
       "reasons": [
-        "missing_fields:linker_name",
+        "missing_fields:linker_name,dar,dar_reported",
         "verification_status:primary_check_pending"
       ]
     }

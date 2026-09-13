@@ -16,9 +16,10 @@ DEFAULT_CATALOG = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.audit.json"
 REQUIRED_FIELDS = (
     "adc_name", "aliases", "target", "antibody", "linker_name", "linker_type",
-    "payload_name", "payload_class", "indication", "company", "source_url",
-    "brand_name", "approval_date", "approval_jurisdictions", "catalog_status",
-    "as_of_date", "verification_status",
+    "payload_name", "payload_class", "dar", "indication", "development_status",
+    "company", "source_url", "data_review_status", "brand_name", "approval_date",
+    "approval_jurisdictions", "catalog_status", "dar_reported", "as_of_date",
+    "verification_status",
 )
 GENERIC_SOURCE_URLS = {
     "https://www.nmpa.gov.cn/",
