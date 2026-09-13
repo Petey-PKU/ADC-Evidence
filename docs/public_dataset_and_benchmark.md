@@ -41,6 +41,8 @@ python scripts/audit_public_dataset.py `
 ```
 
 审计会将计划中的抓取上限记录为 `partial`，不会把部分 PubMed 结果解释为全集覆盖。
+其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
+链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
 
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
 词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和

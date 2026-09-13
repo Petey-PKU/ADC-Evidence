@@ -84,6 +84,7 @@ def audit_database(database: Path) -> dict[str, object]:
         ).fetchone()[0])
 
         fact_coverage: dict[str, int] = {}
+        fact_provenance: dict[str, dict[str, object]] = {}
         if _table_exists(connection, "facts"):
             fact_coverage = {
                 str(row["predicate"]): int(row["value_count"])
@@ -96,6 +97,32 @@ def audit_database(database: Path) -> dict[str, object]:
                     """
                 )
             }
+            if _table_exists(connection, "fact_evidence"):
+                for row in connection.execute(
+                    """
+                    SELECT f.predicate,
+                           COUNT(DISTINCT f.fact_id) AS fact_count,
+                           COUNT(DISTINCT CASE WHEN e.fact_id IS NOT NULL THEN f.fact_id END) AS evidence_count,
+                           COUNT(DISTINCT CASE WHEN TRIM(COALESCE(e.source_url, '')) <> '' THEN f.fact_id END) AS url_count,
+                           COUNT(DISTINCT CASE WHEN TRIM(COALESCE(e.source_url, '')) <> '' THEN e.source_url END) AS distinct_url_count,
+                           GROUP_CONCAT(DISTINCT e.source) AS source_types
+                    FROM facts AS f
+                    LEFT JOIN fact_evidence AS e
+                      ON e.fact_id=f.fact_id AND e.is_current=1 AND e.valid_to IS NULL
+                    WHERE f.subject_type='adc' AND f.valid_to IS NULL
+                    GROUP BY f.predicate ORDER BY f.predicate
+                    """
+                ):
+                    source_types = sorted(
+                        value.strip() for value in str(row["source_types"] or "").split(",") if value.strip()
+                    )
+                    fact_provenance[str(row["predicate"])] = {
+                        "fact_count": int(row["fact_count"]),
+                        "with_current_evidence_count": int(row["evidence_count"]),
+                        "with_source_url_count": int(row["url_count"]),
+                        "distinct_source_url_count": int(row["distinct_url_count"]),
+                        "source_types": source_types,
+                    }
 
         source_runs: list[dict[str, object]] = []
         if _table_exists(connection, "ingestion_source_runs"):
@@ -144,6 +171,7 @@ def audit_database(database: Path) -> dict[str, object]:
             "documents": linked_document_count,
         },
         "adc_fact_coverage": fact_coverage,
+        "adc_fact_provenance": fact_provenance,
         "source_runs": source_runs,
         "incomplete_sources": incomplete_sources,
         "status": "partial" if incomplete_sources else "complete",

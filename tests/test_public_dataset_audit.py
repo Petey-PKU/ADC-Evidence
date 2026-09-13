@@ -24,7 +24,12 @@ class PublicDatasetAuditTests(unittest.TestCase):
                         source_record_type TEXT, source_record_id TEXT
                     );
                     CREATE TABLE facts (
-                        predicate TEXT, subject_type TEXT, valid_to TEXT
+                        fact_id TEXT PRIMARY KEY, predicate TEXT,
+                        subject_type TEXT, valid_to TEXT
+                    );
+                    CREATE TABLE fact_evidence (
+                        fact_id TEXT, source TEXT, source_url TEXT,
+                        is_current INTEGER, valid_to TEXT
                     );
                     CREATE TABLE ingestion_source_runs (
                         source TEXT, status TEXT, expected_count INTEGER,
@@ -36,7 +41,9 @@ class PublicDatasetAuditTests(unittest.TestCase):
                     INSERT INTO documents VALUES ('doc_001');
                     INSERT INTO entity_links VALUES ('adc','adc_001','trial','NCT000001');
                     INSERT INTO entity_links VALUES ('adc','adc_001','document','doc_001');
-                    INSERT INTO facts VALUES ('adc.target','adc',NULL);
+                    INSERT INTO facts VALUES ('fact_1','adc.target','adc',NULL);
+                    INSERT INTO fact_evidence VALUES
+                      ('fact_1','curated_seed','https://example.test/source',1,NULL);
                     INSERT INTO ingestion_source_runs VALUES
                       ('clinicaltrials','complete',1,1,1,'{"total_count":1}');
                     INSERT INTO ingestion_source_runs VALUES
@@ -50,6 +57,8 @@ class PublicDatasetAuditTests(unittest.TestCase):
         self.assertEqual(report["duplicate_identifier_counts"]["trials"], 0)
         self.assertEqual(report["linked_record_counts"], {"trials": 1, "documents": 1})
         self.assertEqual(report["adc_fact_coverage"]["adc.target"], 1)
+        self.assertEqual(report["adc_fact_provenance"]["adc.target"]["with_source_url_count"], 1)
+        self.assertEqual(report["adc_fact_provenance"]["adc.target"]["source_types"], ["curated_seed"])
         self.assertEqual(report["incomplete_sources"], ["pubmed"])
 
 
