@@ -207,36 +207,60 @@ def audit_database(database: Path) -> dict[str, object]:
                 fact_source_quality = dict(sorted(quality.items()))
 
         source_runs: list[dict[str, object]] = []
+        latest_source_runs: dict[str, dict[str, object]] = {}
         if _table_exists(connection, "ingestion_source_runs"):
-            for row in connection.execute(
-                """
-                SELECT source, status, expected_count, collected_count,
-                       is_complete, details_json
-                FROM ingestion_source_runs
-                ORDER BY source
-                """
-            ):
+            run_columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(ingestion_source_runs)")
+            }
+            # Older local snapshots do not have timestamps. Keep auditing them,
+            # while using the latest finished/started run when the metadata is
+            # available in current snapshots.
+            has_timestamps = "started_at" in run_columns or "finished_at" in run_columns
+            selected_columns = ["source", "status", "expected_count", "collected_count", "is_complete", "details_json"]
+            if "run_id" in run_columns:
+                selected_columns.insert(0, "run_id")
+            if "started_at" in run_columns:
+                selected_columns.append("started_at")
+            if "finished_at" in run_columns:
+                selected_columns.append("finished_at")
+            query = "SELECT " + ", ".join(selected_columns) + " FROM ingestion_source_runs"
+            if has_timestamps:
+                query += " ORDER BY COALESCE(finished_at, started_at), rowid"
+            else:
+                query += " ORDER BY rowid"
+            for row in connection.execute(query):
+                values = {
+                    column: row[column] if isinstance(row, sqlite3.Row) else row[index]
+                    for index, column in enumerate(selected_columns)
+                }
                 details: dict[str, object] = {}
                 try:
-                    parsed = json.loads(str(row["details_json"] or "{}"))
+                    parsed = json.loads(str(values.get("details_json") or "{}"))
                     if isinstance(parsed, dict):
                         for key in ("total_count", "expected_capture", "planned_truncation", "truncated"):
                             if key in parsed:
                                 details[key] = parsed[key]
                 except (TypeError, ValueError, json.JSONDecodeError):
                     details = {"details_parse_error": True}
-                source_runs.append({
-                    "source": str(row["source"]),
-                    "status": str(row["status"]),
-                    "expected_count": row["expected_count"],
-                    "collected_count": row["collected_count"],
-                    "is_complete": bool(row["is_complete"]),
+                run = {
+                    "source": str(values["source"]),
+                    "status": str(values["status"]),
+                    "expected_count": values["expected_count"],
+                    "collected_count": values["collected_count"],
+                    "is_complete": bool(values["is_complete"]),
                     **details,
-                })
+                }
+                for field in ("run_id", "started_at", "finished_at"):
+                    if field in values and values[field] is not None:
+                        run[field] = str(values[field])
+                source_runs.append(run)
+                latest_source_runs[run["source"]] = run
 
+    run_summary = latest_source_runs.values() if latest_source_runs else source_runs
     incomplete_sources = sorted({
         str(row["source"])
-        for row in source_runs
+        for row in run_summary
         if row["status"] != "complete" or not row["is_complete"]
     })
     return {
@@ -280,6 +304,11 @@ def audit_database(database: Path) -> dict[str, object]:
             else "needs_review"
         ),
         "source_runs": source_runs,
+        "source_run_history_count": len(source_runs),
+        "latest_source_runs": {
+            source: latest_source_runs[source]
+            for source in sorted(latest_source_runs)
+        },
         "incomplete_sources": incomplete_sources,
         "status": "partial" if incomplete_sources else "complete",
     }

@@ -48,6 +48,9 @@ python scripts/audit_public_dataset.py `
 链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
 审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
 计数；`adc_fact_source_quality_status=needs_review` 时，不能把该快照当作字段来源已核验。
+数据库可能保留多次采集尝试。审计报告同时保留 `source_runs` 历史，并按
+`finished_at`/`started_at` 选择每个来源的 `latest_source_runs`；`incomplete_sources`
+只根据最新一次运行判断，避免把旧的失败尝试误读成当前快照状态。
 
 可对候选 URL 做一次带超时的内容预核验（不修改目录字段，也不生成人工 verdict）：
 

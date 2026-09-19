@@ -99,6 +99,36 @@ class PublicDatasetAuditTests(unittest.TestCase):
         self.assertEqual(report["adc_fact_source_quality_status"], "needs_review")
         self.assertEqual(report["adc_fact_source_quality"]["adc.target"]["generic_url_count"], 1)
 
+    def test_audit_uses_latest_timestamped_run_for_incomplete_status(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            database = Path(temporary.name) / "snapshot.db"
+            with sqlite3.connect(database) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE adcs (adc_id TEXT PRIMARY KEY);
+                    CREATE TABLE trials (nct_id TEXT PRIMARY KEY);
+                    CREATE TABLE documents (document_id TEXT PRIMARY KEY);
+                    CREATE TABLE entity_links (entity_type TEXT, entity_id TEXT, source_record_type TEXT, source_record_id TEXT, match_method TEXT);
+                    CREATE TABLE ingestion_source_runs (
+                        run_id TEXT, source TEXT, started_at TEXT, finished_at TEXT,
+                        status TEXT, expected_count INTEGER, collected_count INTEGER,
+                        is_complete INTEGER, details_json TEXT
+                    );
+                    INSERT INTO adcs VALUES ('adc_001');
+                    INSERT INTO ingestion_source_runs VALUES
+                      ('old','pubmed','2026-01-01','2026-01-01','partial',10,2,0,'{"planned_truncation":true}');
+                    INSERT INTO ingestion_source_runs VALUES
+                      ('new','pubmed','2026-01-02','2026-01-02','complete',10,10,1,'{"total_count":10}');
+                    """
+                )
+            report = audit_database(database)
+        finally:
+            temporary.cleanup()
+        self.assertEqual(report["source_run_history_count"], 2)
+        self.assertEqual(report["latest_source_runs"]["pubmed"]["run_id"], "new")
+        self.assertEqual(report["incomplete_sources"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
