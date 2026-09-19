@@ -17,8 +17,8 @@
 作为扩展模态单独报告。当前目录的核心/扩展数量为 21/2。分类本身仍是
 `provisional_pending_primary_source_review`，不能替代结构字段的一手来源复核。
 
-`data/public/catalog_source_locator_candidates.jsonl` 已加入首批 12 个核心 ADC 的 FDA 标签或
-监管审评字段定位（84 条字段候选）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
+`data/public/catalog_source_locator_candidates.jsonl` 已加入首批 16 个核心 ADC 的 FDA 标签、
+监管数据库、发行人文件或政府/同行评议来源字段定位（112 条字段候选）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
 表示仍需其他结构来源或术语核对；所有条目保持 `pending_independent_primary_source_review`，
 因此不计入人工金标准或论文主结果。
 
