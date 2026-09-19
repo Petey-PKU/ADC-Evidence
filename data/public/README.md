@@ -38,6 +38,10 @@ $env:PYTHONPATH="src"
 python scripts/validate_public_catalog_scope.py
 ```
 
+`catalog_source_locator_candidates.jsonl` 记录了首批 FDA 标签的字段级候选定位。它只表示
+`candidate_direct` 或 `partial` 线索，所有行仍为 `pending_independent_primary_source_review`；
+不得直接用于论文金标准统计。
+
 要逐字段开展一级来源复核，可生成空白审核包（不会自动写入任何人工结论）：
 
 ```powershell
