@@ -41,6 +41,18 @@ python scripts/build_catalog_field_review_packet.py `
 审核包中的 `candidate_source.source_url` 是候选来源链接，`verification.status` 初始为
 `pending_primary_check`；只有人工逐项检查后才可填写 verdict 和 confirmed value。
 
+可在提交审核结果前运行严格的结构校验。默认模式允许待审核项存在，但会报告其数量；
+`--require-complete` 用作发布门禁，要求每个字段都有受控 verdict 和具体来源定位，
+不会把 URL 可访问性或自动文本匹配转换为审核结论：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/validate_catalog_field_review.py `
+  --packet artifacts/evaluation/catalog_field_review.jsonl `
+  --manifest artifacts/evaluation/catalog_field_review.manifest.json `
+  --catalog data/public/marketed_adc_catalog.csv
+```
+
 ## Data policy
 
 - The CSV contains structured facts and source links only; it contains no
