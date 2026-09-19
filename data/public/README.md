@@ -28,6 +28,16 @@ paper uses the field as a gold-standard fact.
 checks; it reports generic regulator landing pages and missing required fields
 without containing private notes.
 
+目录范围由 `catalog_scope_policy.json` 单独声明并机器校验。当前 23 条记录中，21 条属于
+核心 `antibody_drug_conjugate`，`adc_021` 是光免疫偶联物，`adc_023` 是重组免疫毒素，
+两者保留在扩展集合中但不计入核心 ADC 数量。该分类是待一手来源复核的范围元数据，不是
+结构字段的金标准：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/validate_public_catalog_scope.py
+```
+
 要逐字段开展一级来源复核，可生成空白审核包（不会自动写入任何人工结论）：
 
 ```powershell

@@ -115,6 +115,8 @@ def verify_release(path: Path) -> dict[str, object]:
             }
             for key in ("database_path", "catalog_path"):
                 required_runtime.add(str(application.get(key, "")))
+            if application.get("scope_policy_path"):
+                required_runtime.add(str(application["scope_policy_path"]))
             for name in ("manifest.json", "chunk_ids.json", "embeddings.npy"):
                 required_runtime.add(f"{application.get('index_path', '')}/{name}")
             if missing := required_runtime - seen:

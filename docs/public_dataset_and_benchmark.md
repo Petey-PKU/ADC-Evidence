@@ -12,6 +12,11 @@
 必须绑定监管标签、注册库记录或其他一手来源；当前目录的总览来源只是范围参考，不能
 直接充当人工金标准。私有 SQLite、原始响应、评审身份和评审导出不会复制到本目录。
 
+范围边界由 `data/public/catalog_scope_policy.json` 声明：核心集合只计入传统
+`antibody_drug_conjugate`；`photoimmunoconjugate` 和 `recombinant_immunotoxin`
+作为扩展模态单独报告。当前目录的核心/扩展数量为 21/2。分类本身仍是
+`provisional_pending_primary_source_review`，不能替代结构字段的一手来源复核。
+
 ## 构建流程
 
 ```powershell

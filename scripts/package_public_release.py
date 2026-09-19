@@ -29,6 +29,7 @@ DEFAULT_DATABASE = ROOT / "data" / "processed" / "adc_public_2026-09-30.db"
 DEFAULT_INDEX = ROOT / "artifacts" / "vector_index" / "public_2026-09-30"
 DEFAULT_CATALOG = ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 DEFAULT_CATALOG_AUDIT = ROOT / "data" / "public" / "marketed_adc_catalog.audit.json"
+DEFAULT_SCOPE_POLICY = ROOT / "data" / "public" / "catalog_scope_policy.json"
 DEFAULT_BENCHMARK = ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json"
 DEFAULT_BENCHMARK_QUESTIONS = ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
 DEFAULT_OUTPUT = ROOT / "artifacts" / "releases" / "adc-public-2026-09-30.zip"
@@ -244,6 +245,7 @@ def build_release_inventory(
     as_of: str,
     database_archive_name: str | None = None,
     catalog_audit: Path | None = None,
+    scope_policy: Path | None = None,
     benchmark_questions: Path | None = None,
 ) -> tuple[list[tuple[Path, str]], dict[str, object]]:
     database = _require_file(database, "database")
@@ -251,6 +253,8 @@ def build_release_inventory(
     _validate_database_catalog_binding(database, catalog)
     if catalog_audit is not None:
         catalog_audit = _require_file(catalog_audit, "catalog audit")
+    if scope_policy is not None:
+        scope_policy = _require_file(scope_policy, "catalog scope policy")
     benchmark_manifest = _require_file(benchmark_manifest, "benchmark manifest")
     if benchmark_questions is not None:
         benchmark_questions = _require_file(benchmark_questions, "benchmark questions")
@@ -268,6 +272,8 @@ def build_release_inventory(
     ]
     if catalog_audit is not None:
         files.append((catalog_audit, f"data/public/{catalog_audit.name}"))
+    if scope_policy is not None:
+        files.append((scope_policy, f"data/public/{scope_policy.name}"))
     files.extend([
         (benchmark_manifest, f"data/annotations/{benchmark_manifest.name}"),
     ])
@@ -282,6 +288,7 @@ def build_release_inventory(
     application.update({
         "database_path": f"data/processed/{database_archive_name or database.name}",
         "catalog_path": f"data/public/{catalog.name}",
+        "scope_policy_path": f"data/public/{scope_policy.name}" if scope_policy is not None else None,
         "index_path": f"artifacts/vector_index/{index_path.name}",
     })
     inventory = {
@@ -304,8 +311,8 @@ def _release_readme(as_of: str) -> str:
     return f"""# ADC-Evidence public release ({as_of})
 
 This archive contains the query application and required configuration, a public
-SQLite snapshot, its matching retrieval index, the public ADC catalog and source
-audit, and the benchmark questions and manifest. `RELEASE_MANIFEST.json`
+SQLite snapshot, its matching retrieval index, the public ADC catalog, source
+audit, scope policy, and the benchmark questions and manifest. `RELEASE_MANIFEST.json`
 binds every file to a SHA-256 checksum.
 
 Extract into a new folder. No Git clone, model account, or data rebuild is needed.
@@ -346,6 +353,7 @@ def package_release(
     output: Path,
     as_of: str,
     catalog_audit: Path | None = None,
+    scope_policy: Path | None = None,
     benchmark_questions: Path | None = None,
 ) -> dict[str, object]:
     output = output.resolve()
@@ -364,6 +372,7 @@ def package_release(
             index_path=index_path,
             catalog=catalog,
             catalog_audit=catalog_audit,
+            scope_policy=scope_policy,
             benchmark_manifest=benchmark_manifest,
             benchmark_questions=benchmark_questions,
             as_of=as_of,
@@ -395,6 +404,7 @@ def main() -> None:
     parser.add_argument("--index-path", type=Path, default=DEFAULT_INDEX)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--catalog-audit", type=Path, default=DEFAULT_CATALOG_AUDIT)
+    parser.add_argument("--scope-policy", type=Path, default=DEFAULT_SCOPE_POLICY)
     parser.add_argument("--benchmark-manifest", type=Path, default=DEFAULT_BENCHMARK)
     parser.add_argument("--benchmark-questions", type=Path, default=DEFAULT_BENCHMARK_QUESTIONS)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -405,6 +415,7 @@ def main() -> None:
         index_path=args.index_path,
         catalog=args.catalog,
         catalog_audit=args.catalog_audit,
+        scope_policy=args.scope_policy,
         benchmark_manifest=args.benchmark_manifest,
         benchmark_questions=args.benchmark_questions,
         output=args.output,
