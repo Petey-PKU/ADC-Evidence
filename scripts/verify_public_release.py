@@ -117,6 +117,8 @@ def verify_release(path: Path) -> dict[str, object]:
                 required_runtime.add(str(application.get(key, "")))
             if application.get("scope_policy_path"):
                 required_runtime.add(str(application["scope_policy_path"]))
+            if application.get("candidate_locator_path"):
+                required_runtime.add(str(application["candidate_locator_path"]))
             for name in ("manifest.json", "chunk_ids.json", "embeddings.npy"):
                 required_runtime.add(f"{application.get('index_path', '')}/{name}")
             if missing := required_runtime - seen:
@@ -130,6 +132,7 @@ def verify_release(path: Path) -> dict[str, object]:
             "checked_file_count": len(checked),
             "database_absolute_path_count": database_absolute_path_count,
             "benchmark_question_file_present": "data/annotations/public_benchmark_v1.jsonl" in names,
+            "candidate_locator_file_present": "data/public/catalog_source_locator_candidates.jsonl" in names,
             "bundled_application_present": application.get("mode") == "bundled_source",
             "code_commit": application.get("code_commit"),
         }

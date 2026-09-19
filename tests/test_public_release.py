@@ -68,7 +68,9 @@ class PublicReleaseTests(unittest.TestCase):
                 database=database, index_path=index, catalog=catalog,
                 benchmark_manifest=benchmark, output=archive_path, as_of="2026-09-13",
             )
-            self.assertTrue(verify_release(archive_path)["bundled_application_present"])
+            report = verify_release(archive_path)
+            self.assertTrue(report["bundled_application_present"])
+            self.assertTrue(report["candidate_locator_file_present"])
             extracted = root / "standalone"
             with zipfile.ZipFile(archive_path) as archive:
                 archive.extractall(extracted)
