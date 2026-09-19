@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import unittest
 from pathlib import Path
 
@@ -35,6 +36,31 @@ class CatalogFieldReviewPacketTests(unittest.TestCase):
         dar_item = next(item for item in packet if item["field"] == "dar")
         self.assertEqual(dar_item["value_status"], "missing")
         self.assertEqual(manifest["status"], "awaiting_independent_primary_source_review")
+
+    def test_packet_binds_field_locator_candidates_without_verdicts(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            root = Path(temporary.name)
+            catalog = root / "catalog.csv"
+            fields = ["adc_id", "adc_name", "source_url", *KEY_FIELDS]
+            with catalog.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fields)
+                writer.writeheader()
+                writer.writerow({"adc_id": "adc_x", "adc_name": "Example ADC", "source_url": "https://example.test/source"})
+            candidates = root / "candidates.jsonl"
+            candidates.write_text(json.dumps({
+                "adc_id": "adc_x", "field": "target", "candidate_value": "HER2",
+                "source_url": "https://example.test/label.pdf", "source_locator": "Section 11",
+                "source_tier": "regulator_label", "support_status": "candidate_direct",
+                "review_status": "pending_independent_primary_source_review",
+            }) + "\n", encoding="utf-8")
+            packet, manifest = build_packet(catalog, candidates)
+        finally:
+            temporary.cleanup()
+        target = next(item for item in packet if item["field"] == "target")
+        self.assertEqual(target["candidate_source"]["field_locator_candidates"][0]["candidate_value"], "HER2")
+        self.assertIsNone(target["verification"]["verdict"])
+        self.assertEqual(manifest["candidate_locator_count"], 1)
 
 
 if __name__ == "__main__":

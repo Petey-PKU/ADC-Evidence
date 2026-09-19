@@ -96,6 +96,15 @@ def validate_review_packet(
         verification = item.get("verification")
         if not isinstance(verification, dict):
             raise ValueError(f"item {position}: verification must be an object")
+        candidate_source = item.get("candidate_source")
+        if not isinstance(candidate_source, dict):
+            raise ValueError(f"item {position}: candidate_source must be an object")
+        locators = candidate_source.get("field_locator_candidates", [])
+        if not isinstance(locators, list):
+            raise ValueError(f"item {position}: field_locator_candidates must be a list")
+        for locator in locators:
+            if not isinstance(locator, dict) or not str(locator.get("source_url", "")).startswith("https://"):
+                raise ValueError(f"item {position}: candidate locator needs an HTTPS source_url")
         status = str(verification.get("status", "")).strip()
         status_counts[status] = status_counts.get(status, 0) + 1
         if status not in _PENDING | _COMPLETED:

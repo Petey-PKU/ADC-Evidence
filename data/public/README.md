@@ -52,8 +52,10 @@ python scripts/build_catalog_field_review_packet.py `
   --manifest artifacts/evaluation/catalog_field_review.manifest.json
 ```
 
-审核包中的 `candidate_source.source_url` 是候选来源链接，`verification.status` 初始为
-`pending_primary_check`；只有人工逐项检查后才可填写 verdict 和 confirmed value。
+审核包中的 `candidate_source.source_url` 是目录候选来源链接，
+`candidate_source.field_locator_candidates` 还会列出字段级 URL、章节或页码线索；
+`verification.status` 初始为 `pending_primary_check`。这些线索不能代替复核，只有人工逐项
+检查原始来源后才可填写 verdict、confirmed value 和 source locator。
 
 可在提交审核结果前运行严格的结构校验。默认模式允许待审核项存在，但会报告其数量；
 `--require-complete` 用作发布门禁，要求每个字段都有受控 verdict 和具体来源定位，
