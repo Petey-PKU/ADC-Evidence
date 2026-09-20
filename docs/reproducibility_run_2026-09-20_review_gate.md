@@ -7,9 +7,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `8b9c628addbddf305d62b5f6c98d879251254f6c` |
+| 代码提交 | `65311950ff32f62c786f04159059098a14bf95d5` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
-| 本地测试 | 229 项发现，225 项通过，4 项可选依赖跳过，0 项失败 |
+| 本地测试 | 230 项发现，226 项通过，4 项可选依赖跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
 | 公共卫生扫描 | 216 个受跟踪文件，`status=clean`，无发现 |
 
@@ -45,12 +45,17 @@ adjudicator 文件，输出逐字段一致性、分歧数和裁决状态；没�
 `e18f3c92a2efdd50daa12b8454bb43ab7831a070ebc566340ff16a862333ee99`；这些比例描述本次
 抓取窗口，不代表来源全集覆盖率。
 
+本轮还收紧了 benchmark/holdout 元数据门禁：公开 benchmark manifest 必须保持
+`evaluation_use.status=development_exposed` 且 `eligible_for_unseen_test_claim=false`；独立
+holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方式和 attestation。缺少这些
+字段时，校验会失败或投稿审计保持阻塞。
+
 ## 研究包
 
-研究包由代码提交 `9497ee02f8ab3f01884f829bd404d8b1b4d71e27` 构建并通过
+研究包由代码提交 `65311950ff32f62c786f04159059098a14bf95d5` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
-`redistribution_allowed=false`。包大小为 42,147,288 字节，SHA-256 为
-`0b259a9164986f27c48814f46b6b591696f2ed6971aee0aacb2008b662abfd5b`。
+`redistribution_allowed=false`。包大小为 42,147,311 字节，SHA-256 为
+`f23ba4ddf637ba04e330d496b0072c5eb3d3324696388ded25e0fa06c3ebb8a6`。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
