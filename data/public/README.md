@@ -57,6 +57,10 @@ python scripts/build_catalog_field_review_packet.py `
 `verification.status` 初始为 `pending_primary_check`。这些线索不能代替复核，只有人工逐项
 检查原始来源后才可填写 verdict、confirmed value 和 source locator。
 
+命令行仅对默认公共目录自动加载公共候选文件。传入其他 `--catalog` 时，必须通过
+`--candidate-locators` 显式指定匹配的候选文件；Python `build_packet()` 默认不绑定候选。
+显式指定的文件缺失、包含目录外 ADC 或未知字段时会报错，避免静默混入不匹配的来源。
+
 可在提交审核结果前运行严格的结构校验。默认模式允许待审核项存在，但会报告其数量；
 `--require-complete` 用作发布门禁，要求每个字段都有受控 verdict 和具体来源定位，
 不会把 URL 可访问性或自动文本匹配转换为审核结论：

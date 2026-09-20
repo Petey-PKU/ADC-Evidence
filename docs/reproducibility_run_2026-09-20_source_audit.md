@@ -10,8 +10,8 @@
 |---|---|
 | 代码提交 | `54f4d87661acc7427885a10144b6f4f4bc323a60` |
 | 目录 | `sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c` |
-| 来源候选 JSONL | `sha256:143b4a31abc949face0f3bc7a73d2f4ae242e01b31cc71e15c0453c396fac0d1` |
-| 数据库 | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
+| 来源候选 JSONL（统一 LF 后） | `sha256:f7ae2435215948d1d56cae7b35ba4b9523851f64aac0d6cbc4c61bbf697a1a81` |
+| 包内数据库（去除本机路径后） | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
 | benchmark manifest | `sha256:41fd2884722e0c19516f13601df5bd82230dadd87e17c9044c42cb1ec364d7a9` |
 | 检索语料版本 | `corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca` |
 | 本轮离线 ZIP SHA-256 | `sha256:d2e7bc7cf3379619ddcc1b899ace2dbbe76ef56dda4b8120300a35d1feccc3fc` |
@@ -22,8 +22,10 @@
   `pending_independent_primary_source_review`。
 - SKB264 的字段候选补充了同行评议原始研究的结构定位；抗体名称没有从来源中推断为
   Sacituzumab 同义词。
-- SHR-A1811 保留 DAR 5.7 和 DAR 6 两个来源值，并保留 `SHR169265`、`rezetecan`
-  的名称差异。两组差异都留待一级来源复核和裁决。
+- SHR-A1811 保留目录 DAR 5.7 和原始研究 DAR 6 的差异；5.7 尚未在所列摘要中获得支持。
+  `SHR169265`、`rezetecan` 和目录 `SHR9265` 的对应关系也留待复核，不直接等同。
+  来源定位见 [PLOS 原始研究](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0326691)
+  与 [NCI 药物词典](https://www.cancer.gov/publications/dictionaries/cancer-drug/def/trastuzumab-rezetecan)。
 - 复核包的 Python API 默认不加载公共候选文件；只有显式传入候选路径时才绑定候选，
   且候选文件中的 ADC 与字段必须属于传入目录。这样测试目录不会误接真实公共线索。
 
@@ -46,7 +48,8 @@ python scripts/package_public_release.py `
 python scripts/verify_public_release.py .test_tmp/adc-public-54f4d87.zip
 ```
 
-- 本地测试：`213` 项通过，`4` 项因可选模型依赖未安装而跳过。
+- 初次全量验证：执行 `213` 项，其中 `209` 项通过，`4` 项因可选模型依赖未安装而跳过；
+  当时尚未加入随后补充的缺失文件和错配候选回归测试。最终工作区测试结果见下文。
 - 公共卫生扫描：`208` 个受跟踪文件，`status=clean`，无发现。
 - 复核包：`299` 个字段项，`299` 个仍为 pending，`review_ready=false`；候选计数为 `114`。
 - 发布包：`status=verified`，检查 `79` 个文件，数据库绝对本机路径计数为 `0`，
@@ -74,3 +77,19 @@ python scripts/audit_public_dataset.py `
 抓取 1,015/165,105 条；ADCDB 本次为 `skipped`。因此报告状态保持 `partial`，不计算
 “文献覆盖率”或“试验覆盖率”作为全集比例；后续需在固定日期窗口下补齐或明确受限来源，
 并保留每次运行的去重、时间窗口和实体链接清单。
+
+## 收尾校正与复验
+
+收尾检查纠正了上表候选文件重排后的哈希，并明确数据库哈希指包内去除本机路径后的版本。
+原始本地数据库 SHA-256 为 `8bae13afacf3fbb7a88bfb5720413a4e1e3524092bed59db1323a6f04f619f40`。
+这些字节哈希与审核包统一换行后的文本哈希有不同用途，不应混用。
+
+命令行入口也已实施目录隔离：公共默认目录自动加载公共候选，其他目录需显式指定匹配文件。
+新增回归测试覆盖相同 ADC ID 的自定义目录不会加载公共线索，以及显式候选正常加载。
+SKB264 候选备注同时改为指向“先前候选名称”，避免误称目录抗体字段就是 Sacituzumab。
+本次候选文件统一 LF 后 SHA-256 为
+`8d7c1b048995c29565b9b79c6c136ace87ac9b404ef48cdf49faaf7ea430aeb2`。
+
+最终本地全量执行 `216` 项：`212` 项通过、`4` 项跳过、`0` 项失败。
+重新生成并校验公共复核包得到 `299` 个待复核项、`114` 条候选，`review_ready=false`。
+上表 ZIP 是 `54f4d87` 的历史验证包，未包含本节的后续改动；正式发布仍需重新构建和许可核查。

@@ -127,11 +127,17 @@ def build_packet(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
-    parser.add_argument("--candidate-locators", type=Path, default=DEFAULT_CANDIDATE_LOCATORS)
+    parser.add_argument(
+        "--candidate-locators", type=Path,
+        help="Field-source hints; defaults to public hints only for the canonical public catalog",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
     args = parser.parse_args()
-    packet, manifest = build_packet(args.catalog, args.candidate_locators)
+    candidate_path = args.candidate_locators
+    if candidate_path is None and args.catalog.resolve() == DEFAULT_CATALOG.resolve():
+        candidate_path = DEFAULT_CANDIDATE_LOCATORS
+    packet, manifest = build_packet(args.catalog, candidate_path)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in packet),

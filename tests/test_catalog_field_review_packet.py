@@ -1,15 +1,38 @@
 from __future__ import annotations
 
 import csv
+import contextlib
+import io
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from scripts.build_catalog_field_review_packet import KEY_FIELDS, build_packet
+from scripts.build_catalog_field_review_packet import KEY_FIELDS, build_packet, main
 from tests.support import WorkspaceTemporaryDirectory
 
 
 class CatalogFieldReviewPacketTests(unittest.TestCase):
+    def test_cli_custom_catalog_requires_explicit_hints(self) -> None:
+        with WorkspaceTemporaryDirectory() as directory:
+            root = Path(directory)
+            catalog = root / "catalog.csv"
+            catalog.write_text("adc_id,adc_name,target\nadc_001,Fixture,HER2\n", encoding="utf-8")
+            candidates = root / "hints.jsonl"
+            candidates.write_text(json.dumps({
+                "adc_id": "adc_001", "field": "target", "candidate_value": "Fixture value",
+                "source_url": "https://example.test/source", "source_locator": "Results",
+            }) + "\n", encoding="utf-8")
+            output = root / "packet.jsonl"
+            manifest = root / "manifest.json"
+            arguments = ["review", "--catalog", str(catalog), "--output", str(output), "--manifest", str(manifest)]
+            for extra, expected_count in (([], 0), (["--candidate-locators", str(candidates)], 1)):
+                with self.subTest(explicit=bool(extra)), patch("sys.argv", arguments + extra), contextlib.redirect_stdout(io.StringIO()):
+                    main()
+                summary = json.loads(manifest.read_text(encoding="utf-8"))
+                self.assertEqual(summary["candidate_locator_count"], expected_count)
+                self.assertEqual(summary["candidate_locator_file"], candidates.name if extra else None)
+
     def test_packet_covers_every_key_field_and_leaves_verdict_blank(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:
