@@ -21,6 +21,12 @@ class PublicCatalogScopeTests(unittest.TestCase):
         self.assertEqual(report["extended_row_count"], 2)
         self.assertEqual(report["class_counts"]["photoimmunoconjugate"], 1)
         self.assertEqual(report["class_counts"]["recombinant_immunotoxin"], 1)
+        self.assertEqual(report["catalog_status_counts"], {"marketed": 22, "withdrawn": 1})
+        self.assertEqual(
+            report["catalog_status_by_scope"],
+            {"core:marketed": 21, "extended:marketed": 1, "extended:withdrawn": 1},
+        )
+        self.assertEqual(report["excluded_record_ids"], ["adc_021", "adc_023"])
 
     def test_scope_policy_rejects_mismatched_catalog_id(self) -> None:
         temporary = WorkspaceTemporaryDirectory()

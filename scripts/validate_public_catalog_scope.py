@@ -48,6 +48,15 @@ def validate_catalog_scope(catalog: Path, policy_path: Path) -> dict[str, Any]:
     class_counts = Counter(records[adc_id] for adc_id in catalog_ids)
     core_ids = [adc_id for adc_id in catalog_ids if classes[records[adc_id]]["included_in_core"]]
     extended_ids = [adc_id for adc_id in catalog_ids if not classes[records[adc_id]]["included_in_core"]]
+    status_by_id = {
+        str(row["adc_id"]): str(row.get("catalog_status", "")).strip()
+        for row in rows
+    }
+    status_counts = Counter(status_by_id.values())
+    status_by_scope = Counter(
+        f"{'core' if adc_id in core_ids else 'extended'}:{status_by_id[adc_id]}"
+        for adc_id in catalog_ids
+    )
     return {
         "schema_version": "public-adc-catalog-scope-validation-v1",
         "catalog_path": catalog.name,
@@ -58,8 +67,11 @@ def validate_catalog_scope(catalog: Path, policy_path: Path) -> dict[str, Any]:
         "core_row_count": len(core_ids),
         "extended_row_count": len(extended_ids),
         "class_counts": dict(sorted(class_counts.items())),
+        "catalog_status_counts": dict(sorted(status_counts.items())),
+        "catalog_status_by_scope": dict(sorted(status_by_scope.items())),
         "core_adc_ids": core_ids,
         "extended_adc_ids": extended_ids,
+        "excluded_record_ids": extended_ids,
         "validation_status": "passed",
     }
 

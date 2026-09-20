@@ -31,3 +31,9 @@ manifest SHA-256 is
 Until the required independent primary and secondary reviews are supplied,
 the catalog source-quality gate remains `needs_review` and the project must
 not describe these rows as expert-verified or publication-grade gold data.
+
+The scope validator records 21 core ADC rows and two excluded modality rows
+(`adc_021` photoimmunoconjugate and `adc_023` recombinant immunotoxin). The
+catalog status distribution is 21 core marketed, one extended marketed, and
+one extended withdrawn record. These are explicit catalog-scope labels; they
+do not independently establish regulatory status.
