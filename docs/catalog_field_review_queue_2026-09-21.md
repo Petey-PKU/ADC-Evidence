@@ -55,6 +55,16 @@ For the eight core fact fields, candidate locator coverage is:
 | dar | 23 / 23 | 0 |
 | indication | 23 / 23 | 0 |
 
+The remaining 115 review items currently have no field-level candidate
+locator: `company`, `development_status`, `approval_date`,
+`approval_jurisdictions`, and `catalog_status` each have 23 missing pairs.
+Their entry-level `source_url` values are retained as seed context only and
+cannot support an approval, withdrawal, jurisdiction, or sponsor claim by
+themselves. Before these fields are used in a paper result or a released
+catalog, add a locator to the relevant regulator decision, label, or other
+first-party record, record the jurisdiction and effective date, and complete
+the same independent review and provenance checks as the eight core fields.
+
 The automatic value pre-screen found 23 matches among 137 eligible candidate
 values (`0.1679`; indication values matched 7/17 eligible source texts). This is a triage signal only: PDFs and page structure can
 hide values, terminology can differ, and no match is treated as a verified
