@@ -65,8 +65,8 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 与 baseline 后，题集、数据库版本、提示版本和检索条件均匹配，比较结果生成成功；两份
 报告和比较结果的 SHA-256 分别为：
 
-- system：`6cb8d12aaaf273f1c823e2366145e1057625d4824262cdd592f9e6aa1ccacfce`
-- baseline：`fd779b0104853d0677d0ad5f63691fc70d09972b309b9e82e4c08b806e1a1cf1`
+- system：`3b2374296e442ac65a358c7e45218aa19c238ca9339526a222867a09570a3b44`
+- baseline：`a2c4f39c81df2699e6c0bcb453b13297b98141534141f2e5c809d25c97a57079`
 - comparison：`30721b3885b85966bca00781604009f4e9d4e45fc52c31ed991244f1d6d7d0a8`
 
 该结果只是公开开发题集的自动诊断，比较输出仍保留 `human_review_required=true`，不构成
