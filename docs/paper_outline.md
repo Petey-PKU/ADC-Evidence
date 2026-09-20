@@ -59,9 +59,9 @@ public artifacts rather than reconstructed from screenshots or ad-hoc runs:
 | Retrieval and citation controls | `src/adc_evidence/rag/retriever.py`, `src/adc_evidence/generation/citations.py`, `src/adc_evidence/generation/guards.py` | Retrieval, claim support, citation validity, and refusal are separately recorded; passing a programmatic guard is not semantic correctness. |
 | Public data boundary | `data/public/catalog_scope_policy.json`, `data/public/marketed_adc_catalog.audit.json`, `docs/public_dataset_and_benchmark.md` | The snapshot has 23 catalog records, 3,503 trials, 1,410 documents, and 6,754 entity links; source coverage is partial or unknown and catalog fields remain pending independent review. |
 | Development benchmark | `data/annotations/public_benchmark_v1.manifest.json`, `src/adc_evidence/evaluation/public_benchmark.py` | The 98-question public set is `development_exposed`; its automatic scores are smoke diagnostics and cannot support an unseen-test claim. |
-| Same-corpus comparison | `src/adc_evidence/evaluation/benchmark.py`, `src/adc_evidence/evaluation/offline_comparison.py`, `scripts/compare_public_benchmark.py` | Reports bind question, database, prompt, network, generator, and retrieval-budget metadata before paired diagnostics are produced. |
+| Same-corpus comparison | `src/adc_evidence/evaluation/benchmark.py`, `src/adc_evidence/evaluation/offline_comparison.py`, `scripts/compare_public_benchmark.py`, `docs/reproducibility_run_2026-09-21_public_benchmark.md` | Current public development reports bind question, database, prompt, network, generator, retrieval budget, code commit, commands, failure sample, and artifact hashes before paired diagnostics are interpreted. |
 | Human and holdout gates | `src/adc_evidence/evaluation/paper_readiness.py`, `docs/independent_review_packet.md` | Human labels must use independent/adjudicated provenance; the holdout must be separately frozen and access controlled. Both are currently missing. |
-| Reproducible distribution | `scripts/package_public_release.py`, `scripts/verify_public_release.py`, `docs/release_gate_2026-09-20.md` | The current package is research-only; a public release still requires a valid redistribution attestation. |
+| Reproducible distribution | `scripts/package_public_release.py`, `scripts/verify_public_release.py`, `docs/release_gate_2026-09-21.md` | The current package is research-only; a public release still requires a valid redistribution attestation. |
 
 This map separates what the code currently guarantees from what must be
 established by independent review. In particular, the public catalog and
@@ -147,6 +147,7 @@ between smoke diagnostics and confirmation results.
 - [ ] Public artifact manifest with package version, release reference, commit, tracked-file hashes, and hygiene result.
 - [ ] Paired statistics JSON and analysis command.
 - [ ] Ablation reports with matched budgets.
+- [x] Public development benchmark provenance record with code, input, condition, failure, and artifact hashes.
 - [ ] CI log and uploaded paper-readiness audit.
 - [ ] AI-assisted pre-review risks addressed; independent human review remains required.
 - [ ] CI offline smoke holdout report archived (diagnostic only, not an unseen-test result).
