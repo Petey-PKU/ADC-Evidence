@@ -7,9 +7,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `4447c661652bde5c0cf935cf6d0a912a023160a4` |
+| 代码提交 | `1425acbaf5e16728b63529fabf123cddd94a7b45` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
-| 本地测试 | 225 项发现，221 项通过，4 项可选依赖跳过，0 项失败 |
+| 本地测试 | 228 项发现，224 项通过，4 项可选依赖跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
 | 公共卫生扫描 | 213 个受跟踪文件，`status=clean`，无发现 |
 
@@ -33,6 +33,10 @@ git diff --check
 
 这项改动只限制错误标注，不产生人工结论。当前公共目录的 299 个字段项仍为
 `pending_primary_check`，因此不能声称已经完成独立人工来源复核。
+
+本轮新增 `scripts/merge_catalog_field_reviews.py`：它分别验证 primary、secondary 和可选
+adjudicator 文件，输出逐字段一致性、分歧数和裁决状态；没有裁决时报告保持
+`needs_adjudication`，不会自动选择竞争值。
 
 ## 研究包
 
