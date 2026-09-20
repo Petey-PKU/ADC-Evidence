@@ -1,6 +1,6 @@
 # Offline research package gate (2026-09-21)
 
-The package was rebuilt from code commit `42c1e38b1ee496d6efbc2433f27885177a804872`
+The package was rebuilt from code commit `a71e5a7a52a20e6d6ad2f894365191d412e14684`
 using the public snapshot and matching vector index:
 
 ```powershell
@@ -9,12 +9,12 @@ python scripts/package_public_release.py `
   --research-only `
   --database data/processed/adc_public_2026-09-30.db `
   --index-path artifacts/vector_index/public_2026-09-30 `
-  --output .test_tmp/adc-public-research-only-42c1e38.zip
-python scripts/verify_public_release.py .test_tmp/adc-public-research-only-42c1e38.zip
+  --output .test_tmp/adc-public-research-only-a71e5a7.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-research-only-a71e5a7.zip
 ```
 
-The archive is 42,151,866 bytes with SHA-256
-`6c33ad0c3d47a6c1ef526be8b879f4d5d68124df2b225639a7c2800e5354647c`.
+The archive is 42,152,050 bytes with SHA-256
+`7c828de9707ff0ab0b2d14928ac4efce7e40df068fdff6972b71f7135a243f42`.
 Verification checked 79 files, found zero absolute database paths, and found
 the bundled application, public benchmark questions, and candidate locator
 file. The database and index are bound to retrieval corpus
@@ -23,8 +23,8 @@ file. The database and index are bound to retrieval corpus
 After extraction, the following smoke checks passed:
 
 ```powershell
-python -I .test_tmp/release-smoke-42c1e38/scripts/run_public_release.py --check
-python -I .test_tmp/release-smoke-42c1e38/scripts/run_public_release.py `
+python -I .test_tmp/release-smoke-a71e5a7/scripts/run_public_release.py --check
+python -I .test_tmp/release-smoke-a71e5a7/scripts/run_public_release.py `
   --question "T-DXd 的靶点是什么？"
 ```
 
