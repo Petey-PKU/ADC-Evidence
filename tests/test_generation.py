@@ -172,6 +172,28 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result.status, "answered")
         self.assertEqual(result.citations[0].retrieval_document_id, "adc_profile:adc_001")
 
+    def test_identifier_routing_can_be_disabled_for_baseline(self) -> None:
+        source = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "chunk_id": "pubmed:34413126#chunk-000",
+                "retrieval_document_id": "pubmed:34413126",
+                "source_type": "pubmed",
+                "source_record_id": "34413126",
+                "title": "Dato-DXd preclinical activity",
+                "content": "PMID 34413126 Dato-DXd internalization and antitumor activity.",
+            }
+        )
+        retriever = FakeRetriever([source])
+        retriever.identifier_search = lambda query, **kwargs: (_ for _ in ()).throw(AssertionError("identifier routing used"))
+        service = EvidenceAnsweringService(
+            retriever=retriever,
+            generator=StaticGenerator("- 证据支持 Dato-DXd。[S1]"),
+            enable_identifier_routing=False,
+        )
+        result = service.answer("PMID 34413126 的直接摘要证据是什么？")
+        self.assertEqual(result.route, "literature_evidence")
+        self.assertEqual(retriever.call_count, 1)
     def test_invalid_citation_causes_refusal(self) -> None:
         service = EvidenceAnsweringService(
             retriever=FakeRetriever(),

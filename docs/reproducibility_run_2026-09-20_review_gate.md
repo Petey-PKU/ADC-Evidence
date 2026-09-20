@@ -9,7 +9,7 @@
 | 公共分支 | `research/v0.6-freeze` |
 | 代码提交 | `3cb75bea3ffb30480bb3ee332afc424786207076` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
-| 本地测试 | 234 项发现，234 项通过，0 项跳过，0 项失败 |
+| 本地测试 | 235 项发现，235 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
 | 公共卫生扫描 | 216 个受跟踪文件，`status=clean`，无发现 |
 
@@ -69,12 +69,13 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 与 baseline 后，题集、数据库版本、提示版本和检索条件均匹配，比较结果生成成功；两份
 报告和比较结果的 SHA-256 分别为：
 
-- system：`3b2374296e442ac65a358c7e45218aa19c238ca9339526a222867a09570a3b44`
-- baseline：`a2c4f39c81df2699e6c0bcb453b13297b98141534141f2e5c809d25c97a57079`
+- system：`187fb27f4b383ce412c4a935e8555a99409e9430367402172ae00da790d287a7`
+- baseline：`f299d18b1dd43227c64ae79112d6c92334e3754b7aaef1d7d859a17785883abb`
 - comparison：`30721b3885b85966bca00781604009f4e9d4e45fc52c31ed991244f1d6d7d0a8`
 
 该结果只是公开开发题集的自动诊断，比较输出仍保留 `human_review_required=true`，不构成
-独立测试集、人工金标准或论文主结果。
+独立测试集、人工金标准或论文主结果。当前基线实现同时关闭结构化路由和精确 PMID/NCT 路由，
+避免把被比较的组件残留在 baseline 中。
 
 随后又把这些 provenance 字段复制到 comparison JSON 本身，最新 comparison 的 SHA-256 为
 `f5311d129374c32c6b3b676b54f01bb903df300e8a019e228012634af8a791b6`；其中记录题集哈希

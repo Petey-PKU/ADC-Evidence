@@ -54,9 +54,10 @@ def run_identifier_routing_ablation(
             generator=ExtractiveGenerator(),
         ),
         "without_identifier_routing": EvidenceAnsweringService(
-            database_path=database_path,
+            database_path=None,
             retriever=_RankedOnlyRetriever(database_path),
             generator=ExtractiveGenerator(),
+            enable_identifier_routing=False,
         ),
     }
     arms: dict[str, object] = {}

@@ -441,6 +441,7 @@ def run_offline_rag_baseline(
         database_path=None,
         retriever=HybridRetriever(database_path=database_path),
         generator=ExtractiveGenerator(),
+        enable_identifier_routing=False,
     )
     outputs = [_system_row(row, service.answer(str(row["question"]))) for row in rows]
     report = {

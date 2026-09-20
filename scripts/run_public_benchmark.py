@@ -39,6 +39,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         retriever=retriever,
         database_path=(None if getattr(args, "disable_structured_routing", False) else args.database),
         generator=ExtractiveGenerator(),
+        enable_identifier_routing=not getattr(args, "disable_structured_routing", False),
     )
     outputs: list[dict[str, object]] = []
     for question in questions:
