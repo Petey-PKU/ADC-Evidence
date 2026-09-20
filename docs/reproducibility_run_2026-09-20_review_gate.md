@@ -96,6 +96,8 @@ holdout blocker 仍未提供。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
 
+当前公共 artifact manifest 绑定提交 `8fc2a8fe9487e52b810af31d0de996beb122649c`，包含 216 个受跟踪文件，卫生状态为 `clean`；manifest SHA-256 为 `b61d93facf0603d3c999365b920df610671a09840aec8b72452095ef0e27aeb2`。
+
 ## 投稿门禁复跑
 
 在提交 `460f9e15dc3a209ef82efa07432f03334fb6d9fc` 的工作树上运行：
