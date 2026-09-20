@@ -63,3 +63,18 @@ benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
 `89b5551d38cad9794279e3840bac6080aa12155b9a25884951972592a331172b`。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
+
+## 投稿门禁复跑
+
+在提交 `8c6f6df0479f477eb7626ccdfc38222598b9358a` 的工作树上运行：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_paper_readiness.py --output .test_tmp/paper_readiness-current.json
+```
+
+结果为 `not_ready_for_submission`：公开题集不相交、公开 smoke 边界、配对统计工具、
+复核来源门禁和公共卫生扫描通过；数据库质量为 warning（demo 数据库没有文献或试验记录）；
+真实 `human_independent`/`human_adjudicated` 标签和独立访问受控 holdout 仍为两个 blocker。
+审计 JSON 的 SHA-256 为
+`8c49c1a0b85cd2dfee71defdcd951b82f148ec224d72ff18ce551ecaab02d17d`。
