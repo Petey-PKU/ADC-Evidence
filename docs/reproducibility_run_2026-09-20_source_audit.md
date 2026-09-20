@@ -1,20 +1,21 @@
 # 2026-09-20 公共来源候选审计记录
 
-本记录对应公共分支 `research/v0.6-freeze` 的提交
-`54f4d87661acc7427885a10144b6f4f4bc323a60`。本轮只更新公开来源候选和复核包的边界，
+本记录对应公共分支 `research/v0.6-freeze` 的运行代码提交
+`4f36842cb9899c7f8d8153f37d71e5bafe28368b`。本轮只更新公开来源候选、复核包边界和
+实体关联审计，
 没有写入人工 verdict，也没有把来源可访问性当作人工核验。
 
 ## 输入与哈希
 
 | 项目 | 值 |
 |---|---|
-| 代码提交 | `54f4d87661acc7427885a10144b6f4f4bc323a60` |
+| 代码提交 | `4f36842cb9899c7f8d8153f37d71e5bafe28368b` |
 | 目录 | `sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c` |
-| 来源候选 JSONL（统一 LF 后） | `sha256:f7ae2435215948d1d56cae7b35ba4b9523851f64aac0d6cbc4c61bbf697a1a81` |
+| 来源候选 JSONL（统一 LF 后） | `sha256:8d7c1b048995c29565b9b79c6c136ace87ac9b404ef48cdf49fa7ea430aeb2` |
 | 包内数据库（去除本机路径后） | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
 | benchmark manifest | `sha256:41fd2884722e0c19516f13601df5bd82230dadd87e17c9044c42cb1ec364d7a9` |
 | 检索语料版本 | `corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca` |
-| 本轮离线 ZIP SHA-256 | `sha256:d2e7bc7cf3379619ddcc1b899ace2dbbe76ef56dda4b8120300a35d1feccc3fc` |
+| 本轮离线 ZIP SHA-256 | `sha256:fa5bcf86d9318e61639e17cd34d00ce913ff6bbe2a01763f3a118564bb974191` |
 
 ## 本轮数据审计决定
 
@@ -44,8 +45,8 @@ python scripts/package_public_release.py `
   --candidate-locators data/public/catalog_source_locator_candidates.jsonl `
   --benchmark-manifest data/annotations/public_benchmark_v1.manifest.json `
   --benchmark-questions data/annotations/public_benchmark_v1.jsonl `
-  --output .test_tmp/adc-public-54f4d87.zip
-python scripts/verify_public_release.py .test_tmp/adc-public-54f4d87.zip
+  --output .test_tmp/adc-public-4f36842.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-4f36842.zip
 ```
 
 - 初次全量验证：执行 `213` 项，其中 `209` 项通过，`4` 项因可选模型依赖未安装而跳过；
@@ -94,8 +95,8 @@ python scripts/audit_public_dataset.py `
 新增回归测试覆盖相同 ADC ID 的自定义目录不会加载公共线索，以及显式候选正常加载。
 SKB264 候选备注同时改为指向“先前候选名称”，避免误称目录抗体字段就是 Sacituzumab。
 本次候选文件统一 LF 后 SHA-256 为
-`8d7c1b048995c29565b9b79c6c136ace87ac9b404ef48cdf49faaf7ea430aeb2`。
+`8d7c1b048995c29565b9b79c6c136ace87ac9b404ef48cdf49fa7ea430aeb2`。
 
-最终本地全量执行 `216` 项：`212` 项通过、`4` 项跳过、`0` 项失败。
+最终本地全量执行 `217` 项：`213` 项通过、`4` 项跳过、`0` 项失败。
 重新生成并校验公共复核包得到 `299` 个待复核项、`114` 条候选，`review_ready=false`。
-上表 ZIP 是 `54f4d87` 的历史验证包，未包含本节的后续改动；正式发布仍需重新构建和许可核查。
+上表 ZIP 是运行代码提交 `4f36842` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。
