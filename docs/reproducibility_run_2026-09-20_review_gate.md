@@ -7,9 +7,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `23f325e1e850ec0e93a826d1cc3a808a054ebacb` |
+| 代码提交 | `365e5f724a785150e9218bd816d6847cd2f5c8a6` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
-| 本地测试 | 231 项发现，231 项通过，0 项跳过，0 项失败 |
+| 本地测试 | 232 项发现，232 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
 | 公共卫生扫描 | 216 个受跟踪文件，`status=clean`，无发现 |
 
@@ -54,13 +54,24 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 最终 top-k=5、候选上限 60 和 `ExtractiveGenerator`。系统报告或基线报告缺少或改变任一
 条件时，比较器不会生成对照结论；新增预算不一致回归测试已覆盖该门禁。
 
+公开 benchmark 的命令行比较器也已加入同样的报告级门禁。在公开快照上运行 98 题 system
+与 baseline 后，题集、数据库版本、提示版本和检索条件均匹配，比较结果生成成功；两份
+报告和比较结果的 SHA-256 分别为：
+
+- system：`6cb8d12aaaf273f1c823e2366145e1057625d4824262cdd592f9e6aa1ccacfce`
+- baseline：`fd779b0104853d0677d0ad5f63691fc70d09972b309b9e82e4c08b806e1a1cf1`
+- comparison：`30721b3885b85966bca00781604009f4e9d4e45fc52c31ed991244f1d6d7d0a8`
+
+该结果只是公开开发题集的自动诊断，比较输出仍保留 `human_review_required=true`，不构成
+独立测试集、人工金标准或论文主结果。
+
 ## 研究包
 
-研究包由代码提交 `23f325e1e850ec0e93a826d1cc3a808a054ebacb` 构建并通过
+研究包由代码提交 `365e5f724a785150e9218bd816d6847cd2f5c8a6` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
-`redistribution_allowed=false`。包大小为 42,147,678 字节，SHA-256 为
-`89b5551d38cad9794279e3840bac6080aa12155b9a25884951972592a331172b`。
+`redistribution_allowed=false`。包大小为 42,148,189 字节，SHA-256 为
+`75a4636a4f7018f1c9341a5124057eda2c4b8fca888971a1042b7ab218059936`。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
 
