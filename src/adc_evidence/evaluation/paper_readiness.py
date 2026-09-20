@@ -146,7 +146,10 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
 
 
 def validate_independent_holdout_file(
-    questions_path: Path, manifest: dict[str, object]
+    questions_path: Path,
+    manifest: dict[str, object],
+    *,
+    exposed_questions: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     """Bind an external JSONL question file to its manifest without exposing rows."""
     raw = questions_path.read_bytes()
@@ -188,12 +191,16 @@ def validate_independent_holdout_file(
     )
     if manifest.get("question_id_sha256") != actual_question_id_hash:
         raise ValueError("Independent holdout question ID hash mismatch")
+    disjointness = None
+    if exposed_questions is not None:
+        disjointness = validate_holdout_disjoint(rows, exposed_questions)
     return {
         "question_file_sha256": actual_hash,
         "question_set_hash": actual_question_set_hash,
         "question_id_sha256": actual_question_id_hash,
         "question_count": len(rows),
         "path": questions_path.name,
+        "disjointness": disjointness,
     }
 
 
@@ -460,12 +467,16 @@ def audit_public_paper_readiness(
                 )
             )
         else:
-            bound = validate_independent_holdout_file(independent_holdout_questions, manifest)
+            bound = validate_independent_holdout_file(
+                independent_holdout_questions,
+                manifest,
+                exposed_questions=exposed,
+            )
             checks.append(
                 _check(
                     "independent_holdout",
                     "pass",
-                    f"manifest and question file hashes/count validated ({bound['question_count']} questions)",
+                    f"manifest, question file hashes/count, and disjointness validated ({bound['question_count']} questions)",
                 )
             )
     blockers = [item for item in checks if item["status"] == "blocker"]

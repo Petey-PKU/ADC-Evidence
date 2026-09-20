@@ -7,6 +7,7 @@ from adc_evidence.evaluation.human_review import (
     summarize_human_paired_reviews,
     summarize_inter_rater_agreement,
 )
+from adc_evidence.evaluation.public_benchmark import load_public_benchmark
 from adc_evidence.evaluation.paper_readiness import (
     audit_public_paper_readiness,
     build_independent_holdout_manifest,
@@ -150,6 +151,7 @@ class HumanReviewTests(unittest.TestCase):
             bound = validate_independent_holdout_file(questions_path, manifest)
             self.assertEqual(bound["question_count"], 1)
             self.assertEqual(bound["question_set_hash"], manifest["question_set_hash"])
+            self.assertIsNone(bound["disjointness"])
             invalid = dict(manifest, question_file_sha256="sha256:" + "0" * 64)
             with self.assertRaisesRegex(ValueError, "hash mismatch"):
                 validate_independent_holdout_file(questions_path, invalid)
@@ -159,6 +161,31 @@ class HumanReviewTests(unittest.TestCase):
             invalid_ids = dict(manifest, question_id_sha256="sha256:" + "0" * 64)
             with self.assertRaisesRegex(ValueError, "question ID hash mismatch"):
                 validate_independent_holdout_file(questions_path, invalid_ids)
+
+    def test_independent_holdout_rejects_overlap_with_exposed_questions(self) -> None:
+        exposed = load_public_benchmark(
+            PROJECT_ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
+        )
+        source = dict(exposed[0])
+        source["question_id"] = "external-overlap"
+        with WorkspaceTemporaryDirectory() as directory:
+            questions_path = Path(directory) / "overlap.jsonl"
+            questions_path.write_text(
+                json.dumps(source, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            manifest = build_independent_holdout_manifest(
+                questions_path,
+                question_set_version="holdout-v1",
+                evaluation_window_id="window-1",
+                access_control_method="private ACL",
+            )
+            with self.assertRaisesRegex(ValueError, "Holdout overlaps exposed question text"):
+                validate_independent_holdout_file(
+                    questions_path,
+                    manifest,
+                    exposed_questions=exposed,
+                )
 
     def test_independent_holdout_builder_rejects_question_without_gold_schema(self) -> None:
         with WorkspaceTemporaryDirectory() as directory:

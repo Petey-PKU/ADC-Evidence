@@ -78,6 +78,8 @@ python scripts/audit_paper_readiness.py `
 ```
 
 题集文件必须随 manifest 一起提供，并通过 `question_file_sha256`、`question_set_hash`、`question_id_sha256` 和 `question_count` 绑定。只提供 manifest 而不提供文件时，投稿审计保持阻塞。
+
+提供题集文件时，投稿审计还会把它与公开开发题集做题号和规范化题面不相交校验；任何重合都会 fail closed。通过哈希绑定不等于题集独立，访问控制和不相交性必须分别验证。
 不能把结果写成独立测试准确率、专家金标准或系统优越性。
 
 ## 公开前检查
