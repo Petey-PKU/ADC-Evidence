@@ -40,6 +40,9 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
         raise ValueError("Independent holdout must have status=unseen_holdout")
     if manifest.get("access_controlled") is not True:
         raise ValueError("Independent holdout must be access_controlled")
+    for field in ("access_control_method", "access_control_attestation"):
+        if not isinstance(manifest.get(field), str) or not manifest[field].strip():
+            raise ValueError(f"Independent holdout needs nonempty {field}")
     question_count = manifest.get("question_count")
     if not isinstance(question_count, int) or isinstance(question_count, bool) or question_count < 1:
         raise ValueError("Independent holdout question_count must be a positive integer")

@@ -50,6 +50,23 @@ class PublicBenchmarkTests(unittest.TestCase):
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["question_count"], 98)
 
+    def test_manifest_cannot_be_relabelled_as_unseen_test(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            manifest_path = Path(temporary.name) / "manifest.json"
+            manifest = json.loads(
+                (ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            manifest["evaluation_use"]["status"] = "unseen_holdout"
+            manifest["evaluation_use"]["eligible_for_unseen_test_claim"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "development_exposed"):
+                validate_public_benchmark(BENCHMARK, manifest_path)
+        finally:
+            temporary.cleanup()
+
     def test_manifest_question_hash_is_stable_across_newline_conventions(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:

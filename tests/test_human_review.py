@@ -93,6 +93,8 @@ class HumanReviewTests(unittest.TestCase):
             "question_count": 40,
             "evaluation_window_id": "window-1",
             "access_controlled": True,
+            "access_control_method": "private ACL",
+            "access_control_attestation": "operator_asserted; verify independently before publication",
             "evaluation_use": {
                 "status": "unseen_holdout",
                 "eligible_for_unseen_test_claim": True,
@@ -105,6 +107,8 @@ class HumanReviewTests(unittest.TestCase):
             "question_file_sha256",
             "question_count",
             "evaluation_window_id",
+            "access_control_method",
+            "access_control_attestation",
         ):
             invalid = dict(valid)
             invalid[field] = (
@@ -180,6 +184,8 @@ class HumanReviewTests(unittest.TestCase):
             "question_count": 1,
             "evaluation_window_id": "window-1",
             "access_controlled": True,
+            "access_control_method": "private ACL",
+            "access_control_attestation": "operator_asserted; verify independently before publication",
             "evaluation_use": {
                 "status": "unseen_holdout",
                 "eligible_for_unseen_test_claim": True,
