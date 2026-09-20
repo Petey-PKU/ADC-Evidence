@@ -26,6 +26,13 @@ python scripts/build_independent_holdout_manifest.py `
 3. 两名评审者分别使用 `primary` 和 `secondary` 槽位，各自完成预先指定的全部高风险题
    和普通题抽样。评审者应先看问题、答案、引用和原始证据，再填写判断。
 
+独立 holdout 的每条题目在冻结前必须包含可核查的 gold schema：`category`、
+`expected_route`、`expected_status`、`standard_answer`、`evidence_sources`、
+`allow_partial`、`should_refuse` 和 `scoring`。其中 `evidence_sources` 的每项必须
+绑定来源类型、来源 ID、URL 和字段；`scoring` 必须同时列出自动字段、人工字段和主指标。
+`build_independent_holdout_manifest.py` 会在生成 manifest 前拒绝缺少这些字段的题集，
+因此只有题目文本和 ID 的文件不能被标记为正式 unseen holdout。
+
 ## 每条答案的最低记录
 
 JSONL 每行至少包含：

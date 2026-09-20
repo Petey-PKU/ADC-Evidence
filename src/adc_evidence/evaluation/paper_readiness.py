@@ -23,6 +23,84 @@ from adc_evidence.evaluation.public_hygiene import scan_tracked_public_files
 from adc_evidence.repository import data_quality_metrics
 
 
+_INDEPENDENT_HOLDOUT_ROUTES = {
+    "structured_fact",
+    "comparison",
+    "change_query",
+    "trial_lookup",
+    "literature_evidence",
+    "refusal",
+}
+_INDEPENDENT_HOLDOUT_ANSWER_KINDS = {
+    "structured",
+    "comparison",
+    "trial_record",
+    "evidence_document",
+    "refusal",
+    "gap",
+}
+
+
+def _validate_independent_holdout_rows(rows: list[object]) -> None:
+    """Require gold answers and scoring metadata before a holdout is frozen."""
+    required = {
+        "question_id",
+        "question",
+        "category",
+        "expected_route",
+        "expected_status",
+        "standard_answer",
+        "evidence_sources",
+        "allow_partial",
+        "should_refuse",
+        "scoring",
+    }
+    for index, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            raise ValueError(f"Independent holdout row {index} must be an object")
+        missing = sorted(required - set(row))
+        if missing:
+            raise ValueError(
+                f"Independent holdout row {row.get('question_id', index)} missing fields: {missing}"
+            )
+        if not isinstance(row.get("category"), str) or not str(row["category"]).strip():
+            raise ValueError(f"Independent holdout row {row['question_id']} needs category")
+        if row.get("expected_route") not in _INDEPENDENT_HOLDOUT_ROUTES:
+            raise ValueError(f"Independent holdout row {row['question_id']} has invalid expected_route")
+        statuses = row.get("expected_status")
+        if not isinstance(statuses, list) or not statuses or any(
+            not isinstance(status, str) or not status.strip()
+            for status in statuses
+        ):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs expected_status")
+        if not isinstance(row.get("allow_partial"), bool):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs boolean allow_partial")
+        if not isinstance(row.get("should_refuse"), bool):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs boolean should_refuse")
+        if row["should_refuse"] != (row["expected_route"] == "refusal"):
+            raise ValueError(f"Independent holdout row {row['question_id']} refusal metadata disagrees with route")
+        answer = row.get("standard_answer")
+        if not isinstance(answer, dict) or answer.get("kind") not in _INDEPENDENT_HOLDOUT_ANSWER_KINDS:
+            raise ValueError(f"Independent holdout row {row['question_id']} needs a valid standard_answer")
+        sources = row.get("evidence_sources")
+        if not isinstance(sources, list):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs evidence_sources list")
+        for source in sources:
+            if not isinstance(source, dict) or any(
+                not isinstance(source.get(field), str) or not source[field].strip()
+                for field in ("source_type", "source_record_id", "source_url", "field")
+            ):
+                raise ValueError(
+                    f"Independent holdout row {row['question_id']} evidence sources need type, ID, URL, and field"
+                )
+        scoring = row.get("scoring")
+        if not isinstance(scoring, dict) or not isinstance(scoring.get("primary_metric"), str) or not scoring["primary_metric"].strip():
+            raise ValueError(f"Independent holdout row {row['question_id']} needs scoring.primary_metric")
+        for field in ("automatic_fields", "human_fields"):
+            if not isinstance(scoring.get(field), list):
+                raise ValueError(f"Independent holdout row {row['question_id']} needs scoring.{field} list")
+
+
 def _check(name: str, status: str, detail: str) -> dict[str, str]:
     return {"name": name, "status": status, "detail": detail}
 
@@ -89,6 +167,7 @@ def validate_independent_holdout_file(
         raise ValueError("Independent holdout question file count mismatch")
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError("Independent holdout question file rows must be objects")
+    _validate_independent_holdout_rows(rows)
     question_ids = [str(row.get("question_id", "")) for row in rows]
     if any(not question_id.strip() for question_id in question_ids):
         raise ValueError("Independent holdout question IDs must be nonempty")
@@ -146,6 +225,7 @@ def build_independent_holdout_manifest(
     ]
     if not rows or any(not isinstance(row, dict) for row in rows):
         raise ValueError("Independent holdout must contain at least one JSON object row")
+    _validate_independent_holdout_rows(rows)
     question_ids = [str(row.get("question_id", "")).strip() for row in rows]
     if any(not value for value in question_ids) or len(question_ids) != len(set(question_ids)):
         raise ValueError("Independent holdout question IDs must be unique and nonempty")
