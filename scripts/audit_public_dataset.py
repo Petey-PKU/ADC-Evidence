@@ -579,12 +579,30 @@ def audit_database(
         "adc_fact_coverage": fact_coverage,
         "adc_fact_provenance": fact_provenance,
         "adc_fact_source_quality": fact_source_quality,
+        "adc_fact_source_quality_reasons": sorted({
+            reason
+            for reason, condition in (
+                ("missing_or_generic_url", any(
+                    values["missing_url_count"] > 0 or values["generic_url_count"] > 0
+                    for values in fact_source_quality.values()
+                )),
+                ("curated_seed_not_independently_reviewed", any(
+                    "curated_seed" in provenance.get("source_types", [])
+                    for provenance in fact_provenance.values()
+                )),
+            )
+            if condition
+        }),
         "adc_fact_source_quality_status": (
             "pass"
-            if all(
-                values["missing_url_count"] == 0
-                and values["generic_url_count"] == 0
+            if not any((
+                values["missing_url_count"] > 0
+                or values["generic_url_count"] > 0
                 for values in fact_source_quality.values()
+            ))
+            and not any(
+                "curated_seed" in provenance.get("source_types", [])
+                for provenance in fact_provenance.values()
             )
             else "needs_review"
         ),

@@ -108,7 +108,8 @@ class PublicDatasetAuditTests(unittest.TestCase):
         self.assertEqual(report["adc_fact_coverage"]["adc.target"], 1)
         self.assertEqual(report["adc_fact_provenance"]["adc.target"]["with_source_url_count"], 1)
         self.assertEqual(report["adc_fact_provenance"]["adc.target"]["source_types"], ["curated_seed"])
-        self.assertEqual(report["adc_fact_source_quality_status"], "pass")
+        self.assertEqual(report["adc_fact_source_quality_status"], "needs_review")
+        self.assertEqual(report["adc_fact_source_quality_reasons"], ["curated_seed_not_independently_reviewed"])
         self.assertEqual(report["adc_fact_source_quality"]["adc.target"], {"missing_url_count": 0, "generic_url_count": 0})
         self.assertEqual(report["incomplete_sources"], ["pubmed"])
         self.assertEqual(report["partial_sources"], ["pubmed"])
@@ -170,6 +171,7 @@ class PublicDatasetAuditTests(unittest.TestCase):
         finally:
             temporary.cleanup()
         self.assertEqual(report["adc_fact_source_quality_status"], "needs_review")
+        self.assertEqual(report["adc_fact_source_quality_reasons"], ["curated_seed_not_independently_reviewed", "missing_or_generic_url"])
         self.assertEqual(report["adc_fact_source_quality"]["adc.target"]["generic_url_count"], 1)
 
     def test_audit_uses_latest_timestamped_run_for_incomplete_status(self) -> None:
@@ -205,3 +207,4 @@ class PublicDatasetAuditTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
