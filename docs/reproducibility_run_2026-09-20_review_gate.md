@@ -40,10 +40,10 @@ adjudicator 文件，输出逐字段一致性、分歧数和裁决状态；没�
 
 ## 研究包
 
-研究包由代码提交 `d3a122f3702f24851ab461997478ca88204fc550` 构建并通过
+研究包由代码提交 `9497ee02f8ab3f01884f829bd404d8b1b4d71e27` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
-`redistribution_allowed=false`。包大小为 42,147,289 字节，SHA-256 为
-`45bca702a14a89a43d5c2abf14ef8d9f45d8bd237c45301188c963920c020b7e`。
+`redistribution_allowed=false`。包大小为 42,147,288 字节，SHA-256 为
+`0b259a9164986f27c48814f46b6b591696f2ed6971aee0aacb2008b662abfd5b`。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
