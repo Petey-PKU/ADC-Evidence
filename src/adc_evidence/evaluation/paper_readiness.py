@@ -354,6 +354,90 @@ def database_quality_provenance_check(repo_root: Path) -> tuple[str, str]:
     return "pass", "committed quality report matches the committed demo database"
 
 
+def _read_audit_object(path: Path, *, label: str) -> dict[str, object]:
+    """Read a content-free public audit report and reject malformed evidence."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{label} is not readable JSON") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
+def public_dataset_audit_check(
+    dataset_audit: Path | None,
+    catalog_source_audit: Path | None,
+) -> tuple[str, str]:
+    """Validate externally generated public snapshot audits without trusting paths.
+
+    The reports are deliberately supplied from outside the source checkout: a
+    local SQLite snapshot and raw source responses are not public repository
+    content. This check validates the report schema and provenance summary,
+    while retaining ``warning`` status when the underlying data or field
+    review is explicitly partial/pending.
+    """
+    if dataset_audit is None and catalog_source_audit is None:
+        return "warning", "no public snapshot audit reports supplied"
+    details: list[str] = []
+    status = "pass"
+    if dataset_audit is not None:
+        report = _read_audit_object(dataset_audit, label="public dataset audit")
+        if report.get("schema_version") != "public-adc-dataset-audit-v1":
+            raise ValueError("public dataset audit has an unsupported schema_version")
+        digest = report.get("database_sha256")
+        if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise ValueError("public dataset audit needs database_sha256")
+        counts = report.get("counts")
+        if not isinstance(counts, dict) or any(
+            not isinstance(counts.get(name), int) or counts[name] < 0
+            for name in ("adcs", "trials", "documents", "entity_links")
+        ):
+            raise ValueError("public dataset audit has invalid counts")
+        coverage = report.get("source_coverage")
+        if not isinstance(coverage, dict) or not coverage:
+            raise ValueError("public dataset audit needs source_coverage")
+        allowed_states = {"complete", "partial", "unknown"}
+        if any(
+            not isinstance(item, dict) or item.get("coverage_state") not in allowed_states
+            for item in coverage.values()
+        ):
+            raise ValueError("public dataset audit has invalid source coverage states")
+        dataset_status = report.get("status")
+        if dataset_status not in allowed_states:
+            raise ValueError("public dataset audit has invalid status")
+        if dataset_status != "complete" or any(
+            item.get("coverage_state") != "complete" for item in coverage.values()
+        ):
+            status = "warning"
+        details.append(
+            f"dataset audit bound to {digest}, status={dataset_status}, "
+            f"{counts['adcs']} ADCs/{counts['trials']} trials/{counts['documents']} documents"
+        )
+    if catalog_source_audit is not None:
+        report = _read_audit_object(catalog_source_audit, label="catalog source audit")
+        if report.get("schema_version") != "public-adc-source-content-audit-v1":
+            raise ValueError("catalog source audit has an unsupported schema_version")
+        row_count = report.get("catalog_row_count")
+        pair_count = report.get("core_fact_candidate_locator_count")
+        if not isinstance(row_count, int) or row_count < 1:
+            raise ValueError("catalog source audit needs a positive catalog_row_count")
+        if not isinstance(pair_count, int) or pair_count < 0:
+            raise ValueError("catalog source audit needs core fact locator count")
+        review_status = report.get("review_status")
+        if not isinstance(review_status, str) or not review_status.strip():
+            raise ValueError("catalog source audit needs review_status")
+        if report.get("ai_or_automatic_labels_are_gold") is not False:
+            raise ValueError("catalog source audit must reject automatic labels as gold")
+        if review_status != "verified_primary_source_review":
+            status = "warning"
+        details.append(
+            f"catalog source audit covers {row_count} rows and {pair_count} candidate locators; "
+            f"review_status={review_status}"
+        )
+    return status, "; ".join(details)
+
+
 def audit_public_paper_readiness(
     repo_root: Path,
     *,
@@ -361,6 +445,8 @@ def audit_public_paper_readiness(
     human_review_manifest: Path | None = None,
     independent_holdout_manifest: Path | None = None,
     independent_holdout_questions: Path | None = None,
+    public_dataset_audit: Path | None = None,
+    public_catalog_source_audit: Path | None = None,
 ) -> dict[str, object]:
     """Audit public evidence and optional externally supplied confirmation artifacts.
 
@@ -416,6 +502,11 @@ def audit_public_paper_readiness(
             quality_detail,
         )
     )
+    if public_dataset_audit is not None or public_catalog_source_audit is not None:
+        audit_status, audit_detail = public_dataset_audit_check(
+            public_dataset_audit, public_catalog_source_audit
+        )
+        checks.append(_check("public_dataset_audit", audit_status, audit_detail))
     if human_review_jsonl is None:
         checks.append(
             _check(

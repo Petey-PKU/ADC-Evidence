@@ -40,6 +40,19 @@
 `scripts/audit_paper_readiness.py` 提供失败即显式报告的投稿前审计；默认会阻塞在真实人工标签
 和独立封存保留集，直到用户提供这两类外部证据。
 
+公开快照审计可以在同一命令中绑定，避免只检查没有文献和试验记录的 demo 数据库：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_paper_readiness.py `
+  --public-dataset-audit .test_tmp/public_dataset_audit_2026-09-21_with_raw.json `
+  --public-catalog-source-audit .test_tmp/public_catalog_source_audit_2026-09-21.json `
+  --output .test_tmp/paper_readiness-with-public-audit.json
+```
+
+该门禁验证报告 schema、数据库哈希、记录计数、来源覆盖状态和目录字段来源审计状态；
+`partial`、`unknown` 或待人工一级来源复核仍保持 `warning`，不会被自动升级为论文金标准。
+
 论文写作骨架见 [paper_outline.md](paper_outline.md)。其中所有 `[PENDING]` 字段都必须由通过门禁的
 独立保留集和人工复核产物填充，不能用当前公开 smoke 结果替代。
 
