@@ -1,7 +1,7 @@
 # 2026-09-20 公共来源候选审计记录
 
 本记录对应公共分支 `research/v0.6-freeze` 的运行代码提交
-`4f36842cb9899c7f8d8153f37d71e5bafe28368b`。本轮只更新公开来源候选、复核包边界和
+`1d51624c3f4bf6b7e73e410486a37e2cc068252a`。本轮只更新公开来源候选、复核包边界和
 实体关联审计，
 没有写入人工 verdict，也没有把来源可访问性当作人工核验。
 
@@ -9,13 +9,13 @@
 
 | 项目 | 值 |
 |---|---|
-| 代码提交 | `4f36842cb9899c7f8d8153f37d71e5bafe28368b` |
+| 代码提交 | `1d51624c3f4bf6b7e73e410486a37e2cc068252a` |
 | 目录 | `sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c` |
 | 来源候选 JSONL（统一 LF 后） | `sha256:5c258c7b9f75606382a80943dc5576baef40a900187c28ccd939c854b706e402` |
 | 包内数据库（去除本机路径后） | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
 | benchmark manifest | `sha256:41fd2884722e0c19516f13601df5bd82230dadd87e17c9044c42cb1ec364d7a9` |
 | 检索语料版本 | `corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca` |
-| 本轮离线 ZIP SHA-256 | `sha256:fa5bcf86d9318e61639e17cd34d00ce913ff6bbe2a01763f3a118564bb974191` |
+| 本轮离线 ZIP SHA-256 | `sha256:4ed46fa936782fa30b37d33796059584cf02af5ac363584f4da805f3025e2ade` |
 
 ## 本轮数据审计决定
 
@@ -29,6 +29,8 @@
   与 [NCI 药物词典](https://www.cancer.gov/publications/dictionaries/cancer-drug/def/trastuzumab-rezetecan)。
 - 复核包的 Python API 默认不加载公共候选文件；只有显式传入候选路径时才绑定候选，
   且候选文件中的 ADC 与字段必须属于传入目录。这样测试目录不会误接真实公共线索。
+- 本轮新增 `adc_017`、`adc_019`、`adc_021`、`adc_022`、`adc_023` 的公开候选；
+  `adc_018` 和 `adc_020` 仍没有字段级候选，不能按“已覆盖”解释。
 
 ## 验证结果
 
@@ -45,14 +47,14 @@ python scripts/package_public_release.py `
   --candidate-locators data/public/catalog_source_locator_candidates.jsonl `
   --benchmark-manifest data/annotations/public_benchmark_v1.manifest.json `
   --benchmark-questions data/annotations/public_benchmark_v1.jsonl `
-  --output .test_tmp/adc-public-4f36842.zip
-python scripts/verify_public_release.py .test_tmp/adc-public-4f36842.zip
+  --output .test_tmp/adc-public-1d51624.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-1d51624.zip
 ```
 
 - 初次全量验证：执行 `213` 项，其中 `209` 项通过，`4` 项因可选模型依赖未安装而跳过；
   当时尚未加入随后补充的缺失文件和错配候选回归测试。最终工作区测试结果见下文。
 - 公共卫生扫描：`208` 个受跟踪文件，`status=clean`，无发现。
-- 复核包：`299` 个字段项，`299` 个仍为 pending，`review_ready=false`；候选计数为 `114`。
+- 复核包：`299` 个字段项，`299` 个仍为 pending，`review_ready=false`；候选计数为 `150`。
 - 发布包：`status=verified`，检查 `79` 个文件，数据库绝对本机路径计数为 `0`，
   benchmark 和候选来源文件均存在。
 
@@ -99,4 +101,4 @@ SKB264 候选备注同时改为指向“先前候选名称”，避免误称目�
 
 最终本地全量执行 `217` 项：`213` 项通过、`4` 项跳过、`0` 项失败。
 重新生成并校验公共复核包得到 `299` 个待复核项、`150` 条候选，`review_ready=false`。
-上表 ZIP 是运行代码提交 `4f36842` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。
+上表 ZIP 是运行代码提交 `1d51624` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。
