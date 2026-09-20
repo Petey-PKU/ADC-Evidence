@@ -87,6 +87,14 @@ python scripts/audit_public_dataset.py `
 状态为 `needs_review`。这些晚日期记录不能被静默纳入目标窗口，需在下一次固定窗口重建或
 逐条标注为超出窗口。
 
+## 2026-09-20 URL 预核验复跑
+
+使用公共目录和同一脚本重新请求候选入口页后，23 个 URL 均返回了可记录的 HTTP 结果：
+21 个为 `reachable`，2 个为 `http_error`；16 个响应文本出现目录名称或别名，
+161 个结构字段仍为 `field_level_source_missing`。报告状态仍为
+`triage_only_pending_human_source_locator_review`。该复跑只证明当前 URL 的访问结果和自动
+文本匹配状态，不提取 PDF 正文、不确认字段值，也不产生人工 verdict。
+
 ## 收尾校正与复验
 
 收尾检查纠正了上表候选文件重排后的哈希，并明确数据库哈希指包内去除本机路径后的版本。
