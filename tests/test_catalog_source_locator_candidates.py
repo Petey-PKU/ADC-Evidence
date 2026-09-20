@@ -9,7 +9,7 @@ class CatalogSourceLocatorCandidateTests(unittest.TestCase):
     def test_candidates_are_explicitly_pending_and_cover_current_source_records(self) -> None:
         path = Path(__file__).resolve().parents[1] / "data/public/catalog_source_locator_candidates.jsonl"
         rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        self.assertEqual(len(rows), 184)
+        self.assertEqual(len(rows), 187)
         self.assertEqual({row["adc_id"] for row in rows}, {"adc_001", "adc_002", "adc_003", "adc_004", "adc_005", "adc_006", "adc_007", "adc_008", "adc_009", "adc_010", "adc_011", "adc_012", "adc_013", "adc_014", "adc_015", "adc_016", "adc_017", "adc_018", "adc_019", "adc_020", "adc_021", "adc_022", "adc_023"})
         self.assertTrue(all(row["review_status"] == "pending_independent_primary_source_review" for row in rows))
         self.assertTrue(all(row["source_tier"] in {"regulator_label", "regulator_review", "regulator_database", "issuer_filing", "government_dictionary", "peer_reviewed_publication", "clinical_trial_registry"} for row in rows))

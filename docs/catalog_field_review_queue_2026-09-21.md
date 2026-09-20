@@ -20,14 +20,14 @@ python scripts/validate_catalog_field_review.py `
   --catalog data/public/marketed_adc_catalog.csv
 ```
 
-The current packet contains 184 candidate source locators covering 181 unique
+The current packet contains 187 candidate source locators covering 184 unique
 ADC-field pairs. They are hints for
 human checking and are not accepted as field-level evidence until a reviewer
 records a source locator, a controlled verdict, and an independent human
 review origin. The packet SHA-256 is
-`d5b13bc6e6d75332139da6ad3c247a1b4ec64c8eb5b27ba58542806acd68fe26`; its
+`dd8deec4b9498e9bc6fcd68cc7c9160243ef95747d367c4a19777ea87a003a7f`; its
 manifest SHA-256 is
-`97bc51239274f1a93ae06a9544f7b6be967551b38913788f00b673b6ef299dca`.
+`24e656f1fe9a7ee3f2e259e98bb5bbe5d0a08cf70bf13ec4d8ebb078a9087145`.
 
 Until the required independent primary and secondary reviews are supplied,
 the catalog source-quality gate remains `needs_review` and the project must
@@ -41,18 +41,18 @@ do not independently establish regulatory status.
 
 The source-content triage was rerun on 2026-09-21 against all 23 candidate
 URLs. The updated report SHA-256 is
-`55ca98d477cba1a987bb20d9a04dfb91deb30c0314be3148b6ce8aa3e2fbef1a`.
+`8e941f470e41993d0e7d5e1a279d4e24a1668d368c20b8497af5b6ca0c125062`.
 For the eight core fact fields, candidate locator coverage is:
 
 | Field | Locator pairs | Missing pairs |
 |---|---:|---:|
 | target | 23 / 23 | 0 |
 | antibody | 23 / 23 | 0 |
-| linker_name | 22 / 23 | 1 |
-| linker_type | 22 / 23 | 1 |
+| linker_name | 23 / 23 | 0 |
+| linker_type | 23 / 23 | 0 |
 | payload_name | 23 / 23 | 0 |
 | payload_class | 23 / 23 | 0 |
-| dar | 22 / 23 | 1 |
+| dar | 23 / 23 | 0 |
 | indication | 23 / 23 | 0 |
 
 The automatic value pre-screen found 23 matches among 137 eligible candidate
