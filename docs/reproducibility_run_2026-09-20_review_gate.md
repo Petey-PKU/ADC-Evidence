@@ -7,9 +7,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `28ada251da7a8f170dc2682fa956249a7ebc3153` |
+| 代码提交 | `da07c6fd3e0f382b123ab1fa74456150eb2c4009` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
-| 本地测试 | 232 项发现，232 项通过，0 项跳过，0 项失败 |
+| 本地测试 | 233 项发现，233 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
 | 公共卫生扫描 | 216 个受跟踪文件，`status=clean`，无发现 |
 
@@ -54,6 +54,11 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 最终 top-k=5、候选上限 60 和 `ExtractiveGenerator`。系统报告或基线报告缺少或改变任一
 条件时，比较器不会生成对照结论；新增预算不一致回归测试已覆盖该门禁。
 
+本轮还收紧了独立 holdout 的题目 schema。正式 unseen holdout 的每题必须有
+`standard_answer`、`evidence_sources`、`allow_partial`、`should_refuse` 和 `scoring`，并
+包含类别、路由和预期状态；只有题目文本与 ID 的文件现在会在 manifest 生成和文件绑定时
+被拒绝。公开 smoke holdout 仍保持单独的开发用途边界。
+
 公开 benchmark 的命令行比较器也已加入同样的报告级门禁。在公开快照上运行 98 题 system
 与 baseline 后，题集、数据库版本、提示版本和检索条件均匹配，比较结果生成成功；两份
 报告和比较结果的 SHA-256 分别为：
@@ -73,11 +78,15 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 
 ## 研究包
 
-研究包由代码提交 `28ada251da7a8f170dc2682fa956249a7ebc3153` 构建并通过
+研究包由代码提交 `da07c6fd3e0f382b123ab1fa74456150eb2c4009` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
-`redistribution_allowed=false`。包大小为 42,148,233 字节，SHA-256 为
-`d719f996fdbe2865d1b648e491c1e1e254cc929bd0054c462065938fc8a1c54b`。
+`redistribution_allowed=false`。包大小为 42,149,005 字节，SHA-256 为
+`ffa50d8b0167c44c8c3fc18ba0d0f86e5982a31ceca12122f3ed7dcd15c00d25`。
+
+本轮投稿门禁复跑的审计 JSON 哈希仍为
+`8c49c1a0b85cd2dfee71defdcd951b82f148ec224d72ff18ce551ecaab02d17d`：真实人工证据和独立
+holdout blocker 仍未提供。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
 
