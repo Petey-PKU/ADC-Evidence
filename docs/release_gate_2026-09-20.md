@@ -30,11 +30,11 @@ python scripts/package_public_release.py `
 python scripts/verify_public_release.py .test_tmp/adc-public-research-only-current.zip
 ```
 
-结果（代码提交 `da07c6fd3e0f382b123ab1fa74456150eb2c4009`）：79 个文件、数据库绝对路径计数为 0、`status=verified`，manifest 的
+结果（代码提交 `26ab49f3ac7ccf37f1daa50ed80876164c575055`）：79 个文件、数据库绝对路径计数为 0、`status=verified`，manifest 的
 `redistribution.status=research_only`，`redistribution.redistribution_allowed=false`；解压后
-`run_public_release.py --check` 和结构化 T-DXd 查询均成功。ZIP 大小为 42,149,005 字节，
+`run_public_release.py --check` 和结构化 T-DXd 查询均成功。ZIP 大小为 42,149,007 字节，
 SHA-256 为
-`ffa50d8b0167c44c8c3fc18ba0d0f86e5982a31ceca12122f3ed7dcd15c00d25`。
+`6c583b82a8971528f62f077cf2620c9a58d5d510c844b2492ffda08cadfce233`。
 
 这只是本地复现制品，不应上传到 GitHub Release、作为公共数据下载附件或用于声称文献可
 再分发。完整论文门禁仍包括字段级一手来源复核、独立测试集和真实人工评分。

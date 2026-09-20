@@ -7,9 +7,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `da07c6fd3e0f382b123ab1fa74456150eb2c4009` |
+| 代码提交 | `26ab49f3ac7ccf37f1daa50ed80876164c575055` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
-| 本地测试 | 233 项发现，233 项通过，0 项跳过，0 项失败 |
+| 本地测试 | 234 项发现，234 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
 | 公共卫生扫描 | 216 个受跟踪文件，`status=clean`，无发现 |
 
@@ -37,6 +37,8 @@ git diff --check
 本轮新增 `scripts/merge_catalog_field_reviews.py`：它分别验证 primary、secondary 和可选
 adjudicator 文件，输出逐字段一致性、分歧数和裁决状态；没有裁决时报告保持
 `needs_adjudication`，不会自动选择竞争值。
+
+本轮还把目录来源内容审计的候选定位覆盖与人工核验分开记录：候选文件为 161 条记录、158 个唯一 ADC-字段组合，覆盖 23 个 ADC；按 23×7 个结构字段计算，候选定位覆盖 158/161，仍有 3 个组合缺候选 URL，且全部仍为 `candidate_locator_pending_human_review`，不构成字段事实或金标准。
 
 本轮也复跑了公开数据库来源覆盖审计：23 个 ADC、3,503 条试验、1,410 篇文献和 6,754 条
 实体关联；ClinicalTrials.gov 为 `partial`（2,000/13,978，比例 `0.143082`），PubMed 为
@@ -78,11 +80,11 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 
 ## 研究包
 
-研究包由代码提交 `da07c6fd3e0f382b123ab1fa74456150eb2c4009` 构建并通过
+研究包由代码提交 `26ab49f3ac7ccf37f1daa50ed80876164c575055` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
-`redistribution_allowed=false`。包大小为 42,149,005 字节，SHA-256 为
-`ffa50d8b0167c44c8c3fc18ba0d0f86e5982a31ceca12122f3ed7dcd15c00d25`。
+`redistribution_allowed=false`。包大小为 42,149,007 字节，SHA-256 为
+`6c583b82a8971528f62f077cf2620c9a58d5d510c844b2492ffda08cadfce233`。
 
 本轮投稿门禁复跑的审计 JSON 哈希仍为
 `8c49c1a0b85cd2dfee71defdcd951b82f148ec224d72ff18ce551ecaab02d17d`：真实人工证据和独立
@@ -92,7 +94,7 @@ holdout blocker 仍未提供。
 
 ## 投稿门禁复跑
 
-在提交 `8c6f6df0479f477eb7626ccdfc38222598b9358a` 的工作树上运行：
+在提交 `26ab49f3ac7ccf37f1daa50ed80876164c575055` 的工作树上运行：
 
 ```powershell
 $env:PYTHONPATH="src"
