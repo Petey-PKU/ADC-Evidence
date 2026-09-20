@@ -18,7 +18,7 @@
 `provisional_pending_primary_source_review`，不能替代结构字段的一手来源复核。
 
 `data/public/catalog_source_locator_candidates.jsonl` 已加入全部 23 个目录条目的 FDA/PMDA 标签、临床试验注册、
-监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 158 个 ADC-字段组合，共 161 条候选；其中三组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
+监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 173 个 ADC-字段组合，共 176 条候选；其中三组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
 表示仍需其他结构来源或术语核对；所有条目保持 `pending_independent_primary_source_review`，
 因此不计入人工金标准或论文主结果。
 
@@ -93,11 +93,11 @@ python scripts/audit_public_catalog_sources.py `
 `candidate_support_only` 是待人工定位的线索，`candidate_locator_pending_human_review` 表示候选
 文件已经给出字段级 URL 线索但尚未完成独立人工核验，`field_level_source_missing` 表示仍没有
 字段级候选 URL；自动匹配永远不计入金标准。按 7 个结构字段计算，当前候选文件覆盖
-158/161 个 ADC-字段组合，仍有 3 个结构组合没有候选定位；把 `indication` 纳入论文所需
-核心事实后，覆盖为 158/184，仍有 26 个核心事实组合缺候选定位（包括 23 个适应证字段）。
-这些数字都不等同于字段已经被证实。2026-09-13 的实际运行
-结果为 23 行均返回 HTTP 响应（21 行为 200、1 行为 403、1 行为 412），16 行文本出现
-名称/别名；PDF 只记录可访问性，不自动提取正文；状态为
+158/161 个结构 ADC-字段组合，仍有 3 个结构组合没有候选定位；把 `indication` 纳入论文所需
+核心事实后，覆盖为 173/184，仍有 11 个核心事实组合缺候选定位（其中 8 个适应证字段）。
+这些数字都不等同于字段已经被证实。2026-09-21 的实际运行
+结果为 23 行均返回 HTTP 响应（21 行可访问、2 行 HTTP 错误），16 行文本出现
+名称/别名；17 行文本被扫描、4 个 PDF 未提取正文、2 行待处理；状态为
 `triage_only_pending_human_source_locator_review`。
 
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的

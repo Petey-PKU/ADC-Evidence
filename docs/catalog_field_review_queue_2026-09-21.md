@@ -20,13 +20,14 @@ python scripts/validate_catalog_field_review.py `
   --catalog data/public/marketed_adc_catalog.csv
 ```
 
-The current packet contains 161 candidate source locators. They are hints for
+The current packet contains 176 candidate source locators covering 173 unique
+ADC-field pairs. They are hints for
 human checking and are not accepted as field-level evidence until a reviewer
 records a source locator, a controlled verdict, and an independent human
 review origin. The packet SHA-256 is
-`e0cc7012aee66eb0d2f925fdd48b8137023c83e312db5532f1de7f5cbe679cae`; its
+`a24852d2e858c25537e018c37e64f45a3b27e6f8278d4141ba9a2fc0bfddbd34`; its
 manifest SHA-256 is
-`e2f24dc05b80630962f7eac2b9cb7c1bc8ecf35b2dce72f31ce00bba35e9341c`.
+`3164a96e9d9dab43700dfd60167bf475fec06587ac943738dc8eec2129f99442`.
 
 Until the required independent primary and secondary reviews are supplied,
 the catalog source-quality gate remains `needs_review` and the project must
@@ -39,8 +40,8 @@ one extended withdrawn record. These are explicit catalog-scope labels; they
 do not independently establish regulatory status.
 
 The source-content triage was rerun on 2026-09-21 against all 23 candidate
-URLs. The report SHA-256 is
-`555c4373833d02e89c526d5226d2fcd8cdeb2ae2fdf1938004e709c94b34837b`.
+URLs. The updated report SHA-256 is
+`051bf998399888ff29b91331de30686a2c2054a69f7ecfe4eff8e1799c0f9ab4`.
 For the eight core fact fields, candidate locator coverage is:
 
 | Field | Locator pairs | Missing pairs |
@@ -52,10 +53,10 @@ For the eight core fact fields, candidate locator coverage is:
 | payload_name | 23 / 23 | 0 |
 | payload_class | 23 / 23 | 0 |
 | dar | 22 / 23 | 1 |
-| indication | 0 / 23 | 23 |
+| indication | 15 / 23 | 8 |
 
-The automatic value pre-screen found 16 matches among 120 eligible candidate
-values (`0.1333`). This is a triage signal only: PDFs and page structure can
+The automatic value pre-screen found 22 matches among 134 eligible candidate
+values (`0.1642`). This is a triage signal only: PDFs and page structure can
 hide values, terminology can differ, and no match is treated as a verified
 claim. All candidate locators and values remain pending independent human
 source review.
