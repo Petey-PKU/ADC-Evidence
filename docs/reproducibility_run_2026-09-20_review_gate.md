@@ -7,7 +7,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `3cb75bea3ffb30480bb3ee332afc424786207076` |
+| 代码提交 | `656b9de7f7001e1666041e1a30ceb43f3ca270b6` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
 | 本地测试 | 235 项发现，235 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
@@ -85,11 +85,11 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 
 ## 研究包
 
-研究包由代码提交 `3cb75bea3ffb30480bb3ee332afc424786207076` 构建并通过
+研究包由代码提交 `656b9de7f7001e1666041e1a30ceb43f3ca270b6` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
 `redistribution_allowed=false`。包大小为 42,149,006 字节，SHA-256 为
-`da97e3fd77c9fe20e626fba49c27803119412b843c190773696d7cefebc2bd50`。
+`c2a41969614e3473ffa43bedab7553a1da08010148bc31e12a9be4b9ab72bb7d`。
 
 本轮投稿门禁复跑的审计 JSON 哈希仍为
 `8c49c1a0b85cd2dfee71defdcd951b82f148ec224d72ff18ce551ecaab02d17d`：真实人工证据和独立
@@ -97,11 +97,11 @@ holdout blocker 仍未提供。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
 
-当前公共 artifact manifest 绑定提交 `8fc2a8fe9487e52b810af31d0de996beb122649c`，包含 216 个受跟踪文件，卫生状态为 `clean`；manifest SHA-256 为 `b61d93facf0603d3c999365b920df610671a09840aec8b72452095ef0e27aeb2`。
+当前公共 artifact manifest 绑定提交 `656b9de7f7001e1666041e1a30ceb43f3ca270b6`，包含 216 个受跟踪文件，卫生状态为 `clean`；manifest SHA-256 为 `4408038adc5bb99934d9bbddb53786c795a9d558402b9254bb56195a51c7393c`。
 
 ## 投稿门禁复跑
 
-在提交 `3cb75bea3ffb30480bb3ee332afc424786207076` 的工作树上运行：
+在提交 `656b9de7f7001e1666041e1a30ceb43f3ca270b6` 的工作树上运行：
 
 ```powershell
 $env:PYTHONPATH="src"
