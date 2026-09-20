@@ -20,6 +20,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = ROOT / "data" / "public" / "marketed_adc_catalog.csv"
+DEFAULT_CANDIDATE_LOCATORS = ROOT / "data" / "public" / "catalog_source_locator_candidates.jsonl"
 KEY_FIELDS = (
     "target", "antibody", "linker_name", "linker_type", "payload_name",
     "payload_class", "dar", "indication", "development_status", "company",
@@ -53,11 +54,40 @@ def _fetch(url: str, timeout: int) -> tuple[int, str, str]:
         return int(response.status), response.headers.get_content_type(), content.decode("utf-8", errors="ignore")
 
 
-def audit_catalog_sources(catalog: Path, *, timeout: int = 12) -> dict[str, object]:
+def _candidate_pairs(path: Path | None) -> set[tuple[str, str]]:
+    if path is None:
+        return set()
+    pairs: set[tuple[str, str]] = set()
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if not isinstance(row, dict):
+            raise ValueError(f"candidate locator line {line_number} must be an object")
+        adc_id = str(row.get("adc_id", "")).strip()
+        field = str(row.get("field", "")).strip()
+        if not adc_id or not field or not str(row.get("source_url", "")).startswith("https://"):
+            raise ValueError(f"candidate locator line {line_number} needs adc_id, field and HTTPS source_url")
+        pairs.add((adc_id, field))
+    return pairs
+
+
+def audit_catalog_sources(
+    catalog: Path,
+    *,
+    timeout: int = 12,
+    candidate_locators: Path | None = None,
+) -> dict[str, object]:
     with catalog.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
     if not rows:
         raise ValueError("catalog must not be empty")
+    candidate_pairs = _candidate_pairs(candidate_locators)
+    structural_pairs = {
+        (str(row.get("adc_id", "")).strip(), field)
+        for row in rows
+        for field in STRUCTURAL_FIELDS
+    }
     results: list[dict[str, object]] = []
     for row in rows:
         adc_id = str(row.get("adc_id", "")).strip()
@@ -93,7 +123,11 @@ def audit_catalog_sources(catalog: Path, *, timeout: int = 12) -> dict[str, obje
         assert isinstance(field_assessment, dict)
         for field in KEY_FIELDS:
             if field in STRUCTURAL_FIELDS:
-                assessment = "field_level_source_missing"
+                assessment = (
+                    "candidate_locator_pending_human_review"
+                    if (adc_id, field) in candidate_pairs
+                    else "field_level_source_missing"
+                )
             elif match and field in {"catalog_status", "approval_date", "approval_jurisdictions", "development_status", "indication"}:
                 assessment = "candidate_support_only"
             else:
@@ -107,7 +141,16 @@ def audit_catalog_sources(catalog: Path, *, timeout: int = 12) -> dict[str, obje
         "catalog_path": catalog.name, "catalog_row_count": len(results),
         "reachable_or_http_error_count": sum(item["fetch_status"] in {"reachable", "http_error"} for item in results),
         "name_or_alias_match_count": match_count,
-        "field_level_source_missing_count": len(results) * len(STRUCTURAL_FIELDS),
+        "candidate_locator_file": candidate_locators.name if candidate_locators else None,
+        "candidate_locator_pair_count": len(candidate_pairs),
+        "structural_field_pair_count": len(structural_pairs),
+        "structural_field_candidate_locator_count": len(structural_pairs & candidate_pairs),
+        "structural_field_candidate_locator_missing_count": len(structural_pairs - candidate_pairs),
+        "structural_field_candidate_locator_coverage_ratio": (
+            round(len(structural_pairs & candidate_pairs) / len(structural_pairs), 4)
+            if structural_pairs else None
+        ),
+        "field_level_source_missing_count": len(structural_pairs - candidate_pairs),
         "review_status": "triage_only_pending_human_source_locator_review",
         "ai_or_automatic_labels_are_gold": False, "records": results,
     }
@@ -116,15 +159,17 @@ def audit_catalog_sources(catalog: Path, *, timeout: int = 12) -> dict[str, obje
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    parser.add_argument("--candidate-locators", type=Path, default=DEFAULT_CANDIDATE_LOCATORS)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=12)
     args = parser.parse_args()
-    report = audit_catalog_sources(args.catalog, timeout=args.timeout)
+    report = audit_catalog_sources(args.catalog, timeout=args.timeout, candidate_locators=args.candidate_locators)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: report[key] for key in (
         "schema_version", "catalog_row_count", "reachable_or_http_error_count",
-        "name_or_alias_match_count", "field_level_source_missing_count", "review_status",
+        "name_or_alias_match_count", "structural_field_candidate_locator_count",
+        "structural_field_candidate_locator_missing_count", "review_status",
     )}, ensure_ascii=False, indent=2))
 
 

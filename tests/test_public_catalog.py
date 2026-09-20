@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -36,6 +37,36 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(record["inspection_status"], "text_scanned")
         self.assertEqual(record["field_assessment"]["dar"], "field_level_source_missing")
         self.assertEqual(record["field_assessment"]["approval_date"], "candidate_support_only")
+
+    def test_source_content_audit_distinguishes_candidate_locators_from_missing_ones(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            catalog = Path(temporary.name) / "catalog.csv"
+            catalog.write_text(
+                "adc_id,adc_name,aliases,source_url\n"
+                "adc_001,Example ADC,ExADC,https://www.fda.gov/example\n",
+                encoding="utf-8",
+            )
+            locators = Path(temporary.name) / "locators.jsonl"
+            locators.write_text(
+                json.dumps({
+                    "adc_id": "adc_001", "field": "target", "source_url": "https://www.fda.gov/example",
+                }) + "\n",
+                encoding="utf-8",
+            )
+            with patch(
+                "scripts.audit_public_catalog_sources._fetch",
+                return_value=(200, "text/html", "FDA approves Example ADC for cancer"),
+            ):
+                report = audit_catalog_sources(catalog, candidate_locators=locators)
+        finally:
+            temporary.cleanup()
+        self.assertEqual(report["structural_field_pair_count"], 7)
+        self.assertEqual(report["structural_field_candidate_locator_count"], 1)
+        self.assertEqual(report["structural_field_candidate_locator_missing_count"], 6)
+        self.assertEqual(report["structural_field_candidate_locator_coverage_ratio"], 0.1429)
+        self.assertEqual(report["records"][0]["field_assessment"]["target"], "candidate_locator_pending_human_review")
+        self.assertEqual(report["records"][0]["field_assessment"]["dar"], "field_level_source_missing")
     def test_audit_reports_generic_sources_and_pending_primary_checks(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:
