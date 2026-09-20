@@ -25,3 +25,9 @@ python -m unittest tests.test_catalog_source_locator_candidates -q
 测试要求竞争组集合精确等于上表三组。新增候选值会故意使测试失败，迫使维护者更新
 冲突记录和论文主张范围；删除候选值也不会静默把剩余值升级为已确认值。字段复核包仍
 要求两名独立复核者和必要的裁决，AI 辅助结果不能替代该门禁。
+
+字段复核验证器还会拒绝缺少复核来源的 completed 项：`reviewed_primary_source`、
+`rejected` 和 `unclear` 必须由 `primary` 或 `secondary` 槽位以
+`review_origin=human_independent` 提交；`adjudicated` 必须由 `adjudicator` 槽位以
+`review_origin=human_adjudicated` 提交。这样，填写 verdict 和来源定位本身不会被误记为
+真实独立人工证据。

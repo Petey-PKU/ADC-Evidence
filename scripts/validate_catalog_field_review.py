@@ -28,6 +28,7 @@ DEFAULT_CATALOG = ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 _PENDING = {"pending_primary_check"}
 _COMPLETED = {"reviewed_primary_source", "adjudicated", "rejected", "unclear"}
 _VERDICTS = {"supported", "contradicted", "not_found", "unclear"}
+_INDEPENDENT_SLOTS = {"primary", "secondary"}
 
 
 def _canonical_hash(path: Path) -> str:
@@ -115,12 +116,27 @@ def validate_review_packet(
             pending_count += 1
             if verdict is not None or locator is not None:
                 raise ValueError(f"item {position}: pending item must have blank verdict and locator")
+            if verification.get("reviewer_slot") is not None or verification.get("review_origin") is not None:
+                raise ValueError(f"item {position}: pending item must have blank reviewer metadata")
         else:
             completed_count += 1
             if verdict not in _VERDICTS:
                 raise ValueError(f"item {position}: completed item needs a controlled verdict")
             if not isinstance(locator, str) or not locator.strip():
                 raise ValueError(f"item {position}: completed item needs a source locator")
+            reviewer_slot = str(verification.get("reviewer_slot", "")).strip()
+            review_origin = str(verification.get("review_origin", "")).strip()
+            if status == "adjudicated":
+                if reviewer_slot != "adjudicator" or review_origin != "human_adjudicated":
+                    raise ValueError(
+                        f"item {position}: adjudicated item needs reviewer_slot=adjudicator "
+                        "and review_origin=human_adjudicated"
+                    )
+            elif reviewer_slot not in _INDEPENDENT_SLOTS or review_origin != "human_independent":
+                raise ValueError(
+                    f"item {position}: completed item needs an independent human reviewer "
+                    "(primary/secondary with review_origin=human_independent)"
+                )
     missing = sorted(expected_keys - seen)
     if missing:
         raise ValueError(f"review packet is missing {len(missing)} expected items")

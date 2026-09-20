@@ -45,6 +45,8 @@ class CatalogFieldReviewValidationTests(unittest.TestCase):
                 "status": "reviewed_primary_source",
                 "verdict": "supported",
                 "source_locator": "label.pdf#page=2",
+                "reviewer_slot": "primary",
+                "review_origin": "human_independent",
             }
             packet.write_text("".join(json.dumps(item) + "\n" for item in lines), encoding="utf-8")
             report = validate_review_packet(packet, manifest, catalog_path=catalog)
@@ -52,6 +54,29 @@ class CatalogFieldReviewValidationTests(unittest.TestCase):
             temporary.cleanup()
         self.assertEqual(report["completed_count"], 1)
         self.assertEqual(report["pending_count"], len(KEY_FIELDS) - 1)
+
+    def test_completed_item_rejects_missing_or_ai_review_metadata(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            directory = Path(temporary.name)
+            catalog, packet, manifest = self._packet_files(directory)
+            lines = [json.loads(line) for line in packet.read_text(encoding="utf-8").splitlines()]
+            lines[0]["verification"] = {
+                "status": "reviewed_primary_source",
+                "verdict": "supported",
+                "source_locator": "label.pdf#page=2",
+            }
+            packet.write_text("".join(json.dumps(item) + "\n" for item in lines), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                validate_review_packet(packet, manifest, catalog_path=catalog)
+
+            lines[0]["verification"]["reviewer_slot"] = "primary"
+            lines[0]["verification"]["review_origin"] = "ai_assisted_primary"
+            packet.write_text("".join(json.dumps(item) + "\n" for item in lines), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                validate_review_packet(packet, manifest, catalog_path=catalog)
+        finally:
+            temporary.cleanup()
 
 
 if __name__ == "__main__":
