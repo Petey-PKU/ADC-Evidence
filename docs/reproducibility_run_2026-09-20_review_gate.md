@@ -49,6 +49,8 @@ adjudicator 文件，输出逐字段一致性、分歧数和裁决状态；没�
 `e18f3c92a2efdd50daa12b8454bb43ab7831a070ebc566340ff16a862333ee99`；这些比例描述本次
 抓取窗口，不代表来源全集覆盖率。
 
+最新公共数据库审计（数据库哈希绑定当前 `adc_public_2026-09-30.db`）仍为 `partial`：23 个 ADC、3,503 条试验、1,410 篇文献和 6,754 条实体关联；ClinicalTrials.gov 与 PubMed 为 `partial`，ADCDB 为 `unknown`。字段来源质量状态现在明确为 `needs_review`，原因是 10 类 ADC 事实的来源类型仍为 `curated_seed_not_independently_reviewed`，即使 URL 有效也不能视为人工来源核验。审计 JSON 的 SHA-256 为 `b6263077c5e59039a1bc9fe7058b2cf32db1dc2cf65bd3841de14168080a06cd`。
+
 本轮还收紧了 benchmark/holdout 元数据门禁：公开 benchmark manifest 必须保持
 `evaluation_use.status=development_exposed` 且 `eligible_for_unseen_test_claim=false`；独立
 holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方式和 attestation。缺少这些
