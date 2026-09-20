@@ -112,7 +112,9 @@ embedding 模型后重新构建。
 发布包的示例配置同时设置 `ADC_OFFLINE_ONLY=true` 和
 `ADC_LLM_BACKEND=extractive`，确保下载者不配置 API 也能运行。
 
-如果要提供“下载后直接查询”的版本，可运行 `scripts/package_public_release.py`。脚本会
+如果要在本地验证“下载后直接查询”的版本，可运行 `scripts/package_public_release.py --research-only`。
+该模式明确禁止上传或再分发；只有完成来源许可核查并提供独立 attestation 文件后，才可用
+`--redistribution-attestation` 生成公开版本。脚本会
 先验证 SQLite 与向量索引的 retrieval corpus 版本一致，再生成包含数据库、索引、公开目录、
 benchmark 题集与 manifest、查询程序、必要配置、README 和 SHA-256 清单的 v2 外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和

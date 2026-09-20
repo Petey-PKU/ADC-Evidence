@@ -60,7 +60,7 @@ jobs:
           --catalog data/public/marketed_adc_catalog.csv
           --database "data/processed/adc_public_${{ inputs.as_of }}.db"
           --requested-as-of "${{ inputs.as_of }}"
-      - name: Package and verify release
+      - name: Package and verify release (requires explicit redistribution mode)
         run: >-
           python scripts/package_public_release.py
           --database "data/processed/adc_public_${{ inputs.as_of }}.db"

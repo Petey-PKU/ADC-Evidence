@@ -97,6 +97,47 @@ def _read_json(path: Path) -> dict[str, object]:
     return value
 
 
+def _redistribution_metadata(
+    *,
+    attestation: Path | None,
+    research_only: bool,
+) -> dict[str, object]:
+    """Require an explicit release mode before packaging source-derived text.
+
+    A local research artifact may contain the snapshot for reproducibility, but
+    it is not a redistribution approval. A public package needs a separate,
+    content-free attestation; the attestation itself is never bundled.
+    """
+    if bool(attestation) == research_only:
+        raise ValueError(
+            "Choose exactly one release mode: --research-only or "
+            "--redistribution-attestation"
+        )
+    if research_only:
+        return {
+            "status": "research_only",
+            "redistribution_allowed": False,
+            "reason": "No source-license attestation supplied; local validation only.",
+        }
+    attestation = _require_file(attestation, "redistribution attestation")
+    value = _read_json(attestation)
+    if value.get("schema_version") != "public-redistribution-attestation-v1":
+        raise ValueError("Redistribution attestation has an unsupported schema_version")
+    if value.get("status") != "approved":
+        raise ValueError("Redistribution attestation must have status=approved")
+    for field in ("attestation_id", "scope", "review_date"):
+        if not isinstance(value.get(field), str) or not value[field].strip():
+            raise ValueError(f"Redistribution attestation needs nonempty {field}")
+    return {
+        "status": "approved",
+        "redistribution_allowed": True,
+        "attestation_id": value["attestation_id"],
+        "scope": value["scope"],
+        "review_date": value["review_date"],
+        "attestation_sha256": _sha256(attestation),
+    }
+
+
 def _dataset_summary(database: Path) -> dict[str, object]:
     """Read public, non-content counts without exposing raw paths or text."""
     uri = f"file:{database.as_posix()}?mode=ro"
@@ -249,7 +290,10 @@ def build_release_inventory(
     scope_policy: Path | None = None,
     candidate_locators: Path | None = None,
     benchmark_questions: Path | None = None,
+    redistribution_metadata: dict[str, object] | None = None,
 ) -> tuple[list[tuple[Path, str]], dict[str, object]]:
+    if not isinstance(redistribution_metadata, dict):
+        raise ValueError("redistribution_metadata is required before packaging")
     database = _require_file(database, "database")
     catalog = _require_file(catalog, "catalog")
     _validate_database_catalog_binding(database, catalog)
@@ -305,16 +349,21 @@ def build_release_inventory(
         "retrieval_corpus_version": corpus_version,
         "dataset_summary": _dataset_summary(database),
         "benchmark_manifest": _read_json(benchmark_manifest),
+        "redistribution": redistribution_metadata,
         "files": [
             {"archive_path": archive_path, "size_bytes": path.stat().st_size, "sha256": _sha256(path)}
             for path, archive_path in files
         ],
-        "redistribution_note": "Verify source licenses for abstracts and trial payloads before redistribution.",
+        "redistribution_note": (
+            "This archive is for local research validation only. Do not redistribute."
+            if redistribution_metadata.get("status") == "research_only"
+            else "Redistribution scope is limited to the attached source-license attestation."
+        ),
     }
     return files, inventory
 
 
-def _release_readme(as_of: str) -> str:
+def _release_readme(as_of: str, redistribution_status: str = "unverified") -> str:
     return f"""# ADC-Evidence public release ({as_of})
 
 This archive contains the query application and required configuration, a public
@@ -344,8 +393,9 @@ working-tree status and file hashes are recorded under `application` and `files`
 
 The dataset remains a partial, pending-review snapshot. A working query does not
 establish clinical validity, full source coverage, or independent human review.
-Abstract and full-text redistribution remains subject to the original source
-license. Raw response files are not included; local paths stored in the source
+Release mode: `{redistribution_status}`. If this says `research_only`, the archive
+must remain local and must not be uploaded or redistributed. Abstract and full-text
+redistribution remains subject to the original source license. Raw response files are not included; local paths stored in the source
 database are redacted in this archive. Use the catalog builder to reproduce or
 refresh the snapshot in the public source repository.
 """
@@ -363,9 +413,15 @@ def package_release(
     scope_policy: Path | None = None,
     candidate_locators: Path | None = DEFAULT_CANDIDATE_LOCATORS,
     benchmark_questions: Path | None = None,
+    redistribution_attestation: Path | None = None,
+    research_only: bool = False,
 ) -> dict[str, object]:
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
+    redistribution_metadata = _redistribution_metadata(
+        attestation=redistribution_attestation,
+        research_only=research_only,
+    )
     release_database = database
     cleanup_paths: list[Path] = []
     if database.is_file():
@@ -386,6 +442,7 @@ def package_release(
             benchmark_questions=benchmark_questions,
             as_of=as_of,
             database_archive_name=database.name,
+            redistribution_metadata=redistribution_metadata,
         )
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
             for path, archive_path in files:
@@ -397,7 +454,10 @@ def package_release(
             archive.writestr(manifest_info, json.dumps(inventory, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
             readme_info = zipfile.ZipInfo("RELEASE_README.md", date_time=(2020, 1, 1, 0, 0, 0))
             readme_info.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(readme_info, _release_readme(as_of))
+            archive.writestr(
+                readme_info,
+                _release_readme(as_of, str(redistribution_metadata["status"])),
+            )
     finally:
         for path in cleanup_paths:
             try:
@@ -417,6 +477,17 @@ def main() -> None:
     parser.add_argument("--candidate-locators", type=Path, default=DEFAULT_CANDIDATE_LOCATORS)
     parser.add_argument("--benchmark-manifest", type=Path, default=DEFAULT_BENCHMARK)
     parser.add_argument("--benchmark-questions", type=Path, default=DEFAULT_BENCHMARK_QUESTIONS)
+    release_mode = parser.add_mutually_exclusive_group(required=True)
+    release_mode.add_argument(
+        "--research-only",
+        action="store_true",
+        help="Build a local validation artifact that must not be redistributed.",
+    )
+    release_mode.add_argument(
+        "--redistribution-attestation",
+        type=Path,
+        help="Content-free JSON attestation approving the selected source content for redistribution.",
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--as-of", default="2026-09-30")
     args = parser.parse_args()
@@ -429,6 +500,8 @@ def main() -> None:
         candidate_locators=args.candidate_locators,
         benchmark_manifest=args.benchmark_manifest,
         benchmark_questions=args.benchmark_questions,
+        redistribution_attestation=args.redistribution_attestation,
+        research_only=args.research_only,
         output=args.output,
         as_of=args.as_of,
     )

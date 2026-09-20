@@ -25,6 +25,7 @@ SHA-256 清单约束。上表的 ZIP 哈希是本次本地构建产物的哈希�
 ```powershell
 $env:PYTHONPATH="src"
 python scripts/package_public_release.py `
+  --research-only `
   --database data/processed/adc_public_2026-09-30.db `
   --index artifacts/vector_index/public_2026-09-30 `
   --catalog data/public/marketed_adc_catalog.csv `

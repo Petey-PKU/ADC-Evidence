@@ -39,6 +39,7 @@ $env:PYTHONPATH="src"
 python -m unittest discover -s tests
 python scripts/audit_public_hygiene.py --output .test_tmp/hygiene-source-audit.json
 python scripts/package_public_release.py `
+  --research-only `
   --database data/processed/adc_public_2026-09-30.db `
   --index artifacts/vector_index/public_2026-09-30 `
   --catalog data/public/marketed_adc_catalog.csv `
@@ -108,6 +109,6 @@ SKB264 候选备注同时改为指向“先前候选名称”，避免误称目�
 本次候选文件统一 LF 后 SHA-256 为
 `a2ef82393091168fbdb3e2ab92560e35247089ef6099450a25bced5c90b34e66`。
 
-最终本地全量执行 `223` 项：`219` 项通过、`4` 项跳过、`0` 项失败。
+最终本地全量执行 `224` 项：`220` 项通过、`4` 项跳过、`0` 项失败。
 重新生成并校验公共复核包得到 `299` 个待复核项、`161` 条候选，`review_ready=false`。
 上表 ZIP 是运行代码提交 `820e214` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。

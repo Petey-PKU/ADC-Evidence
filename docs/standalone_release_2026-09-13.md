@@ -53,7 +53,7 @@ v1 发布包只提供数据和索引，运行时还依赖另行取得的代码�
 ```powershell
 $env:PYTHONPATH="src"
 python -m unittest discover -s tests -q
-python scripts/package_public_release.py --output artifacts/releases/adc-public-2026-09-30-standalone.zip
+python scripts/package_public_release.py --research-only --output artifacts/releases/adc-public-2026-09-30-standalone.zip
 python scripts/verify_public_release.py artifacts/releases/adc-public-2026-09-30-standalone.zip
 python scripts/validate_public_benchmark.py --questions data/annotations/public_benchmark_v1.jsonl --manifest data/annotations/public_benchmark_v1.manifest.json --catalog data/public/marketed_adc_catalog.csv
 python scripts/validate_public_holdout.py

@@ -67,6 +67,7 @@ class PublicReleaseTests(unittest.TestCase):
             package_release(
                 database=database, index_path=index, catalog=catalog,
                 benchmark_manifest=benchmark, output=archive_path, as_of="2026-09-13",
+                research_only=True,
             )
             report = verify_release(archive_path)
             self.assertTrue(report["bundled_application_present"])
@@ -129,6 +130,17 @@ class PublicReleaseTests(unittest.TestCase):
         self.assertIn("ADC_OFFLINE_ONLY", readme)
         self.assertIn('ADC_LLM_BACKEND = "extractive"', readme)
         self.assertIn("RELEASE_MANIFEST.json", readme)
+        self.assertIn("Release mode: `unverified`", readme)
+
+    def test_package_requires_explicit_redistribution_mode(self) -> None:
+        with WorkspaceTemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "Choose exactly one release mode"):
+                package_release(
+                    database=root / "db", index_path=root / "index", catalog=root / "catalog",
+                    benchmark_manifest=root / "benchmark", output=root / "release.zip",
+                    as_of="2026-09-30",
+                )
 
     def test_package_contains_manifest_and_checksummed_files(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
@@ -158,6 +170,7 @@ class PublicReleaseTests(unittest.TestCase):
                     benchmark_manifest=root / "benchmark",
                     output=output,
                     as_of="2026-09-30",
+                    research_only=True,
                 )
             with zipfile.ZipFile(output) as archive:
                 self.assertEqual(archive.read("data/source.txt"), b"public fixture")
@@ -195,6 +208,7 @@ class PublicReleaseTests(unittest.TestCase):
                     benchmark_manifest=root / "benchmark",
                     output=output,
                     as_of="2026-09-30",
+                    research_only=True,
                 )
             report = verify_release(output)
             self.assertEqual(report["status"], "verified")
