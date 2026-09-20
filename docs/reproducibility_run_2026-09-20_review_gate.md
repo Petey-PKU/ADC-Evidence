@@ -7,7 +7,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `460f9e15dc3a209ef82efa07432f03334fb6d9fc` |
+| 代码提交 | `3cb75bea3ffb30480bb3ee332afc424786207076` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
 | 本地测试 | 234 项发现，234 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
@@ -84,11 +84,11 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 
 ## 研究包
 
-研究包由代码提交 `460f9e15dc3a209ef82efa07432f03334fb6d9fc` 构建并通过
+研究包由代码提交 `3cb75bea3ffb30480bb3ee332afc424786207076` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
 `redistribution_allowed=false`。包大小为 42,149,006 字节，SHA-256 为
-`f4b18e7b355fdfaa0fbdaab0e7363b72a17bf8cd5c78a7aed9143500eac0a21b`。
+`da97e3fd77c9fe20e626fba49c27803119412b843c190773696d7cefebc2bd50`。
 
 本轮投稿门禁复跑的审计 JSON 哈希仍为
 `8c49c1a0b85cd2dfee71defdcd951b82f148ec224d72ff18ce551ecaab02d17d`：真实人工证据和独立
@@ -100,7 +100,7 @@ holdout blocker 仍未提供。
 
 ## 投稿门禁复跑
 
-在提交 `460f9e15dc3a209ef82efa07432f03334fb6d9fc` 的工作树上运行：
+在提交 `3cb75bea3ffb30480bb3ee332afc424786207076` 的工作树上运行：
 
 ```powershell
 $env:PYTHONPATH="src"
