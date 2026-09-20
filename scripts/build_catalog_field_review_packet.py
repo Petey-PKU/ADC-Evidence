@@ -27,8 +27,10 @@ def _canonical_hash(path: Path) -> str:
 
 def _load_candidate_locators(path: Path | None) -> dict[tuple[str, str], list[dict[str, object]]]:
     """Load field-level source hints without treating them as review verdicts."""
-    if path is None or not path.exists():
+    if path is None:
         return {}
+    if not path.exists():
+        raise FileNotFoundError(f"candidate locator file does not exist: {path}")
     grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
     for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
@@ -57,7 +59,7 @@ def _load_candidate_locators(path: Path | None) -> dict[tuple[str, str], list[di
 
 def build_packet(
     catalog_path: Path,
-    candidate_locator_path: Path | None = DEFAULT_CANDIDATE_LOCATORS,
+    candidate_locator_path: Path | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Return one blank-review item for every ADC/key-field pair."""
     with catalog_path.open(encoding="utf-8-sig", newline="") as handle:
@@ -68,6 +70,11 @@ def build_packet(
     if any(not value for value in ids) or len(ids) != len(set(ids)):
         raise ValueError("Catalog must contain unique nonempty adc_id values")
     candidate_locators = _load_candidate_locators(candidate_locator_path)
+    catalog_ids = set(ids)
+    unknown_candidates = [key for key in candidate_locators if key[0] not in catalog_ids or key[1] not in KEY_FIELDS]
+    if unknown_candidates:
+        preview = ", ".join(f"{adc_id}:{field}" for adc_id, field in unknown_candidates[:3])
+        raise ValueError(f"candidate locators do not match catalog fields: {preview}")
 
     packet: list[dict[str, object]] = []
     for row in rows:
@@ -103,7 +110,7 @@ def build_packet(
         "catalog_row_count": len(rows),
         "review_item_count": len(packet),
         "candidate_locator_file": candidate_locator_path.name if candidate_locator_path else None,
-        "candidate_locator_sha256": _canonical_hash(candidate_locator_path) if candidate_locator_path and candidate_locator_path.exists() else None,
+        "candidate_locator_sha256": _canonical_hash(candidate_locator_path) if candidate_locator_path else None,
         "candidate_locator_count": sum(len(values) for values in candidate_locators.values()),
         "key_fields": list(KEY_FIELDS),
         "status": "awaiting_independent_primary_source_review",
