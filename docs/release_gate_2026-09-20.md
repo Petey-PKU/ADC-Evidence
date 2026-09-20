@@ -6,8 +6,9 @@
 - `--research-only`：生成仅用于本地研究验证的包，manifest 标记
   `redistribution_allowed=false`；
 - `--redistribution-attestation FILE`：只有内容无关的许可核查证明文件为
-  `schema_version=public-redistribution-attestation-v1`、`status=approved`，才允许生成
-  可再分发模式。证明文件本身不进入 ZIP，只记录哈希、范围和日期。
+  `schema_version=public-redistribution-attestation-v2`、`status=approved`，并且逐项列出
+  每个来源范围的唯一 HTTPS 许可链接、许可依据和 `review_status=approved`，才允许生成
+  可再分发模式。证明文件本身不进入 ZIP，只记录哈希、范围、日期和来源 ID 数量。
 
 没有模式参数时命令直接失败，避免“可运行”被误解为“可以上传”。
 

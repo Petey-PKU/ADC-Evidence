@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from scripts.package_public_release import (
     _release_readme,
+    _redistribution_metadata,
     _runtime_files,
     _sanitize_database_for_release,
     _validate_database_catalog_binding,
@@ -141,6 +142,36 @@ class PublicReleaseTests(unittest.TestCase):
                     benchmark_manifest=root / "benchmark", output=root / "release.zip",
                     as_of="2026-09-30",
                 )
+
+    def test_redistribution_attestation_requires_per_source_approved_licenses(self) -> None:
+        with WorkspaceTemporaryDirectory() as directory:
+            root = Path(directory)
+            attestation = root / "attestation.json"
+            attestation.write_text(
+                json.dumps({
+                    "schema_version": "public-redistribution-attestation-v2",
+                    "status": "approved",
+                    "attestation_id": "att-2026-01",
+                    "scope": "structured catalog and source metadata",
+                    "review_date": "2026-09-21",
+                    "source_licenses": [{
+                        "source_id": "catalog_metadata",
+                        "content_scope": "structured ADC catalog fields",
+                        "license_url": "https://example.org/license",
+                        "permission_basis": "public metadata reuse",
+                        "review_status": "approved",
+                    }],
+                }),
+                encoding="utf-8",
+            )
+            metadata = _redistribution_metadata(attestation=attestation, research_only=False)
+            self.assertTrue(metadata["redistribution_allowed"])
+            self.assertEqual(metadata["source_license_count"], 1)
+            invalid = json.loads(attestation.read_text(encoding="utf-8"))
+            invalid["source_licenses"][0]["review_status"] = "pending"
+            attestation.write_text(json.dumps(invalid), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "review_status=approved"):
+                _redistribution_metadata(attestation=attestation, research_only=False)
 
     def test_package_contains_manifest_and_checksummed_files(self) -> None:
         temporary = WorkspaceTemporaryDirectory()

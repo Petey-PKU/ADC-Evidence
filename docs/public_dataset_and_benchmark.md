@@ -127,6 +127,9 @@ embedding 模型后重新构建。
 benchmark 题集与 manifest、查询程序、必要配置、README 和 SHA-256 清单的 v2 外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
+attestation 必须使用 `public-redistribution-attestation-v2`，并为每个随包来源范围提供唯一
+的 HTTPS 许可链接、许可依据和 `review_status=approved`；格式与待核查范围见
+[`docs/redistribution_attestation.md`](redistribution_attestation.md)。
 打包前还会逐条比较 SQLite 与目录中重叠的 ADC 字段；如果数据库仍是旧来源或旧值，打包会
 直接失败，避免发布包中的可查询数据库与目录清单不一致。
 
@@ -150,18 +153,19 @@ Python 依赖安装需要联网或自行提供依赖 wheel。发布包未捆绑 
 
 公共仓库还提供手动触发的 `.github/workflows/public-release.yml`。在 GitHub Actions 中输入
 快照日期和抓取上限后，它会在干净的 Ubuntu runner 上重建数据库、hashing 索引和 benchmark，
-执行脱敏、语料版本绑定及发布包校验，并将 zip 作为 Actions artifact 提供下载。工作流只有
-`workflow_dispatch` 入口，不会因普通代码 push 自动抓取或发布数据；下载者仍应先检查包内的
-`RELEASE_MANIFEST.json` 和来源许可。
+执行脱敏、语料版本绑定及研究包校验。由于当前尚无逐项许可批准，工作流明确使用
+`--research-only`，不会上传或发布 zip；只有提供 v2 redistribution attestation 后，才允许
+另行生成可再分发包。工作流只有 `workflow_dispatch` 入口，不会因普通代码 push 自动抓取或
+发布数据。
 `RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
 最近采集运行状态；本地快照当前为 `partial`，因为 ClinicalTrials.gov 与 PubMed 均设置了抓取上限，当前数据库分别包含 3,503 和 1,410 条记录。
 打包过程会对 SQLite 副本中的本机绝对路径做脱敏，原始数据库不会被修改；发布包不含原始
 响应文件，因此无法用这些路径恢复本地采集缓存。
 
-下载者可以在解压前检查发布包：
+在本地生成研究包后，可以在解压前检查发布包：
 
 ```powershell
-python scripts/verify_public_release.py artifacts/releases/adc-public-2026-09-30.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-research-only-current.zip
 ```
 
 只有输出 `status: verified` 且 `checked_file_count` 与发布清单一致时，才应把数据库和索引

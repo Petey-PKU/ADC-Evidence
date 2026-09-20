@@ -1,6 +1,6 @@
 # Offline research package gate (2026-09-21)
 
-The package was rebuilt from code commit `a715a25de696072a01689a96c71bc81c8acdba2a`
+The package was rebuilt from code commit `bc07f63ed5697d79b9507f76169b2838b8d7f57c`
 using the public snapshot and matching vector index:
 
 ```powershell
@@ -9,12 +9,12 @@ python scripts/package_public_release.py `
   --research-only `
   --database data/processed/adc_public_2026-09-30.db `
   --index-path artifacts/vector_index/public_2026-09-30 `
-  --output .test_tmp/adc-public-research-only-a715a25.zip
-python scripts/verify_public_release.py .test_tmp/adc-public-research-only-a715a25.zip
+  --output .test_tmp/adc-public-research-only-bc07f63.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-research-only-bc07f63.zip
 ```
 
-The archive is 42,149,373 bytes with SHA-256
-`ad731b636fe0c1cd6c233a1411c1b48b2fe63145ac6cc5a174a66cb44894f7be`.
+The archive is 42,150,573 bytes with SHA-256
+`d38c62000d98b184a8b5fb87d330612511d8114d8bbe542099e307f44d342394`.
 Verification checked 79 files, found zero absolute database paths, and found
 the bundled application, public benchmark questions, and candidate locator
 file. The database and index are bound to retrieval corpus
@@ -23,8 +23,8 @@ file. The database and index are bound to retrieval corpus
 After extraction, the following smoke checks passed:
 
 ```powershell
-python -I .test_tmp/release-smoke-a715a25/scripts/run_public_release.py --check
-python -I .test_tmp/release-smoke-a715a25/scripts/run_public_release.py `
+python -I .test_tmp/release-smoke-bc07f63/scripts/run_public_release.py --check
+python -I .test_tmp/release-smoke-bc07f63/scripts/run_public_release.py `
   --question "T-DXd 的靶点是什么？"
 ```
 
@@ -35,4 +35,6 @@ clinical validity or source completeness.
 
 The package remains `research_only` with `redistribution_allowed=false`.
 No GitHub Release should be created until the source-content licence review
-and a content-free redistribution attestation are complete.
+and a v2 content-free redistribution attestation with per-source approved
+license entries are complete. The attestation format is documented in
+`docs/redistribution_attestation.md`.

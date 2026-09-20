@@ -121,19 +121,44 @@ def _redistribution_metadata(
         }
     attestation = _require_file(attestation, "redistribution attestation")
     value = _read_json(attestation)
-    if value.get("schema_version") != "public-redistribution-attestation-v1":
+    if value.get("schema_version") != "public-redistribution-attestation-v2":
         raise ValueError("Redistribution attestation has an unsupported schema_version")
     if value.get("status") != "approved":
         raise ValueError("Redistribution attestation must have status=approved")
     for field in ("attestation_id", "scope", "review_date"):
         if not isinstance(value.get(field), str) or not value[field].strip():
             raise ValueError(f"Redistribution attestation needs nonempty {field}")
+    source_licenses = value.get("source_licenses")
+    if not isinstance(source_licenses, list) or not source_licenses:
+        raise ValueError("Redistribution attestation needs a nonempty source_licenses list")
+    source_ids: list[str] = []
+    required_license_fields = (
+        "source_id", "content_scope", "license_url", "permission_basis", "review_status"
+    )
+    for index, entry in enumerate(source_licenses, 1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"Redistribution source license {index} must be an object")
+        missing = [field for field in required_license_fields if not str(entry.get(field, "")).strip()]
+        if missing:
+            raise ValueError(
+                f"Redistribution source license {index} missing fields: {', '.join(missing)}"
+            )
+        source_id = str(entry["source_id"]).strip()
+        if source_id in source_ids:
+            raise ValueError(f"Redistribution source license IDs must be unique: {source_id}")
+        source_ids.append(source_id)
+        if not str(entry["license_url"]).startswith("https://"):
+            raise ValueError(f"Redistribution source license {source_id} needs an HTTPS license_url")
+        if str(entry["review_status"]).strip() != "approved":
+            raise ValueError(f"Redistribution source license {source_id} must have review_status=approved")
     return {
         "status": "approved",
         "redistribution_allowed": True,
         "attestation_id": value["attestation_id"],
         "scope": value["scope"],
         "review_date": value["review_date"],
+        "source_license_count": len(source_ids),
+        "source_license_ids": source_ids,
         "attestation_sha256": _sha256(attestation),
     }
 
@@ -486,7 +511,7 @@ def main() -> None:
     release_mode.add_argument(
         "--redistribution-attestation",
         type=Path,
-        help="Content-free JSON attestation approving the selected source content for redistribution.",
+        help="Content-free v2 JSON attestation with one approved HTTPS license entry per source scope.",
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--as-of", default="2026-09-30")

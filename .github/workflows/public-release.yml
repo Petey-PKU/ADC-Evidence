@@ -60,9 +60,10 @@ jobs:
           --catalog data/public/marketed_adc_catalog.csv
           --database "data/processed/adc_public_${{ inputs.as_of }}.db"
           --requested-as-of "${{ inputs.as_of }}"
-      - name: Package and verify release (requires explicit redistribution mode)
+      - name: Package and verify research-only release
         run: >-
           python scripts/package_public_release.py
+          --research-only
           --database "data/processed/adc_public_${{ inputs.as_of }}.db"
           --index-path "artifacts/vector_index/public_${{ inputs.as_of }}"
           --catalog data/public/marketed_adc_catalog.csv
@@ -88,10 +89,6 @@ jobs:
           assert answer['generator_backend'] == 'structured', answer
           assert answer['claim_validation']['valid'], answer
           PY
-      - name: Upload release archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: adc-public-${{ inputs.as_of }}
-          path: artifacts/releases/adc-public-${{ inputs.as_of }}.zip
-          if-no-files-found: error
-          retention-days: 30
+      - name: Report research-only release boundary
+        run: >-
+          echo "Research-only archive verified locally on the runner; it is not uploaded or published."
