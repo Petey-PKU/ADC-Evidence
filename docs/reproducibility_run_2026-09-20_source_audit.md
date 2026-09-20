@@ -1,7 +1,7 @@
 # 2026-09-20 公共来源候选审计记录
 
 本记录对应公共分支 `research/v0.6-freeze` 的运行代码提交
-`4ff125457585a9becc38bc836cc1de60318b2607`。本轮只更新公开来源候选、复核包边界和
+`820e2147ef8ab3e6aa5c12ceb0e6d68a5a43d760`。本轮只更新公开来源候选、复核包边界和
 实体关联审计，
 没有写入人工 verdict，也没有把来源可访问性当作人工核验。
 
@@ -9,13 +9,13 @@
 
 | 项目 | 值 |
 |---|---|
-| 代码提交 | `4ff125457585a9becc38bc836cc1de60318b2607` |
+| 代码提交 | `820e2147ef8ab3e6aa5c12ceb0e6d68a5a43d760` |
 | 目录 | `sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c` |
 | 来源候选 JSONL（统一 LF 后） | `sha256:a2ef82393091168fbdb3e2ab92560e35247089ef6099450a25bced5c90b34e66` |
 | 包内数据库（去除本机路径后） | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
 | benchmark manifest | `sha256:41fd2884722e0c19516f13601df5bd82230dadd87e17c9044c42cb1ec364d7a9` |
 | 检索语料版本 | `corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca` |
-| 本轮离线 ZIP SHA-256 | `sha256:457354ee382a35320cc85782232bfb37076633967b3a5546520adb311e6d50b` |
+| 本轮离线 ZIP SHA-256 | `sha256:6ce7486054de9547b02772e97966abac3d481e8928030256243838943b48a3cc` |
 
 ## 本轮数据审计决定
 
@@ -47,8 +47,8 @@ python scripts/package_public_release.py `
   --candidate-locators data/public/catalog_source_locator_candidates.jsonl `
   --benchmark-manifest data/annotations/public_benchmark_v1.manifest.json `
   --benchmark-questions data/annotations/public_benchmark_v1.jsonl `
-  --output .test_tmp/adc-public-4ff1254.zip
-python scripts/verify_public_release.py .test_tmp/adc-public-4ff1254.zip
+  --output .test_tmp/adc-public-820e214.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-820e214.zip
 ```
 
 - 初次全量验证：执行 `213` 项，其中 `209` 项通过，`4` 项因可选模型依赖未安装而跳过；
@@ -101,4 +101,4 @@ SKB264 候选备注同时改为指向“先前候选名称”，避免误称目�
 
 最终本地全量执行 `217` 项：`213` 项通过、`4` 项跳过、`0` 项失败。
 重新生成并校验公共复核包得到 `299` 个待复核项、`150` 条候选，`review_ready=false`。
-上表 ZIP 是运行代码提交 `4ff1254` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。
+上表 ZIP 是运行代码提交 `820e214` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。
