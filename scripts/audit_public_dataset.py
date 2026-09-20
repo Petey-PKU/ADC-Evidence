@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,6 +18,10 @@ GENERIC_SOURCE_URLS = {
     "https://www.nmpa.gov.cn",
     "https://www.fda.gov/drugs/resources-information-approved-drugs",
 }
+DEFAULT_AS_OF = dt.date(2026, 9, 30)
+_MONTHS = {name: index for index, name in enumerate(
+    ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), 1
+)}
 
 
 def _sha256(path: Path) -> str:
@@ -26,6 +32,10 @@ def _table_exists(connection: sqlite3.Connection, table: str) -> bool:
     return connection.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
     ).fetchone() is not None
+
+
+def _column_exists(connection: sqlite3.Connection, table: str, column: str) -> bool:
+    return any(str(row[1]) == column for row in connection.execute(f"PRAGMA table_info({table})"))
 
 
 def _count(connection: sqlite3.Connection, table: str) -> int:
@@ -42,7 +52,72 @@ def _is_generic_source_url(value: str) -> bool:
     return bool(parsed.netloc) and parsed.path in {"", "/"}
 
 
-def audit_database(database: Path) -> dict[str, object]:
+def _parse_source_date(value: object) -> dt.date | None:
+    """Parse the date formats used by ClinicalTrials.gov and PubMed exports."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for pattern, formatter in (
+        (r"^(\d{4})-(\d{2})-(\d{2})$", lambda m: dt.date(int(m[1]), int(m[2]), int(m[3]))),
+        (r"^(\d{4})-(\d{2})$", lambda m: dt.date(int(m[1]), int(m[2]), 1)),
+        (r"^(\d{4})-([A-Za-z]{3})-(\d{2})$", lambda m: dt.date(int(m[1]), _MONTHS[m[2].title()], int(m[3]))),
+        (r"^(\d{4})-([A-Za-z]{3})$", lambda m: dt.date(int(m[1]), _MONTHS[m[2].title()], 1)),
+        (r"^(\d{4})$", lambda m: dt.date(int(m[1]), 1, 1)),
+        # PubMed can emit a combined issue month such as "2022 Nov-Dec 01".
+        (r"^(\d{4}) ([A-Za-z]{3})-[A-Za-z]{3} (\d{2})$", lambda m: dt.date(int(m[1]), _MONTHS[m[2].title()], int(m[3]))),
+    ):
+        match = re.match(pattern, text)
+        if match:
+            try:
+                return formatter(match)
+            except (KeyError, ValueError):
+                return None
+    return None
+
+
+def _date_quality(connection: sqlite3.Connection, table: str, column: str, as_of: dt.date) -> dict[str, object]:
+    if not _column_exists(connection, table, column):
+        return {"status": "unknown", "reason": "column_missing", "as_of": as_of.isoformat()}
+    values = [str(row[0] or "").strip() for row in connection.execute(
+        f"SELECT {column} FROM {table}"
+    )]
+    nonempty = [value for value in values if value]
+    parsed = [(value, _parse_source_date(value)) for value in nonempty]
+    valid_dates = [date for _, date in parsed if date is not None]
+    invalid_values = [value for value, date in parsed if date is None]
+    future_values = [value for value, date in parsed if date is not None and date > as_of]
+    return {
+        "status": "needs_review" if invalid_values or future_values else "pass",
+        "observed_count": len(values),
+        "missing_count": len(values) - len(nonempty),
+        "invalid_format_count": len(invalid_values),
+        "invalid_examples": invalid_values[:5],
+        "min_date": min(valid_dates).isoformat() if valid_dates else None,
+        "max_date": max(valid_dates).isoformat() if valid_dates else None,
+        "after_as_of_count": len(future_values),
+        "after_as_of_examples": future_values[:5],
+        "as_of": as_of.isoformat(),
+    }
+
+
+def _source_url_quality(connection: sqlite3.Connection, table: str) -> dict[str, object]:
+    if not _column_exists(connection, table, "source_url"):
+        return {"status": "unknown", "reason": "column_missing"}
+    values = [str(row[0] or "").strip() for row in connection.execute(
+        f"SELECT source_url FROM {table}"
+    )]
+    return {
+        "status": "needs_review" if any(
+            (not value) or (not value.startswith("https://")) for value in values
+        ) else "pass",
+        "record_count": len(values),
+        "missing_url_count": sum(not value for value in values),
+        "non_https_url_count": sum(bool(value) and not value.startswith("https://") for value in values),
+        "distinct_url_count": len({value for value in values if value}),
+    }
+
+
+def audit_database(database: Path, *, as_of: dt.date = DEFAULT_AS_OF) -> dict[str, object]:
     """Return deterministic quality and coverage statistics for a snapshot."""
     database = database.resolve()
     if not database.is_file():
@@ -63,6 +138,14 @@ def audit_database(database: Path) -> dict[str, object]:
         duplicate_identifier_counts = {
             table: total - distinct
             for table, (total, distinct) in identifier_counts.items()
+        }
+        record_date_quality = {
+            "documents.publication_date": _date_quality(connection, "documents", "publication_date", as_of),
+            "trials.last_update_date": _date_quality(connection, "trials", "last_update_date", as_of),
+        }
+        source_url_quality = {
+            "documents": _source_url_quality(connection, "documents"),
+            "trials": _source_url_quality(connection, "trials"),
         }
 
         link_stats = {
@@ -141,6 +224,46 @@ def audit_database(database: Path) -> dict[str, object]:
                 """
             )
         }
+        duplicate_link_groups = [
+            int(row["link_count"])
+            for row in connection.execute(
+                """
+                SELECT COUNT(*) AS link_count
+                FROM entity_links
+                GROUP BY entity_type, entity_id, source_record_type, source_record_id
+                HAVING COUNT(*) > 1
+                """
+            )
+        ]
+        entity_link_integrity: dict[str, object] = {
+            "unknown_adc_entity_count": int(connection.execute(
+                """
+                SELECT COUNT(*) FROM entity_links AS l
+                LEFT JOIN adcs AS a ON a.adc_id=l.entity_id
+                WHERE l.entity_type='adc' AND a.adc_id IS NULL
+                """
+            ).fetchone()[0]),
+            "duplicate_logical_link_group_count": len(duplicate_link_groups),
+            "duplicate_logical_link_extra_row_count": sum(count - 1 for count in duplicate_link_groups),
+            "max_links_per_logical_record": max(duplicate_link_groups, default=1),
+        }
+        if _table_exists(connection, "entity_aliases"):
+            entity_link_integrity["unmatched_alias_count"] = int(connection.execute(
+                """
+                SELECT COUNT(*) FROM entity_links AS l
+                LEFT JOIN entity_aliases AS a
+                  ON a.entity_type=l.entity_type
+                 AND a.entity_id=l.entity_id
+                 AND a.normalized_alias=l.matched_alias
+                WHERE a.entity_id IS NULL
+                """
+            ).fetchone()[0])
+            entity_link_integrity["alias_validation_status"] = (
+                "pass" if entity_link_integrity["unmatched_alias_count"] == 0 else "needs_review"
+            )
+        else:
+            entity_link_integrity["unmatched_alias_count"] = None
+            entity_link_integrity["alias_validation_status"] = "unknown"
 
         fact_coverage: dict[str, int] = {}
         fact_provenance: dict[str, dict[str, object]] = {}
@@ -290,7 +413,10 @@ def audit_database(database: Path) -> dict[str, object]:
             if not values["document_record_count"]
         ),
         "orphan_link_counts": orphan_link_counts,
+        "entity_link_integrity": entity_link_integrity,
         "match_method_counts": match_method_counts,
+        "record_date_quality": record_date_quality,
+        "source_url_quality": source_url_quality,
         "adc_fact_coverage": fact_coverage,
         "adc_fact_provenance": fact_provenance,
         "adc_fact_source_quality": fact_source_quality,
@@ -318,6 +444,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--as-of", type=lambda value: dt.date.fromisoformat(value), default=DEFAULT_AS_OF)
     args = parser.parse_args()
     report = audit_database(args.database)
     args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import unittest
+import datetime as dt
 from pathlib import Path
 
 from scripts.audit_public_dataset import audit_database
@@ -9,6 +10,47 @@ from tests.support import WorkspaceTemporaryDirectory
 
 
 class PublicDatasetAuditTests(unittest.TestCase):
+    def test_audit_reports_alias_date_and_url_validation_states(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            database = Path(temporary.name) / "snapshot.db"
+            with sqlite3.connect(database) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE adcs (adc_id TEXT PRIMARY KEY);
+                    CREATE TABLE trials (nct_id TEXT PRIMARY KEY, source_url TEXT, last_update_date TEXT);
+                    CREATE TABLE documents (document_id TEXT PRIMARY KEY, source_url TEXT, publication_date TEXT);
+                    CREATE TABLE entity_links (
+                        entity_type TEXT, entity_id TEXT, source_record_type TEXT,
+                        source_record_id TEXT, matched_alias TEXT, match_method TEXT
+                    );
+                    CREATE TABLE entity_aliases (
+                        entity_type TEXT, entity_id TEXT, canonical_name TEXT,
+                        alias TEXT, normalized_alias TEXT, source TEXT
+                    );
+                    CREATE TABLE ingestion_source_runs (
+                        source TEXT, status TEXT, expected_count INTEGER,
+                        collected_count INTEGER, is_complete INTEGER, details_json TEXT
+                    );
+                    INSERT INTO adcs VALUES ('adc_001');
+                    INSERT INTO trials VALUES ('NCT000001','https://clinicaltrials.gov/study/NCT000001','2026-09-11');
+                    INSERT INTO documents VALUES ('doc_001','http://pubmed.example/doc','2026-Oct');
+                    INSERT INTO entity_links VALUES ('adc','adc_001','trial','NCT000001','known alias','normalized_alias');
+                    INSERT INTO entity_links VALUES ('adc','adc_001','document','doc_001','unknown alias','normalized_alias');
+                    INSERT INTO entity_aliases VALUES ('adc','adc_001','Fixture','known alias','known alias','seed');
+                    INSERT INTO ingestion_source_runs VALUES ('pubmed','partial',2,1,0,'{}');
+                    """
+                )
+            report = audit_database(database, as_of=dt.date(2026, 9, 30))
+        finally:
+            temporary.cleanup()
+        self.assertEqual(report["entity_link_integrity"]["unmatched_alias_count"], 1)
+        self.assertEqual(report["entity_link_integrity"]["alias_validation_status"], "needs_review")
+        self.assertEqual(report["record_date_quality"]["documents.publication_date"]["after_as_of_count"], 1)
+        self.assertEqual(report["record_date_quality"]["documents.publication_date"]["status"], "needs_review")
+        self.assertEqual(report["source_url_quality"]["documents"]["status"], "needs_review")
+        self.assertEqual(report["source_url_quality"]["trials"]["status"], "pass")
+
     def test_audit_reports_deduplication_links_and_partial_source(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:

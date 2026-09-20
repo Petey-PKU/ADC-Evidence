@@ -54,6 +54,10 @@ python scripts/audit_public_dataset.py `
 `link_coverage_by_adc`、`missing_trial_link_adc_ids`、`missing_document_link_adc_ids` 和
 `orphan_link_counts` 用于发现实体关联缺口，
 不会把没有关联记录的 ADC 静默计入文献或试验覆盖率。
+`entity_link_integrity` 还检查 ADC 实体、匹配别名和逻辑重复链接；`source_url_quality` 检查
+ClinicalTrials.gov/PubMed 记录是否有可追溯 HTTPS 来源；`record_date_quality` 按显式 `--as-of`
+日期报告缺失、格式异常和超出窗口的记录。任何 `needs_review` 或 `unknown` 状态都不能被解释为
+完整覆盖或正确实体关联。
 其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
 链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
 审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
