@@ -17,6 +17,23 @@ class CatalogSourceLocatorCandidateTests(unittest.TestCase):
         self.assertTrue(all(row["source_url"].startswith("https://") for row in rows))
         self.assertFalse(any("verdict" in row for row in rows))
 
+        values_by_pair: dict[tuple[str, str], set[str]] = {}
+        for row in rows:
+            values_by_pair.setdefault((row["adc_id"], row["field"]), set()).add(
+                str(row["candidate_value"])
+            )
+        competing_pairs = {
+            pair for pair, values in values_by_pair.items() if len(values) > 1
+        }
+        self.assertEqual(
+            competing_pairs,
+            {
+                ("adc_016", "dar"),
+                ("adc_016", "payload_name"),
+                ("adc_019", "payload_name"),
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

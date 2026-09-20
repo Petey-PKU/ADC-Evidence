@@ -18,9 +18,12 @@
 `provisional_pending_primary_source_review`，不能替代结构字段的一手来源复核。
 
 `data/public/catalog_source_locator_candidates.jsonl` 已加入全部 23 个目录条目的 FDA/PMDA 标签、临床试验注册、
-监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 158 个 ADC-字段组合，共 161 条候选；其中四组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
+监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 158 个 ADC-字段组合，共 161 条候选；其中三组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
 表示仍需其他结构来源或术语核对；所有条目保持 `pending_independent_primary_source_review`，
 因此不计入人工金标准或论文主结果。
+
+当前三组竞争字段为 `adc_016.dar`、`adc_016.payload_name` 和
+`adc_019.payload_name`；它们的来源值和复核要求见[字段冲突审计记录](catalog_field_conflict_audit_2026-09-20.md)。
 
 ## 构建流程
 
