@@ -119,6 +119,47 @@ def _source_url_quality(connection: sqlite3.Connection, table: str) -> dict[str,
     }
 
 
+def _source_coverage(run: dict[str, object]) -> dict[str, object]:
+    """Summarize a source run without treating missing denominators as zero."""
+    run_status = str(run.get("status", "")).strip().lower()
+    expected: int | None
+    collected: int | None
+    try:
+        expected = int(run["expected_count"]) if run.get("expected_count") is not None else None
+    except (TypeError, ValueError):
+        expected = None
+    try:
+        collected = int(run["collected_count"]) if run.get("collected_count") is not None else None
+    except (TypeError, ValueError):
+        collected = None
+
+    if run_status in {"unknown", "skipped", "failed"}:
+        state = "unknown"
+    elif run_status == "complete" and bool(run.get("is_complete")) and expected is not None:
+        state = "complete" if collected is None or collected >= expected else "partial"
+    elif run_status == "partial" or not bool(run.get("is_complete")):
+        state = "partial"
+    else:
+        state = "unknown"
+
+    ratio = None
+    ratio_reason = None
+    if expected is None or expected <= 0:
+        ratio_reason = "expected_count_missing_or_nonpositive"
+    elif collected is None:
+        ratio_reason = "collected_count_missing"
+    else:
+        ratio = round(collected / expected, 6)
+    return {
+        "run_status": run_status or "unknown",
+        "coverage_state": state,
+        "expected_count": expected,
+        "collected_count": collected,
+        "coverage_ratio": ratio,
+        "coverage_ratio_reason": ratio_reason,
+    }
+
+
 def _late_publication_dates(
     connection: sqlite3.Connection, *, as_of: dt.date, raw_root: Path | None
 ) -> dict[str, object]:
@@ -491,6 +532,18 @@ def audit_database(
         for row in run_summary
         if row["status"] != "complete" or not row["is_complete"]
     })
+    source_coverage = {
+        str(row["source"]): _source_coverage(row)
+        for row in run_summary
+    }
+    partial_sources = sorted(
+        source for source, summary in source_coverage.items()
+        if summary["coverage_state"] == "partial"
+    )
+    unknown_sources = sorted(
+        source for source, summary in source_coverage.items()
+        if summary["coverage_state"] == "unknown"
+    )
     return {
         "schema_version": "public-adc-dataset-audit-v1",
         "database_sha256": _sha256(database),
@@ -541,6 +594,12 @@ def audit_database(
             source: latest_source_runs[source]
             for source in sorted(latest_source_runs)
         },
+        "source_coverage": {
+            source: source_coverage[source]
+            for source in sorted(source_coverage)
+        },
+        "partial_sources": partial_sources,
+        "unknown_sources": unknown_sources,
         "incomplete_sources": incomplete_sources,
         "status": "partial" if incomplete_sources else "complete",
     }

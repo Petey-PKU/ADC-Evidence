@@ -73,6 +73,9 @@ NLM 处理日期和日期顺序异常；不提供原始文件目录时保持 unk
 数据库可能保留多次采集尝试。审计报告同时保留 `source_runs` 历史，并按
 `finished_at`/`started_at` 选择每个来源的 `latest_source_runs`；`incomplete_sources`
 只根据最新一次运行判断，避免把旧的失败尝试误读成当前快照状态。
+`source_coverage` 进一步为每个最新来源输出 `coverage_state`、expected/collected 数量和可计算的
+`coverage_ratio`；`partial_sources` 与 `unknown_sources` 分开列出。缺少来源总数、跳过或失败的
+运行不会被编码成 0% 覆盖，而会保持 `unknown` 并给出不可计算原因。
 
 可对候选 URL 做一次带超时的内容预核验（不修改目录字段，也不生成人工 verdict）：
 

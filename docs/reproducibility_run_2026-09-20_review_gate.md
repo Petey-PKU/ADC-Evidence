@@ -38,6 +38,13 @@ git diff --check
 adjudicator 文件，输出逐字段一致性、分歧数和裁决状态；没有裁决时报告保持
 `needs_adjudication`，不会自动选择竞争值。
 
+本轮也复跑了公开数据库来源覆盖审计：23 个 ADC、3,503 条试验、1,410 篇文献和 6,754 条
+实体关联；ClinicalTrials.gov 为 `partial`（2,000/13,978，比例 `0.143082`），PubMed 为
+`partial`（1,015/165,105，比例 `0.006148`），ADCDB 为 `unknown`（`skipped` 且没有分母）。
+审计 JSON 的 SHA-256 为
+`e18f3c92a2efdd50daa12b8454bb43ab7831a070ebc566340ff16a862333ee99`；这些比例描述本次
+抓取窗口，不代表来源全集覆盖率。
+
 ## 研究包
 
 研究包由代码提交 `9497ee02f8ab3f01884f829bd404d8b1b4d71e27` 构建并通过
