@@ -51,7 +51,8 @@ class PublicCatalogAuditTests(unittest.TestCase):
             locators = Path(temporary.name) / "locators.jsonl"
             locators.write_text(
                 json.dumps({
-                    "adc_id": "adc_001", "field": "target", "source_url": "https://www.fda.gov/example",
+                    "adc_id": "adc_001", "field": "target", "candidate_value": "Example ADC",
+                    "source_url": "https://www.fda.gov/example",
                 }) + "\n",
                 encoding="utf-8",
             )
@@ -70,6 +71,9 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(report["core_fact_candidate_locator_count"], 1)
         self.assertEqual(report["core_fact_candidate_locator_missing_count"], 7)
         self.assertEqual(report["core_fact_candidate_locator_coverage_ratio"], 0.125)
+        self.assertEqual(report["candidate_value_match_count"], 1)
+        self.assertEqual(report["candidate_value_match_eligible_count"], 1)
+        self.assertEqual(report["candidate_value_match_rate"], 1.0)
         self.assertEqual(report["records"][0]["field_assessment"]["target"], "candidate_locator_pending_human_review")
         self.assertEqual(report["records"][0]["field_assessment"]["dar"], "field_level_source_missing")
         self.assertEqual(report["records"][0]["field_assessment"]["indication"], "field_level_source_missing")

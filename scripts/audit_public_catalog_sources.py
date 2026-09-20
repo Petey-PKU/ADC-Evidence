@@ -57,10 +57,10 @@ def _fetch(url: str, timeout: int) -> tuple[int, str, str]:
         return int(response.status), response.headers.get_content_type(), content.decode("utf-8", errors="ignore")
 
 
-def _candidate_pairs(path: Path | None) -> set[tuple[str, str]]:
+def _candidate_rows(path: Path | None) -> dict[tuple[str, str], list[dict[str, object]]]:
     if path is None:
-        return set()
-    pairs: set[tuple[str, str]] = set()
+        return {}
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
     for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
@@ -71,8 +71,8 @@ def _candidate_pairs(path: Path | None) -> set[tuple[str, str]]:
         field = str(row.get("field", "")).strip()
         if not adc_id or not field or not str(row.get("source_url", "")).startswith("https://"):
             raise ValueError(f"candidate locator line {line_number} needs adc_id, field and HTTPS source_url")
-        pairs.add((adc_id, field))
-    return pairs
+        grouped.setdefault((adc_id, field), []).append(row)
+    return grouped
 
 
 def audit_catalog_sources(
@@ -85,7 +85,8 @@ def audit_catalog_sources(
         rows = list(csv.DictReader(handle))
     if not rows:
         raise ValueError("catalog must not be empty")
-    candidate_pairs = _candidate_pairs(candidate_locators)
+    candidate_rows = _candidate_rows(candidate_locators)
+    candidate_pairs = set(candidate_rows)
     structural_pairs = {
         (str(row.get("adc_id", "")).strip(), field)
         for row in rows
@@ -107,7 +108,9 @@ def audit_catalog_sources(
             "source_class": source_class(url), "http_status": None,
             "content_type": None, "name_or_alias_match": False,
             "inspection_status": "pending", "fetch_status": "pending", "field_assessment": {},
-            "review_required": True,
+            "candidate_value_count": 0, "candidate_value_match_count": 0,
+            "candidate_value_match_eligible_count": 0, "candidate_value_match_fields": [],
+            "candidate_value_unmatched_fields": [], "review_required": True,
         }
         match = False
         try:
@@ -118,6 +121,24 @@ def audit_catalog_sources(
                 haystack = re.sub(r"\s+", " ", content).casefold()
                 match = any(term.casefold() in haystack for term in (name, *aliases) if len(term) >= 4)
                 item["inspection_status"] = "text_scanned"
+                candidates = [candidate for key, values in candidate_rows.items() if key[0] == adc_id for candidate in values]
+                candidate_values = [
+                    (str(candidate.get("field", "")), str(candidate.get("candidate_value", "")).strip())
+                    for candidate in candidates
+                    if str(candidate.get("candidate_value", "")).strip()
+                ]
+                item["candidate_value_count"] = len(candidate_values)
+                item["candidate_value_match_eligible_count"] = len(candidate_values)
+                matched_values = [
+                    (field, value)
+                    for field, value in candidate_values
+                    if value.casefold() in haystack
+                ]
+                matched_fields = {field for field, _ in matched_values}
+                candidate_fields = {field for field, _ in candidate_values}
+                item["candidate_value_match_count"] = len(matched_values)
+                item["candidate_value_match_fields"] = sorted(matched_fields)
+                item["candidate_value_unmatched_fields"] = sorted(candidate_fields - matched_fields)
             item.update(http_status=status, content_type=content_type,
                         name_or_alias_match=match,
                         fetch_status="reachable" if status < 400 else "http_error")
@@ -149,6 +170,16 @@ def audit_catalog_sources(
         "catalog_path": catalog.name, "catalog_row_count": len(results),
         "reachable_or_http_error_count": sum(item["fetch_status"] in {"reachable", "http_error"} for item in results),
         "name_or_alias_match_count": match_count,
+        "candidate_value_match_count": sum(int(item["candidate_value_match_count"]) for item in results),
+        "candidate_value_match_eligible_count": sum(int(item["candidate_value_match_eligible_count"]) for item in results),
+        "candidate_value_match_rate": (
+            round(
+                sum(int(item["candidate_value_match_count"]) for item in results)
+                / sum(int(item["candidate_value_match_eligible_count"]) for item in results),
+                4,
+            )
+            if sum(int(item["candidate_value_match_eligible_count"]) for item in results) else None
+        ),
         "candidate_locator_file": candidate_locators.name if candidate_locators else None,
         "candidate_locator_pair_count": len(candidate_pairs),
         "structural_field_pair_count": len(structural_pairs),
@@ -188,7 +219,8 @@ def main() -> None:
         "schema_version", "catalog_row_count", "reachable_or_http_error_count",
         "name_or_alias_match_count", "structural_field_candidate_locator_count",
         "structural_field_candidate_locator_missing_count", "core_fact_candidate_locator_count",
-        "core_fact_candidate_locator_missing_count", "review_status",
+        "core_fact_candidate_locator_missing_count", "candidate_value_match_count",
+        "candidate_value_match_eligible_count", "candidate_value_match_rate", "review_status",
     )}, ensure_ascii=False, indent=2))
 
 
