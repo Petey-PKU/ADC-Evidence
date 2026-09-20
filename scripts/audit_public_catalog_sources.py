@@ -30,6 +30,9 @@ STRUCTURAL_FIELDS = {
     "target", "antibody", "linker_name", "linker_type", "payload_name",
     "payload_class", "dar",
 }
+# Core facts required for the public catalog claim; indication is tracked
+# separately from structural chemistry so historical structural metrics remain comparable.
+CORE_FACT_FIELDS = STRUCTURAL_FIELDS | {"indication"}
 
 
 def source_class(url: str) -> str:
@@ -88,6 +91,11 @@ def audit_catalog_sources(
         for row in rows
         for field in STRUCTURAL_FIELDS
     }
+    core_fact_pairs = {
+        (str(row.get("adc_id", "")).strip(), field)
+        for row in rows
+        for field in CORE_FACT_FIELDS
+    }
     results: list[dict[str, object]] = []
     for row in rows:
         adc_id = str(row.get("adc_id", "")).strip()
@@ -122,7 +130,7 @@ def audit_catalog_sources(
         field_assessment = item["field_assessment"]
         assert isinstance(field_assessment, dict)
         for field in KEY_FIELDS:
-            if field in STRUCTURAL_FIELDS:
+            if field in CORE_FACT_FIELDS:
                 assessment = (
                     "candidate_locator_pending_human_review"
                     if (adc_id, field) in candidate_pairs
@@ -150,7 +158,17 @@ def audit_catalog_sources(
             round(len(structural_pairs & candidate_pairs) / len(structural_pairs), 4)
             if structural_pairs else None
         ),
+        "core_fact_pair_count": len(core_fact_pairs),
+        "core_fact_candidate_locator_count": len(core_fact_pairs & candidate_pairs),
+        "core_fact_candidate_locator_missing_count": len(core_fact_pairs - candidate_pairs),
+        "core_fact_candidate_locator_coverage_ratio": (
+            round(len(core_fact_pairs & candidate_pairs) / len(core_fact_pairs), 4)
+            if core_fact_pairs else None
+        ),
+        # Keep the historical key structural-only; use the explicit core_fact key for
+        # the broader publication-readiness gate.
         "field_level_source_missing_count": len(structural_pairs - candidate_pairs),
+        "core_fact_field_level_source_missing_count": len(core_fact_pairs - candidate_pairs),
         "review_status": "triage_only_pending_human_source_locator_review",
         "ai_or_automatic_labels_are_gold": False, "records": results,
     }
@@ -169,7 +187,8 @@ def main() -> None:
     print(json.dumps({key: report[key] for key in (
         "schema_version", "catalog_row_count", "reachable_or_http_error_count",
         "name_or_alias_match_count", "structural_field_candidate_locator_count",
-        "structural_field_candidate_locator_missing_count", "review_status",
+        "structural_field_candidate_locator_missing_count", "core_fact_candidate_locator_count",
+        "core_fact_candidate_locator_missing_count", "review_status",
     )}, ensure_ascii=False, indent=2))
 
 

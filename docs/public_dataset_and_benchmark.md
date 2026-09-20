@@ -92,8 +92,10 @@ python scripts/audit_public_catalog_sources.py `
 报告只记录 HTTP 状态、内容类型、ADC 名称/别名是否出现在响应文本中、来源类别和字段评估。
 `candidate_support_only` 是待人工定位的线索，`candidate_locator_pending_human_review` 表示候选
 文件已经给出字段级 URL 线索但尚未完成独立人工核验，`field_level_source_missing` 表示仍没有
-字段级候选 URL；自动匹配永远不计入金标准。当前候选文件覆盖 158/161 个 ADC-字段组合，
-仍有 3 个组合没有候选定位；这不等同于 158 个字段已经被证实。2026-09-13 的实际运行
+字段级候选 URL；自动匹配永远不计入金标准。按 7 个结构字段计算，当前候选文件覆盖
+158/161 个 ADC-字段组合，仍有 3 个结构组合没有候选定位；把 `indication` 纳入论文所需
+核心事实后，覆盖为 158/184，仍有 26 个核心事实组合缺候选定位（包括 23 个适应证字段）。
+这些数字都不等同于字段已经被证实。2026-09-13 的实际运行
 结果为 23 行均返回 HTTP 响应（21 行为 200、1 行为 403、1 行为 412），16 行文本出现
 名称/别名；PDF 只记录可访问性，不自动提取正文；状态为
 `triage_only_pending_human_source_locator_review`。

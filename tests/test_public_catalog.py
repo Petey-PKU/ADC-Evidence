@@ -31,6 +31,7 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(source_class("https://www.fda.gov/example"), "regulator_fda")
         self.assertEqual(report["name_or_alias_match_count"], 1)
         self.assertEqual(report["field_level_source_missing_count"], 7)
+        self.assertEqual(report["core_fact_field_level_source_missing_count"], 8)
         self.assertEqual(report["review_status"], "triage_only_pending_human_source_locator_review")
         self.assertFalse(report["ai_or_automatic_labels_are_gold"])
         record = report["records"][0]
@@ -65,8 +66,13 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(report["structural_field_candidate_locator_count"], 1)
         self.assertEqual(report["structural_field_candidate_locator_missing_count"], 6)
         self.assertEqual(report["structural_field_candidate_locator_coverage_ratio"], 0.1429)
+        self.assertEqual(report["core_fact_pair_count"], 8)
+        self.assertEqual(report["core_fact_candidate_locator_count"], 1)
+        self.assertEqual(report["core_fact_candidate_locator_missing_count"], 7)
+        self.assertEqual(report["core_fact_candidate_locator_coverage_ratio"], 0.125)
         self.assertEqual(report["records"][0]["field_assessment"]["target"], "candidate_locator_pending_human_review")
         self.assertEqual(report["records"][0]["field_assessment"]["dar"], "field_level_source_missing")
+        self.assertEqual(report["records"][0]["field_assessment"]["indication"], "field_level_source_missing")
     def test_audit_reports_generic_sources_and_pending_primary_checks(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
         try:
