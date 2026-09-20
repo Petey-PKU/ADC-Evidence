@@ -637,6 +637,8 @@ def main() -> None:
         "status": report["status"],
         "counts": report["counts"],
         "incomplete_sources": report["incomplete_sources"],
+        "adc_fact_source_quality_status": report["adc_fact_source_quality_status"],
+        "adc_fact_source_quality_reasons": report["adc_fact_source_quality_reasons"],
     }, ensure_ascii=False))
 
 
