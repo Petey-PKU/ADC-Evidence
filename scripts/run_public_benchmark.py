@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from adc_evidence.evaluation.public_benchmark import (
+    PUBLIC_BENCHMARK_PROMPT_VERSION,
+    PUBLIC_EVALUATION_CONDITIONS,
     load_public_benchmark,
     score_public_benchmark,
 )
@@ -67,12 +69,16 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "evaluated_at": datetime.now(UTC).isoformat(),
         "network_enabled": False,
         "model": "extractive-offline-v1",
+        "prompt_version": PUBLIC_BENCHMARK_PROMPT_VERSION,
+        "evaluation_conditions": dict(PUBLIC_EVALUATION_CONDITIONS),
         "system_variant": (
             "offline_rag_baseline"
             if getattr(args, "disable_structured_routing", False)
             else "adc_evidence_public"
         ),
         "database_data_version": evidence_data_version(args.database),
+        "question_set_sha256": f"sha256:{_object_hash(questions)}",
+        "question_count": len(questions),
         "automatic_scoring": scored,
         "human_review": {"status": "pending", "required": True},
         "questions": outputs,
