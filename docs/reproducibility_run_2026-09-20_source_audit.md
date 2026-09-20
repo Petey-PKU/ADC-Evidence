@@ -11,7 +11,7 @@
 |---|---|
 | 代码提交 | `1d51624c3f4bf6b7e73e410486a37e2cc068252a` |
 | 目录 | `sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c` |
-| 来源候选 JSONL（统一 LF 后） | `sha256:5c258c7b9f75606382a80943dc5576baef40a900187c28ccd939c854b706e402` |
+| 来源候选 JSONL（统一 LF 后） | `sha256:a2ef82393091168fbdb3e2ab92560e35247089ef6099450a25bced5c90b34e66` |
 | 包内数据库（去除本机路径后） | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
 | benchmark manifest | `sha256:41fd2884722e0c19516f13601df5bd82230dadd87e17c9044c42cb1ec364d7a9` |
 | 检索语料版本 | `corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca` |
@@ -19,7 +19,7 @@
 
 ## 本轮数据审计决定
 
-- 来源候选由 147 个 ADC-字段组合、150 条候选组成，覆盖 21 个目录条目；每条仍为
+- 来源候选由 158 个 ADC-字段组合、161 条候选组成，覆盖全部 23 个目录条目；每条仍为
   `pending_independent_primary_source_review`。
 - SKB264 的字段候选补充了同行评议原始研究的结构定位；抗体名称没有从来源中推断为
   Sacituzumab 同义词。
@@ -29,8 +29,8 @@
   与 [NCI 药物词典](https://www.cancer.gov/publications/dictionaries/cancer-drug/def/trastuzumab-rezetecan)。
 - 复核包的 Python API 默认不加载公共候选文件；只有显式传入候选路径时才绑定候选，
   且候选文件中的 ADC 与字段必须属于传入目录。这样测试目录不会误接真实公共线索。
-- 本轮新增 `adc_017`、`adc_019`、`adc_021`、`adc_022`、`adc_023` 的公开候选；
-  `adc_018` 和 `adc_020` 仍没有字段级候选，不能按“已覆盖”解释。
+- 本轮新增 `adc_017`、`adc_018`、`adc_019`、`adc_020`、`adc_021`、`adc_022`、`adc_023` 的公开候选；
+  `adc_018` 的候选目前主要来自临床试验注册，字段范围较少，仍需结构来源复核。
 
 ## 验证结果
 
@@ -54,7 +54,7 @@ python scripts/verify_public_release.py .test_tmp/adc-public-1d51624.zip
 - 初次全量验证：执行 `213` 项，其中 `209` 项通过，`4` 项因可选模型依赖未安装而跳过；
   当时尚未加入随后补充的缺失文件和错配候选回归测试。最终工作区测试结果见下文。
 - 公共卫生扫描：`208` 个受跟踪文件，`status=clean`，无发现。
-- 复核包：`299` 个字段项，`299` 个仍为 pending，`review_ready=false`；候选计数为 `150`。
+- 复核包：`299` 个字段项，`299` 个仍为 pending，`review_ready=false`；候选计数为 `161`。
 - 发布包：`status=verified`，检查 `79` 个文件，数据库绝对本机路径计数为 `0`，
   benchmark 和候选来源文件均存在。
 
@@ -97,7 +97,7 @@ python scripts/audit_public_dataset.py `
 新增回归测试覆盖相同 ADC ID 的自定义目录不会加载公共线索，以及显式候选正常加载。
 SKB264 候选备注同时改为指向“先前候选名称”，避免误称目录抗体字段就是 Sacituzumab。
 本次候选文件统一 LF 后 SHA-256 为
-`5c258c7b9f75606382a80943dc5576baef40a900187c28ccd939c854b706e402`。
+`a2ef82393091168fbdb3e2ab92560e35247089ef6099450a25bced5c90b34e66`。
 
 最终本地全量执行 `217` 项：`213` 项通过、`4` 项跳过、`0` 项失败。
 重新生成并校验公共复核包得到 `299` 个待复核项、`150` 条候选，`review_ready=false`。
