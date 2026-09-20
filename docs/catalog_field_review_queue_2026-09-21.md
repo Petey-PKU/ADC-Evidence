@@ -20,14 +20,14 @@ python scripts/validate_catalog_field_review.py `
   --catalog data/public/marketed_adc_catalog.csv
 ```
 
-The current packet contains 176 candidate source locators covering 173 unique
+The current packet contains 184 candidate source locators covering 181 unique
 ADC-field pairs. They are hints for
 human checking and are not accepted as field-level evidence until a reviewer
 records a source locator, a controlled verdict, and an independent human
 review origin. The packet SHA-256 is
-`a24852d2e858c25537e018c37e64f45a3b27e6f8278d4141ba9a2fc0bfddbd34`; its
+`d5b13bc6e6d75332139da6ad3c247a1b4ec64c8eb5b27ba58542806acd68fe26`; its
 manifest SHA-256 is
-`3164a96e9d9dab43700dfd60167bf475fec06587ac943738dc8eec2129f99442`.
+`97bc51239274f1a93ae06a9544f7b6be967551b38913788f00b673b6ef299dca`.
 
 Until the required independent primary and secondary reviews are supplied,
 the catalog source-quality gate remains `needs_review` and the project must
@@ -41,7 +41,7 @@ do not independently establish regulatory status.
 
 The source-content triage was rerun on 2026-09-21 against all 23 candidate
 URLs. The updated report SHA-256 is
-`051bf998399888ff29b91331de30686a2c2054a69f7ecfe4eff8e1799c0f9ab4`.
+`55ca98d477cba1a987bb20d9a04dfb91deb30c0314be3148b6ce8aa3e2fbef1a`.
 For the eight core fact fields, candidate locator coverage is:
 
 | Field | Locator pairs | Missing pairs |
@@ -53,10 +53,10 @@ For the eight core fact fields, candidate locator coverage is:
 | payload_name | 23 / 23 | 0 |
 | payload_class | 23 / 23 | 0 |
 | dar | 22 / 23 | 1 |
-| indication | 15 / 23 | 8 |
+| indication | 23 / 23 | 0 |
 
-The automatic value pre-screen found 22 matches among 134 eligible candidate
-values (`0.1642`). This is a triage signal only: PDFs and page structure can
+The automatic value pre-screen found 23 matches among 137 eligible candidate
+values (`0.1679`; indication values matched 7/17 eligible source texts). This is a triage signal only: PDFs and page structure can
 hide values, terminology can differ, and no match is treated as a verified
 claim. All candidate locators and values remain pending independent human
 source review.
