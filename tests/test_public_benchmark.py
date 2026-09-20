@@ -221,7 +221,9 @@ class PublicBenchmarkTests(unittest.TestCase):
 
         system = report("adc_evidence_public")
         baseline = report("offline_rag_baseline")
-        validate_public_benchmark_report_metadata(system, baseline, rows)
+        metadata = validate_public_benchmark_report_metadata(system, baseline, rows)
+        self.assertEqual(metadata["database_data_version"], {"data_version": "db-v1"})
+        self.assertEqual(metadata["question_count"], 1)
         baseline["evaluation_conditions"] = {
             **PUBLIC_EVALUATION_CONDITIONS,
             "retrieval_top_k": 10,

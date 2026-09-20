@@ -413,7 +413,7 @@ def validate_public_benchmark_report_metadata(
     system_report: dict[str, object],
     baseline_report: dict[str, object],
     benchmark_rows: list[dict[str, object]],
-) -> None:
+) -> dict[str, object]:
     """Require paired public reports to describe the same evaluation conditions."""
     if not benchmark_rows:
         raise ValueError("Public benchmark must not be empty")
@@ -446,3 +446,11 @@ def validate_public_benchmark_report_metadata(
         database_versions.append(database_version)
     if database_versions[0] != database_versions[1]:
         raise ValueError("Public benchmark reports disagree on database_data_version")
+    return {
+        "question_set_sha256": expected_question_hash,
+        "question_count": len(benchmark_rows),
+        "database_data_version": database_versions[0],
+        "prompt_version": PUBLIC_BENCHMARK_PROMPT_VERSION,
+        "evaluation_conditions": dict(PUBLIC_EVALUATION_CONDITIONS),
+        "network_enabled": False,
+    }

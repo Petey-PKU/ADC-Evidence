@@ -26,10 +26,11 @@ def main() -> None:
     system = json.loads(args.system_report.read_text(encoding="utf-8-sig"))
     baseline = json.loads(args.baseline_report.read_text(encoding="utf-8-sig"))
     benchmark_rows = load_public_benchmark(args.questions)
-    validate_public_benchmark_report_metadata(system, baseline, benchmark_rows)
+    comparison_metadata = validate_public_benchmark_report_metadata(system, baseline, benchmark_rows)
     comparison = compare_public_benchmark_reports(
         system.get("questions", []), baseline.get("questions", []), benchmark_rows
     )
+    comparison.update(comparison_metadata)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(comparison, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(comparison, ensure_ascii=False, indent=2))
