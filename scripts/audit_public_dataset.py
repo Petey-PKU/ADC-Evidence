@@ -8,6 +8,8 @@ import hashlib
 import json
 import re
 import sqlite3
+import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -117,7 +119,109 @@ def _source_url_quality(connection: sqlite3.Connection, table: str) -> dict[str,
     }
 
 
-def audit_database(database: Path, *, as_of: dt.date = DEFAULT_AS_OF) -> dict[str, object]:
+def _late_publication_dates(
+    connection: sqlite3.Connection, *, as_of: dt.date, raw_root: Path | None
+) -> dict[str, object]:
+    """Inspect late issue dates without changing records or declaring eligibility.
+
+    Raw files are read only inside an explicitly allowed directory, and only
+    after binding the bytes to the document checksum and its unique PMID.
+    NLM processing dates are kept separate from electronic publication dates.
+    """
+    required = ("source", "source_record_id", "publication_date", "raw_path", "checksum")
+    if any(not _column_exists(connection, "documents", column) for column in required):
+        return {"status": "unknown", "reason": "provenance_columns_missing"}
+    allowed_root = raw_root.resolve() if raw_root is not None else None
+    records = []
+    for row in connection.execute(
+        "SELECT source_record_id, publication_date, raw_path, checksum "
+        "FROM documents WHERE source='pubmed' ORDER BY source_record_id"
+    ):
+        issue_date = _parse_source_date(row["publication_date"])
+        if issue_date is None or issue_date <= as_of:
+            continue
+        record = {
+            "pmid": row["source_record_id"],
+            "issue_date": row["publication_date"],
+            "raw_sha256": None,
+            "status": "unknown",
+            "reason": "raw_root_not_supplied",
+        }
+        records.append(record)
+        if allowed_root is None:
+            continue
+        raw_path = Path(row["raw_path"] or "")
+        # Relative paths cannot be safely resolved from an arbitrary CLI cwd.
+        if not raw_path.is_absolute() or not raw_path.resolve().is_relative_to(allowed_root):
+            record["reason"] = "raw_path_outside_allowed_root"
+            continue
+        try:
+            raw = raw_path.read_bytes()
+        except OSError:
+            record["reason"] = "raw_file_unavailable"
+            continue
+        digest = hashlib.sha256(raw).hexdigest()
+        record["raw_sha256"] = "sha256:" + digest
+        if digest != row["checksum"]:
+            record["reason"] = "raw_checksum_mismatch"
+            continue
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError:
+            record["reason"] = "invalid_xml"
+            continue
+        articles = [article for article in root.findall("PubmedArticle")
+                    if article.findtext("./MedlineCitation/PMID") == row["source_record_id"]]
+        if len(articles) != 1:
+            record["reason"] = "pmid_not_unique_in_raw"
+            continue
+        article = articles[0]
+        dates = []
+        invalid_count = 0
+        for node in (article.findall("./MedlineCitation/Article/ArticleDate")
+                     + article.findall("./PubmedData/History/PubMedPubDate")):
+            kind = ("article:" + node.get("DateType", "unknown") if node.tag == "ArticleDate"
+                    else "history:" + node.get("PubStatus", "unknown"))
+            try:
+                value = dt.date(*(int(node.findtext(part, "")) for part in ("Year", "Month", "Day")))
+            except ValueError:
+                invalid_count += 1
+                continue
+            dates.append({"kind": kind, "date": value.isoformat(), "on_or_before_as_of": value <= as_of})
+        electronic = [d for d in dates if d["kind"] in {"article:Electronic", "history:epublish"}]
+        processing = [d for d in dates if d["kind"] in {"history:pubmed", "history:entrez"}]
+        accepted = [d for d in dates if d["kind"] == "history:accepted"]
+        flags = []
+        if invalid_count:
+            flags.append("invalid_date_components")
+        if any(a["date"] > p["date"] for a in accepted for p in electronic + processing):
+            flags.append("acceptance_after_publication_or_indexing")
+        before_electronic = any(d["on_or_before_as_of"] for d in electronic)
+        before_processing = any(d["on_or_before_as_of"] for d in processing)
+        record.update({
+            "status": "candidate_pending_review",
+            "reason": ("electronic_publication_before_cutoff" if before_electronic else
+                       "indexing_before_cutoff_only" if before_processing else
+                       "no_pre_cutoff_publication_or_indexing_evidence"),
+            "dates": sorted(dates, key=lambda d: (d["kind"], d["date"])),
+            "invalid_date_count": invalid_count,
+            "chronology_flags": flags,
+        })
+    return {
+        "status": "pending_review" if records else "no_late_issue_dates",
+        "as_of": as_of.isoformat(),
+        "late_issue_count": len(records),
+        "reason_counts": dict(sorted(Counter(row["reason"] for row in records).items())),
+        "records": records,
+        "method_note": "Issue dates, electronic publication dates and NLM processing dates are distinct. "
+                       "This audit does not reconstruct an as-of database or establish independent human review; "
+                       "retrieval and source revision times still require a frozen snapshot protocol.",
+    }
+
+
+def audit_database(
+    database: Path, *, as_of: dt.date = DEFAULT_AS_OF, raw_root: Path | None = None
+) -> dict[str, object]:
     """Return deterministic quality and coverage statistics for a snapshot."""
     database = database.resolve()
     if not database.is_file():
@@ -143,6 +247,7 @@ def audit_database(database: Path, *, as_of: dt.date = DEFAULT_AS_OF) -> dict[st
             "documents.publication_date": _date_quality(connection, "documents", "publication_date", as_of),
             "trials.last_update_date": _date_quality(connection, "trials", "last_update_date", as_of),
         }
+        late_publication_dates = _late_publication_dates(connection, as_of=as_of, raw_root=raw_root)
         source_url_quality = {
             "documents": _source_url_quality(connection, "documents"),
             "trials": _source_url_quality(connection, "trials"),
@@ -416,6 +521,7 @@ def audit_database(database: Path, *, as_of: dt.date = DEFAULT_AS_OF) -> dict[st
         "entity_link_integrity": entity_link_integrity,
         "match_method_counts": match_method_counts,
         "record_date_quality": record_date_quality,
+        "late_publication_date_review": late_publication_dates,
         "source_url_quality": source_url_quality,
         "adc_fact_coverage": fact_coverage,
         "adc_fact_provenance": fact_provenance,
@@ -445,8 +551,9 @@ def main() -> None:
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--as-of", type=lambda value: dt.date.fromisoformat(value), default=DEFAULT_AS_OF)
+    parser.add_argument("--raw-root", type=Path, help="Explicit allowed root for checksum-bound PubMed date review")
     args = parser.parse_args()
-    report = audit_database(args.database)
+    report = audit_database(args.database, as_of=args.as_of, raw_root=args.raw_root)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({

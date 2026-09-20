@@ -58,6 +58,11 @@ python scripts/audit_public_dataset.py `
 ClinicalTrials.gov/PubMed 记录是否有可追溯 HTTPS 来源；`record_date_quality` 按显式 `--as-of`
 日期报告缺失、格式异常和超出窗口的记录。任何 `needs_review` 或 `unknown` 状态都不能被解释为
 完整覆盖或正确实体关联。
+对晚卷期日期可显式提供 `--raw-root data/raw/public_2026-09-30`，生成
+`late_publication_date_review`：绑定原始 XML 哈希和 PMID，分开记录电子发表日期、
+NLM 处理日期和日期顺序异常；不提供原始文件目录时保持 unknown。该检查不自动删除记录、
+更改来源日期或证明历史时点的内容可用性。实例见
+[文献日期边界核查](publication_date_audit_2026-09-20.md)。
 其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
 链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
 审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
