@@ -11,7 +11,7 @@
 |---|---|
 | 代码提交 | `4f36842cb9899c7f8d8153f37d71e5bafe28368b` |
 | 目录 | `sha256:97a21b0f104ee530783c1aa367cc28f95643680e82c54e6e57f83d5f195e692c` |
-| 来源候选 JSONL（统一 LF 后） | `sha256:8d7c1b048995c29565b9b79c6c136ace87ac9b404ef48cdf49fa7ea430aeb2` |
+| 来源候选 JSONL（统一 LF 后） | `sha256:5c258c7b9f75606382a80943dc5576baef40a900187c28ccd939c854b706e402` |
 | 包内数据库（去除本机路径后） | `sha256:2f9a5c53f49bbc23a883b0863a1c5577510ac5004ca47cfad106d40794dc819a` |
 | benchmark manifest | `sha256:41fd2884722e0c19516f13601df5bd82230dadd87e17c9044c42cb1ec364d7a9` |
 | 检索语料版本 | `corpus_bf154bd752280b20b6ea0ad9cab8dde06e65062276209ae655bf27de49efc1ca` |
@@ -19,7 +19,7 @@
 
 ## 本轮数据审计决定
 
-- 来源候选由 112 个 ADC-字段组合、114 条候选组成；每条仍为
+- 来源候选由 147 个 ADC-字段组合、150 条候选组成，覆盖 21 个目录条目；每条仍为
   `pending_independent_primary_source_review`。
 - SKB264 的字段候选补充了同行评议原始研究的结构定位；抗体名称没有从来源中推断为
   Sacituzumab 同义词。
@@ -95,8 +95,8 @@ python scripts/audit_public_dataset.py `
 新增回归测试覆盖相同 ADC ID 的自定义目录不会加载公共线索，以及显式候选正常加载。
 SKB264 候选备注同时改为指向“先前候选名称”，避免误称目录抗体字段就是 Sacituzumab。
 本次候选文件统一 LF 后 SHA-256 为
-`8d7c1b048995c29565b9b79c6c136ace87ac9b404ef48cdf49fa7ea430aeb2`。
+`5c258c7b9f75606382a80943dc5576baef40a900187c28ccd939c854b706e402`。
 
 最终本地全量执行 `217` 项：`213` 项通过、`4` 项跳过、`0` 项失败。
-重新生成并校验公共复核包得到 `299` 个待复核项、`114` 条候选，`review_ready=false`。
+重新生成并校验公共复核包得到 `299` 个待复核项、`150` 条候选，`review_ready=false`。
 上表 ZIP 是运行代码提交 `4f36842` 构建的最新验证包；文档提交若继续变化，正式发布前仍应重新构建并完成许可核查。
