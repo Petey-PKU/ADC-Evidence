@@ -31,3 +31,19 @@ python -m unittest tests.test_catalog_source_locator_candidates -q
 `review_origin=human_independent` 提交；`adjudicated` 必须由 `adjudicator` 槽位以
 `review_origin=human_adjudicated` 提交。这样，填写 verdict 和来源定位本身不会被误记为
 真实独立人工证据。
+
+双人复核完成后，使用配对合并器检查一致性；它不会从两个值中自动选择一个：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/merge_catalog_field_reviews.py `
+  --primary primary-review.jsonl `
+  --secondary secondary-review.jsonl `
+  --manifest review.manifest.json `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --output paired-review.json
+```
+
+若存在分歧，只有再传入全部字段均标记为 `adjudicated`、且来源为
+`human_adjudicated` 的裁决包，报告才会变为 `ready_for_catalog_update`。没有裁决包时，
+报告保持 `needs_adjudication`。
