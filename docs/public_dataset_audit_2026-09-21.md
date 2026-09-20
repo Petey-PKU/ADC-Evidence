@@ -37,3 +37,23 @@ provided; issue date, electronic publication date, and indexing date must be
 distinguished before an as-of claim is made. The overall dataset status is
 `partial`, and ADC fact source quality remains `needs_review` because current
 facts are still marked `curated_seed_not_independently_reviewed`.
+
+The checksum-bound raw snapshot was then supplied to the same audit:
+
+```powershell
+python scripts/audit_public_dataset.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --as-of 2026-09-30 `
+  --raw-root data/raw/public_2026-09-30 `
+  --output .test_tmp/public_dataset_audit_2026-09-21_with_raw.json
+```
+
+The raw-bound report SHA-256 is
+`d2c4da6fc481528a53649e0b702178b53c26216794cfdb38f33f5d5195758099`.
+All seven raw XML files matched the database checksum and contained one
+matching PMID. Six records have an electronic publication date on or before
+the cutoff; one record (`PMID 42233446`) has only pre-cutoff PubMed/Entrez
+indexing dates and also carries a chronology warning because its acceptance
+date follows those indexing dates. These seven records remain
+`candidate_pending_review`; the audit does not silently convert them into
+eligible historical evidence.
