@@ -7,7 +7,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 公共分支 | `research/v0.6-freeze` |
-| 代码提交 | `365e5f724a785150e9218bd816d6847cd2f5c8a6` |
+| 代码提交 | `28ada251da7a8f170dc2682fa956249a7ebc3153` |
 | 门禁代码提交 | `d3a122f3702f24851ab461997478ca88204fc550` |
 | 本地测试 | 232 项发现，232 项通过，0 项跳过，0 项失败 |
 | GitHub CI | Python 3.11/3.12 的 base 与 generation 四个 job 均成功 |
@@ -65,13 +65,19 @@ holdout manifest 除 `access_controlled=true` 外必须记录非空的控制方�
 该结果只是公开开发题集的自动诊断，比较输出仍保留 `human_review_required=true`，不构成
 独立测试集、人工金标准或论文主结果。
 
+随后又把这些 provenance 字段复制到 comparison JSON 本身，最新 comparison 的 SHA-256 为
+`f5311d129374c32c6b3b676b54f01bb903df300e8a019e228012634af8a791b6`；其中记录题集哈希
+`sha256:b22f528867cf6197df1b48f2e328e812abcc16e8f03f480e13fb04cb357aeec0`、数据库版本
+`data_465aab2dc23d8b11c769c7a8b61c6f3144f496ca02355e0318321f2b6ebc93d4` 和
+`prompt_version=public-benchmark-v1`。
+
 ## 研究包
 
-研究包由代码提交 `365e5f724a785150e9218bd816d6847cd2f5c8a6` 构建并通过
+研究包由代码提交 `28ada251da7a8f170dc2682fa956249a7ebc3153` 构建并通过
 `scripts/verify_public_release.py` 验证：检查 79 个文件，数据库绝对路径计数为 0，
 benchmark 和候选来源文件均存在，manifest 为 `research_only` 且
-`redistribution_allowed=false`。包大小为 42,148,189 字节，SHA-256 为
-`75a4636a4f7018f1c9341a5124057eda2c4b8fca888971a1042b7ab218059936`。
+`redistribution_allowed=false`。包大小为 42,148,233 字节，SHA-256 为
+`d719f996fdbe2865d1b648e491c1e1e254cc929bd0054c462065938fc8a1c54b`。
 
 该包仍只用于本地研究复现；公开 GitHub Release 仍需逐项许可核查和正式 attestation。
 
