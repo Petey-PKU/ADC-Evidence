@@ -54,3 +54,23 @@ python scripts/verify_public_release.py .test_tmp/adc-public-54f4d87.zip
 
 这些结果证明代码、数据清单和离线包的一致性；它们不证明字段已经过独立人工确认，
 也不构成临床金标准或论文主结果。
+
+## 实体关联审计
+
+使用同一数据库运行：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_public_dataset.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --output artifacts/evaluation/public_dataset_audit.json
+```
+
+本次审计得到 23 个 ADC、3,503 条试验、1,410 篇文献和 6,754 条实体关联；23 个 ADC
+均有至少一条试验和文献关联，孤立试验/文献关联均为 `0`。这只说明当前快照中的
+链接完整性，不等于领域全集覆盖。
+
+来源运行仍是 `partial`：ClinicalTrials.gov 最新运行抓取 2,000/13,978 条，PubMed
+抓取 1,015/165,105 条；ADCDB 本次为 `skipped`。因此报告状态保持 `partial`，不计算
+“文献覆盖率”或“试验覆盖率”作为全集比例；后续需在固定日期窗口下补齐或明确受限来源，
+并保留每次运行的去重、时间窗口和实体链接清单。
