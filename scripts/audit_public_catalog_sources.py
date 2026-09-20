@@ -11,6 +11,7 @@ import argparse
 import csv
 import json
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -110,6 +111,7 @@ def audit_catalog_sources(
             "inspection_status": "pending", "fetch_status": "pending", "field_assessment": {},
             "candidate_value_count": 0, "candidate_value_match_count": 0,
             "candidate_value_match_eligible_count": 0, "candidate_value_match_fields": [],
+            "candidate_value_match_values": [],
             "candidate_value_unmatched_fields": [], "review_required": True,
         }
         match = False
@@ -138,6 +140,10 @@ def audit_catalog_sources(
                 candidate_fields = {field for field, _ in candidate_values}
                 item["candidate_value_match_count"] = len(matched_values)
                 item["candidate_value_match_fields"] = sorted(matched_fields)
+                item["candidate_value_match_values"] = [
+                    {"field": field, "candidate_value": value}
+                    for field, value in matched_values
+                ]
                 item["candidate_value_unmatched_fields"] = sorted(candidate_fields - matched_fields)
             item.update(http_status=status, content_type=content_type,
                         name_or_alias_match=match,
@@ -164,6 +170,58 @@ def audit_catalog_sources(
             field_assessment[field] = assessment
         results.append(item)
     match_count = sum(bool(item["name_or_alias_match"]) for item in results)
+    records_by_adc = {str(item["adc_id"]): item for item in results}
+    field_candidate_summary: dict[str, dict[str, object]] = {}
+    for field in sorted(CORE_FACT_FIELDS):
+        expected_pairs = {(str(row.get("adc_id", "")).strip(), field) for row in rows}
+        candidate_pairs_for_field = expected_pairs & candidate_pairs
+        candidate_value_count = 0
+        candidate_value_match_count = 0
+        candidate_value_match_eligible_count = 0
+        source_tiers: Counter[str] = Counter()
+        for (adc_id, candidate_field), values in candidate_rows.items():
+            if candidate_field != field:
+                continue
+            for candidate in values:
+                value = str(candidate.get("candidate_value", "")).strip()
+                if not value:
+                    continue
+                candidate_value_count += 1
+                tier = str(candidate.get("source_tier", "unknown")).strip() or "unknown"
+                source_tiers[tier] += 1
+            record = records_by_adc.get(adc_id)
+            if record is None:
+                continue
+            eligible_fields = set(record.get("candidate_value_match_fields", [])) | set(
+                record.get("candidate_value_unmatched_fields", [])
+            )
+            if field in eligible_fields:
+                candidate_value_match_eligible_count += sum(
+                    1
+                    for candidate in values
+                    if str(candidate.get("candidate_value", "")).strip()
+                )
+            if field in set(record.get("candidate_value_match_fields", [])):
+                candidate_value_match_count += sum(
+                    1
+                    for match in record.get("candidate_value_match_values", [])
+                    if isinstance(match, dict) and str(match.get("field", "")) == field
+                )
+        field_candidate_summary[field] = {
+            "expected_pair_count": len(expected_pairs),
+            "candidate_locator_pair_count": len(candidate_pairs_for_field),
+            "candidate_locator_missing_count": len(expected_pairs - candidate_pairs_for_field),
+            "candidate_locator_coverage_ratio": round(
+                len(candidate_pairs_for_field) / len(expected_pairs), 4
+            ) if expected_pairs else None,
+            "candidate_value_count": candidate_value_count,
+            "candidate_value_match_count": candidate_value_match_count,
+            "candidate_value_match_eligible_count": candidate_value_match_eligible_count,
+            "candidate_value_match_rate": round(
+                candidate_value_match_count / candidate_value_match_eligible_count, 4
+            ) if candidate_value_match_eligible_count else None,
+            "candidate_source_tier_counts": dict(sorted(source_tiers.items())),
+        }
     return {
         "schema_version": "public-adc-source-content-audit-v1",
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -200,6 +258,7 @@ def audit_catalog_sources(
         # the broader publication-readiness gate.
         "field_level_source_missing_count": len(structural_pairs - candidate_pairs),
         "core_fact_field_level_source_missing_count": len(core_fact_pairs - candidate_pairs),
+        "field_candidate_summary": field_candidate_summary,
         "review_status": "triage_only_pending_human_source_locator_review",
         "ai_or_automatic_labels_are_gold": False, "records": results,
     }

@@ -74,6 +74,24 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(report["candidate_value_match_count"], 1)
         self.assertEqual(report["candidate_value_match_eligible_count"], 1)
         self.assertEqual(report["candidate_value_match_rate"], 1.0)
+        self.assertEqual(
+            report["field_candidate_summary"]["target"],
+            {
+                "expected_pair_count": 1,
+                "candidate_locator_pair_count": 1,
+                "candidate_locator_missing_count": 0,
+                "candidate_locator_coverage_ratio": 1.0,
+                "candidate_value_count": 1,
+                "candidate_value_match_count": 1,
+                "candidate_value_match_eligible_count": 1,
+                "candidate_value_match_rate": 1.0,
+                "candidate_source_tier_counts": {"unknown": 1},
+            },
+        )
+        self.assertEqual(
+            report["field_candidate_summary"]["dar"]["candidate_locator_missing_count"],
+            1,
+        )
         self.assertEqual(report["records"][0]["field_assessment"]["target"], "candidate_locator_pending_human_review")
         self.assertEqual(report["records"][0]["field_assessment"]["dar"], "field_level_source_missing")
         self.assertEqual(report["records"][0]["field_assessment"]["indication"], "field_level_source_missing")

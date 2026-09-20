@@ -37,3 +37,25 @@ The scope validator records 21 core ADC rows and two excluded modality rows
 catalog status distribution is 21 core marketed, one extended marketed, and
 one extended withdrawn record. These are explicit catalog-scope labels; they
 do not independently establish regulatory status.
+
+The source-content triage was rerun on 2026-09-21 against all 23 candidate
+URLs. The report SHA-256 is
+`555c4373833d02e89c526d5226d2fcd8cdeb2ae2fdf1938004e709c94b34837b`.
+For the eight core fact fields, candidate locator coverage is:
+
+| Field | Locator pairs | Missing pairs |
+|---|---:|---:|
+| target | 23 / 23 | 0 |
+| antibody | 23 / 23 | 0 |
+| linker_name | 22 / 23 | 1 |
+| linker_type | 22 / 23 | 1 |
+| payload_name | 23 / 23 | 0 |
+| payload_class | 23 / 23 | 0 |
+| dar | 22 / 23 | 1 |
+| indication | 0 / 23 | 23 |
+
+The automatic value pre-screen found 16 matches among 120 eligible candidate
+values (`0.1333`). This is a triage signal only: PDFs and page structure can
+hide values, terminology can differ, and no match is treated as a verified
+claim. All candidate locators and values remain pending independent human
+source review.
