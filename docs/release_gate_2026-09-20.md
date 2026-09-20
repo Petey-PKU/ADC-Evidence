@@ -25,16 +25,16 @@ python scripts/package_public_release.py `
   --candidate-locators data/public/catalog_source_locator_candidates.jsonl `
   --benchmark-manifest data/annotations/public_benchmark_v1.manifest.json `
   --benchmark-questions data/annotations/public_benchmark_v1.jsonl `
-  --output .test_tmp/adc-public-research-only.zip `
+  --output .test_tmp/adc-public-research-only-current.zip `
   --as-of 2026-09-30
-python scripts/verify_public_release.py .test_tmp/adc-public-research-only.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-research-only-current.zip
 ```
 
-结果（代码提交 `55104fe38498eaae6ff7f9455d2a2152fc7a526b`）：79 个文件、数据库绝对路径计数为 0、`status=verified`，manifest 的
+结果（代码提交 `71d63b1d6c05eac3f4bb888c0ec55d83bc9bcc98`）：79 个文件、数据库绝对路径计数为 0、`status=verified`，manifest 的
 `redistribution.status=research_only`，`redistribution.redistribution_allowed=false`；解压后
-`run_public_release.py --check` 和结构化 T-DXd 查询均成功。ZIP 大小为 42,147,292 字节，
+`run_public_release.py --check` 和结构化 T-DXd 查询均成功。ZIP 大小为 42,147,289 字节，
 SHA-256 为
-`25e7c30bd65bdae4426a97496ff522a4db1d3bc4fd37d8601299349a3190e861`。
+`37fdbe7676db7008c2996eb1fd676240c252602428a475e10125c3c70117da04`。
 
 这只是本地复现制品，不应上传到 GitHub Release、作为公共数据下载附件或用于声称文献可
 再分发。完整论文门禁仍包括字段级一手来源复核、独立测试集和真实人工评分。
