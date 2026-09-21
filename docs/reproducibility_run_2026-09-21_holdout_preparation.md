@@ -26,6 +26,13 @@ remains `not_ready_for_submission` because real `human_independent` or
 `human_adjudicated` labels are still absent. The draft is therefore a
 preparation artifact, not a publication result.
 
+The frozen draft was also smoke-tested against the verified offline release
+launcher without a model API: 20/20 questions completed without runtime errors;
+14 structured questions and 3 comparison questions used the structured backend
+with claim validation reported as valid, and 3 refusal questions used the
+refusal route. These are routing and execution diagnostics only; they do not
+measure semantic correctness or replace human review.
+
 Reproduce the content-free manifest in a private directory with:
 
 ```powershell
