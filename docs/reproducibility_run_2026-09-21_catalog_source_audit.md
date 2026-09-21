@@ -1,7 +1,8 @@
 # Reproducibility record: public catalog source audit (2026-09-21)
 
-This record binds the public catalog source-locator update to the final code
-commit recorded in the Git history on branch `research/v0.6-freeze`. The
+This record binds the public catalog source-locator update to public code commit
+`646f7568dc227ad1d70e0bc4374b9d5d89836a54` on branch
+`research/v0.6-freeze`. The
 update adds provisional status locators for all 23 catalog rows in addition to
 the company, approval date, and approval jurisdiction locators added for
 `adc_006`, `adc_017`, `adc_018`, and `adc_020`. These are source-review leads
