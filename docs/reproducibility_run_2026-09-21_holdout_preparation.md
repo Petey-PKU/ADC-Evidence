@@ -33,6 +33,14 @@ with claim validation reported as valid, and 3 refusal questions used the
 refusal route. These are routing and execution diagnostics only; they do not
 measure semantic correctness or replace human review.
 
+A private two-arm review packet has now been generated from the same offline
+run. It contains 20 questions, 40 blinded candidate outputs, and 80 blank
+review slots for two independent reviewers per candidate. The arm identity map
+is stored separately and remains undisclosed until both ratings are saved and
+any disagreements are adjudicated. The packet contains no standard answers;
+automatic system-versus-baseline diagnostics remain private and are not a
+publication result. Review status is still `awaiting_independent_human_review`.
+
 Reproduce the content-free manifest in a private directory with:
 
 ```powershell
