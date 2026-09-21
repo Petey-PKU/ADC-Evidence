@@ -38,6 +38,13 @@ def validate_public_benchmark(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     if not isinstance(manifest, dict):
         raise ValueError("Benchmark manifest must be a JSON object")
+    evaluation_use = manifest.get("evaluation_use")
+    if not isinstance(evaluation_use, dict):
+        raise ValueError("Public benchmark manifest needs evaluation_use metadata")
+    if evaluation_use.get("status") != "development_exposed":
+        raise ValueError("Public benchmark must have status=development_exposed")
+    if evaluation_use.get("eligible_for_unseen_test_claim") is not False:
+        raise ValueError("Public benchmark cannot be eligible for an unseen test claim")
     question_bytes = questions_path.read_bytes()
     expected_file_hash = str(manifest.get("question_file_sha256", ""))
     actual_file_hash = _text_hash(questions_path)

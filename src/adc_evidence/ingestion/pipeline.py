@@ -36,6 +36,7 @@ from adc_evidence.repository import (
     data_quality_metrics,
     finish_ingestion_run,
     finish_source_run,
+    recover_stale_ingestion_runs,
     source_run_statuses,
     start_ingestion_run,
     start_source_run,
@@ -84,8 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--raw-root", type=Path, default=RAW_DATA_PATH)
     parser.add_argument("--quality-report", type=Path, default=QUALITY_REPORT_PATH)
     parser.add_argument("--pubmed-max", type=int, default=200)
-    parser.add_argument("--trial-page-size", type=int, default=1000)
-    parser.add_argument("--trial-max-pages", type=int, default=1)
+    parser.add_argument("--trial-page-size", type=int, default=100)
+    parser.add_argument("--trial-max-pages", type=int, default=20)
     parser.add_argument("--adcdb-limit", type=int, default=10)
     parser.add_argument("--skip-pubmed", action="store_true")
     parser.add_argument("--skip-trials", action="store_true")
@@ -105,6 +106,14 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     seed_by_id = {record.adc_id: record for record in seed_records}
     normalizer = EntityNormalizer(seed_path=seed_path)
     adc_names = [record.adc_name for record in seed_records]
+    # Include canonical names and catalog aliases in PubMed queries. Aliases
+    # such as RM-1929/Akalux are often used without the generic "ADC" phrase.
+    adc_search_names = list(dict.fromkeys(
+        alias
+        for record in seed_records
+        for alias in (record.adc_name, *record.aliases)
+        if alias
+    ))
     errors: list[str] = []
     summary: dict[str, object] = {
         "run_id": run_id,
@@ -117,8 +126,11 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     parameters = {key: str(value) if isinstance(value, Path) else value for key, value in parameters.items()}
 
     initialize_database(args.database, seed_path)
+    recovered_runs = recover_stale_ingestion_runs(args.database)
     upsert_entity_aliases(args.database, _alias_rows(normalizer))
     start_ingestion_run(args.database, run_id, started_at, parameters)
+    if recovered_runs:
+        summary["recovered_stale_run_ids"] = recovered_runs
     summary["seed_fact_sync"] = record_fact_sets(
         args.database,
         [
@@ -255,7 +267,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
                 attempts,
             ) = retry_call(
                 lambda: collect_clinical_trials(
-                    adc_names,
+                    adc_search_names,
                     run_directory / "clinicaltrials",
                     page_size=args.trial_page_size,
                     max_pages=args.trial_max_pages,
@@ -355,9 +367,10 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
                 attempts,
             ) = retry_call(
                 lambda: collect_pubmed(
-                    adc_names,
+                    adc_search_names,
                     run_directory / "pubmed",
                     max_records=args.pubmed_max,
+                    coverage_names=adc_names,
                 ),
                 max_attempts=source_retries,
                 base_delay_seconds=source_retry_delay,
@@ -396,6 +409,9 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
             upsert_evidence(args.database, evidence)
             summary["pubmed_documents"] = len(documents)
             summary["pubmed_query"] = query
+            summary["pubmed_query_transport"] = (
+                "POST" if len(query.encode("utf-8")) > 1800 else "GET"
+            )
             summary["pubmed_total_matches"] = total_count
             summary["pubmed_truncated"] = total_count > len(documents)
             pubmed_complete = total_count == len(documents)

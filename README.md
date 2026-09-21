@@ -99,7 +99,7 @@ python -m adc_evidence.ingestion.pipeline
 默认范围：
 
 - ADCdb：10 个指定 ADC 的低频精确查询；
-- ClinicalTrials.gov：当前查询命中的全部记录，单页最多 1000 条；
+- ClinicalTrials.gov：当前查询命中的全部记录，单页最多 100 条（通过多页游标继续抓取）；
 - PubMed：按相关度取前 200 条。
 
 可单独跳过某个来源：
@@ -284,9 +284,15 @@ python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/p
 
 面向公开快照的 ADC 目录位于 `data/public/marketed_adc_catalog.csv`。它与 10 条演示种子分开维护，当前包含 23 条监管批准候选记录；使用 `scripts/build_public_dataset.py` 可在本地生成带文献和试验来源哈希的 SQLite 快照。详细范围、未来截止日处理和 Benchmark v1 见 [`docs/public_dataset_and_benchmark.md`](docs/public_dataset_and_benchmark.md)。
 
-需要下载后直接查询的完整快照，可在 GitHub Actions 手动运行
+需要验证下载后直接查询的完整快照，可在 GitHub Actions 手动运行
 [`Build public dataset release`](.github/workflows/public-release.yml)。工作流会生成并校验
-数据库、索引和 benchmark 压缩包；普通代码 push 不会自动抓取或发布数据。
+数据库、索引、benchmark、查询程序及配置的压缩包；普通代码 push 不会自动抓取或发布数据。
+当前工作流只生成并校验 `research_only` 包，不上传或发布压缩包；完成逐项来源许可核查并提供
+v2 redistribution attestation 后，才可在本地生成可再分发包。研究包可解压到独立文件夹，无需另行克隆仓库或重建数据库。按包内
+`RELEASE_README.md` 安装 Python 3.11+ 的基础依赖后，运行
+`python scripts/run_public_release.py` 启动网页，或使用 `--question` 执行单次查询。
+启动器自动选择包内数据，固定使用离线结构化/抽取式回答；首次依赖安装仍需联网，
+包内不包含 Python 解释器、依赖 wheel 或生成模型。
 
 ## 后续工作
 

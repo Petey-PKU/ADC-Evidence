@@ -23,6 +23,84 @@ from adc_evidence.evaluation.public_hygiene import scan_tracked_public_files
 from adc_evidence.repository import data_quality_metrics
 
 
+_INDEPENDENT_HOLDOUT_ROUTES = {
+    "structured_fact",
+    "comparison",
+    "change_query",
+    "trial_lookup",
+    "literature_evidence",
+    "refusal",
+}
+_INDEPENDENT_HOLDOUT_ANSWER_KINDS = {
+    "structured",
+    "comparison",
+    "trial_record",
+    "evidence_document",
+    "refusal",
+    "gap",
+}
+
+
+def _validate_independent_holdout_rows(rows: list[object]) -> None:
+    """Require gold answers and scoring metadata before a holdout is frozen."""
+    required = {
+        "question_id",
+        "question",
+        "category",
+        "expected_route",
+        "expected_status",
+        "standard_answer",
+        "evidence_sources",
+        "allow_partial",
+        "should_refuse",
+        "scoring",
+    }
+    for index, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            raise ValueError(f"Independent holdout row {index} must be an object")
+        missing = sorted(required - set(row))
+        if missing:
+            raise ValueError(
+                f"Independent holdout row {row.get('question_id', index)} missing fields: {missing}"
+            )
+        if not isinstance(row.get("category"), str) or not str(row["category"]).strip():
+            raise ValueError(f"Independent holdout row {row['question_id']} needs category")
+        if row.get("expected_route") not in _INDEPENDENT_HOLDOUT_ROUTES:
+            raise ValueError(f"Independent holdout row {row['question_id']} has invalid expected_route")
+        statuses = row.get("expected_status")
+        if not isinstance(statuses, list) or not statuses or any(
+            not isinstance(status, str) or not status.strip()
+            for status in statuses
+        ):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs expected_status")
+        if not isinstance(row.get("allow_partial"), bool):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs boolean allow_partial")
+        if not isinstance(row.get("should_refuse"), bool):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs boolean should_refuse")
+        if row["should_refuse"] != (row["expected_route"] == "refusal"):
+            raise ValueError(f"Independent holdout row {row['question_id']} refusal metadata disagrees with route")
+        answer = row.get("standard_answer")
+        if not isinstance(answer, dict) or answer.get("kind") not in _INDEPENDENT_HOLDOUT_ANSWER_KINDS:
+            raise ValueError(f"Independent holdout row {row['question_id']} needs a valid standard_answer")
+        sources = row.get("evidence_sources")
+        if not isinstance(sources, list):
+            raise ValueError(f"Independent holdout row {row['question_id']} needs evidence_sources list")
+        for source in sources:
+            if not isinstance(source, dict) or any(
+                not isinstance(source.get(field), str) or not source[field].strip()
+                for field in ("source_type", "source_record_id", "source_url", "field")
+            ):
+                raise ValueError(
+                    f"Independent holdout row {row['question_id']} evidence sources need type, ID, URL, and field"
+                )
+        scoring = row.get("scoring")
+        if not isinstance(scoring, dict) or not isinstance(scoring.get("primary_metric"), str) or not scoring["primary_metric"].strip():
+            raise ValueError(f"Independent holdout row {row['question_id']} needs scoring.primary_metric")
+        for field in ("automatic_fields", "human_fields"):
+            if not isinstance(scoring.get(field), list):
+                raise ValueError(f"Independent holdout row {row['question_id']} needs scoring.{field} list")
+
+
 def _check(name: str, status: str, detail: str) -> dict[str, str]:
     return {"name": name, "status": status, "detail": detail}
 
@@ -40,6 +118,9 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
         raise ValueError("Independent holdout must have status=unseen_holdout")
     if manifest.get("access_controlled") is not True:
         raise ValueError("Independent holdout must be access_controlled")
+    for field in ("access_control_method", "access_control_attestation"):
+        if not isinstance(manifest.get(field), str) or not manifest[field].strip():
+            raise ValueError(f"Independent holdout needs nonempty {field}")
     question_count = manifest.get("question_count")
     if not isinstance(question_count, int) or isinstance(question_count, bool) or question_count < 1:
         raise ValueError("Independent holdout question_count must be a positive integer")
@@ -65,7 +146,10 @@ def validate_independent_holdout_manifest(manifest: object) -> dict[str, object]
 
 
 def validate_independent_holdout_file(
-    questions_path: Path, manifest: dict[str, object]
+    questions_path: Path,
+    manifest: dict[str, object],
+    *,
+    exposed_questions: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     """Bind an external JSONL question file to its manifest without exposing rows."""
     raw = questions_path.read_bytes()
@@ -86,6 +170,7 @@ def validate_independent_holdout_file(
         raise ValueError("Independent holdout question file count mismatch")
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError("Independent holdout question file rows must be objects")
+    _validate_independent_holdout_rows(rows)
     question_ids = [str(row.get("question_id", "")) for row in rows]
     if any(not question_id.strip() for question_id in question_ids):
         raise ValueError("Independent holdout question IDs must be nonempty")
@@ -106,13 +191,77 @@ def validate_independent_holdout_file(
     )
     if manifest.get("question_id_sha256") != actual_question_id_hash:
         raise ValueError("Independent holdout question ID hash mismatch")
+    disjointness = None
+    if exposed_questions is not None:
+        disjointness = validate_holdout_disjoint(rows, exposed_questions)
     return {
         "question_file_sha256": actual_hash,
         "question_set_hash": actual_question_set_hash,
         "question_id_sha256": actual_question_id_hash,
         "question_count": len(rows),
         "path": questions_path.name,
+        "disjointness": disjointness,
     }
+
+
+def build_independent_holdout_manifest(
+    questions_path: Path,
+    *,
+    question_set_version: str,
+    evaluation_window_id: str,
+    access_control_method: str,
+    database_data_version: str | None = None,
+    code_commit: str | None = None,
+) -> dict[str, object]:
+    """Create content-free integrity metadata for an external confirmation set.
+
+    The caller must attest how the question file is access controlled.  This
+    function records that attestation but cannot prove filesystem permissions;
+    the question bytes are never copied into the manifest.
+    """
+    if not question_set_version.strip() or not evaluation_window_id.strip():
+        raise ValueError("question_set_version and evaluation_window_id must be nonempty")
+    if not access_control_method.strip():
+        raise ValueError("access_control_method must be nonempty")
+    questions_path = questions_path.resolve()
+    raw = questions_path.read_bytes()
+    rows = [
+        json.loads(line)
+        for line in raw.decode("utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    if not rows or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("Independent holdout must contain at least one JSON object row")
+    _validate_independent_holdout_rows(rows)
+    question_ids = [str(row.get("question_id", "")).strip() for row in rows]
+    if any(not value for value in question_ids) or len(question_ids) != len(set(question_ids)):
+        raise ValueError("Independent holdout question IDs must be unique and nonempty")
+    for row in rows:
+        validate_question_text(row.get("question"))
+    canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    manifest: dict[str, object] = {
+        "schema_version": "v0.6-independent-holdout-manifest-v1",
+        "question_set_version": question_set_version,
+        "question_set_hash": "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        "question_id_sha256": question_id_sha256(question_ids),
+        "question_file_sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        "question_count": len(rows),
+        "evaluation_window_id": evaluation_window_id,
+        "access_controlled": True,
+        "access_control_method": access_control_method,
+        "access_control_attestation": "operator_asserted; verify independently before publication",
+        "evaluation_use": {
+            "status": "unseen_holdout",
+            "eligible_for_unseen_test_claim": True,
+            "reason": "Question content was frozen outside the public development repository before evaluation.",
+        },
+        "privacy_note": "Only hashes and metadata are included; question content and local paths remain external.",
+    }
+    if database_data_version:
+        manifest["database_data_version"] = database_data_version
+    if code_commit:
+        manifest["code_commit"] = code_commit
+    return manifest
 
 
 def validate_human_review_manifest(manifest: object) -> dict[str, object]:
@@ -205,6 +354,94 @@ def database_quality_provenance_check(repo_root: Path) -> tuple[str, str]:
     return "pass", "committed quality report matches the committed demo database"
 
 
+def _read_audit_object(path: Path, *, label: str) -> dict[str, object]:
+    """Read a content-free public audit report and reject malformed evidence."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{label} is not readable JSON") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
+def public_dataset_audit_check(
+    dataset_audit: Path | None,
+    catalog_source_audit: Path | None,
+) -> tuple[str, str]:
+    """Validate externally generated public snapshot audits without trusting paths.
+
+    The reports are deliberately supplied from outside the source checkout: a
+    local SQLite snapshot and raw source responses are not public repository
+    content. This check validates the report schema and provenance summary,
+    while retaining ``warning`` status when the underlying data or field
+    review is explicitly partial/pending.
+    """
+    if dataset_audit is None and catalog_source_audit is None:
+        return "warning", "no public snapshot audit reports supplied"
+    details: list[str] = []
+    status = "pass"
+    if dataset_audit is not None:
+        report = _read_audit_object(dataset_audit, label="public dataset audit")
+        if report.get("schema_version") != "public-adc-dataset-audit-v1":
+            raise ValueError("public dataset audit has an unsupported schema_version")
+        digest = report.get("database_sha256")
+        if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise ValueError("public dataset audit needs database_sha256")
+        counts = report.get("counts")
+        if not isinstance(counts, dict) or any(
+            not isinstance(counts.get(name), int) or counts[name] < 0
+            for name in ("adcs", "trials", "documents", "entity_links")
+        ):
+            raise ValueError("public dataset audit has invalid counts")
+        coverage = report.get("source_coverage")
+        if not isinstance(coverage, dict) or not coverage:
+            raise ValueError("public dataset audit needs source_coverage")
+        allowed_states = {"complete", "partial", "unknown"}
+        if any(
+            not isinstance(item, dict) or item.get("coverage_state") not in allowed_states
+            for item in coverage.values()
+        ):
+            raise ValueError("public dataset audit has invalid source coverage states")
+        dataset_status = report.get("status")
+        if dataset_status not in allowed_states:
+            raise ValueError("public dataset audit has invalid status")
+        if dataset_status != "complete" or any(
+            item.get("coverage_state") != "complete" for item in coverage.values()
+        ):
+            status = "warning"
+        details.append(
+            f"dataset audit bound to {digest}, status={dataset_status}, "
+            f"{counts['adcs']} ADCs/{counts['trials']} trials/{counts['documents']} documents"
+        )
+    if catalog_source_audit is not None:
+        report = _read_audit_object(catalog_source_audit, label="catalog source audit")
+        if report.get("schema_version") != "public-adc-source-content-audit-v1":
+            raise ValueError("catalog source audit has an unsupported schema_version")
+        row_count = report.get("catalog_row_count")
+        pair_count = report.get("core_fact_candidate_locator_count")
+        total_pair_count = report.get("candidate_locator_pair_count", pair_count)
+        if not isinstance(row_count, int) or row_count < 1:
+            raise ValueError("catalog source audit needs a positive catalog_row_count")
+        if not isinstance(pair_count, int) or pair_count < 0:
+            raise ValueError("catalog source audit needs core fact locator count")
+        if not isinstance(total_pair_count, int) or total_pair_count < pair_count:
+            raise ValueError("catalog source audit needs a valid total candidate locator count")
+        review_status = report.get("review_status")
+        if not isinstance(review_status, str) or not review_status.strip():
+            raise ValueError("catalog source audit needs review_status")
+        if report.get("ai_or_automatic_labels_are_gold") is not False:
+            raise ValueError("catalog source audit must reject automatic labels as gold")
+        if review_status != "verified_primary_source_review":
+            status = "warning"
+        details.append(
+            f"catalog source audit covers {row_count} rows and {pair_count} core-fact candidate locators "
+            f"({total_pair_count} total candidate pairs); "
+            f"review_status={review_status}"
+        )
+    return status, "; ".join(details)
+
+
 def audit_public_paper_readiness(
     repo_root: Path,
     *,
@@ -212,6 +449,8 @@ def audit_public_paper_readiness(
     human_review_manifest: Path | None = None,
     independent_holdout_manifest: Path | None = None,
     independent_holdout_questions: Path | None = None,
+    public_dataset_audit: Path | None = None,
+    public_catalog_source_audit: Path | None = None,
 ) -> dict[str, object]:
     """Audit public evidence and optional externally supplied confirmation artifacts.
 
@@ -267,6 +506,11 @@ def audit_public_paper_readiness(
             quality_detail,
         )
     )
+    if public_dataset_audit is not None or public_catalog_source_audit is not None:
+        audit_status, audit_detail = public_dataset_audit_check(
+            public_dataset_audit, public_catalog_source_audit
+        )
+        checks.append(_check("public_dataset_audit", audit_status, audit_detail))
     if human_review_jsonl is None:
         checks.append(
             _check(
@@ -318,12 +562,16 @@ def audit_public_paper_readiness(
                 )
             )
         else:
-            bound = validate_independent_holdout_file(independent_holdout_questions, manifest)
+            bound = validate_independent_holdout_file(
+                independent_holdout_questions,
+                manifest,
+                exposed_questions=exposed,
+            )
             checks.append(
                 _check(
                     "independent_holdout",
                     "pass",
-                    f"manifest and question file hashes/count validated ({bound['question_count']} questions)",
+                    f"manifest, question file hashes/count, and disjointness validated ({bound['question_count']} questions)",
                 )
             )
     blockers = [item for item in checks if item["status"] == "blocker"]

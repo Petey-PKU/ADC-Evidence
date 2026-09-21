@@ -529,6 +529,7 @@ def record_fact_sets(
                     observation.source,
                     observation.source_record_id,
                     observation.snapshot_id or "",
+                    observation.source_url,
                     value.source_locator,
                     value_hash,
                     evidence_text,

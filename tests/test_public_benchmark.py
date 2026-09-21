@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import unittest
 from pathlib import Path
 
 from adc_evidence.evaluation.public_benchmark import (
+    PUBLIC_BENCHMARK_PROMPT_VERSION,
+    PUBLIC_EVALUATION_CONDITIONS,
     benchmark_manifest,
     compare_public_benchmark_reports,
     load_public_benchmark,
     score_public_benchmark,
+    validate_public_benchmark_report_metadata,
 )
 from scripts.prepare_public_benchmark_review import prepare_packet
 from scripts.validate_public_benchmark import validate_public_benchmark
@@ -49,6 +53,23 @@ class PublicBenchmarkTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["question_count"], 98)
+
+    def test_manifest_cannot_be_relabelled_as_unseen_test(self) -> None:
+        temporary = WorkspaceTemporaryDirectory()
+        try:
+            manifest_path = Path(temporary.name) / "manifest.json"
+            manifest = json.loads(
+                (ROOT / "data" / "annotations" / "public_benchmark_v1.manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            manifest["evaluation_use"]["status"] = "unseen_holdout"
+            manifest["evaluation_use"]["eligible_for_unseen_test_claim"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "development_exposed"):
+                validate_public_benchmark(BENCHMARK, manifest_path)
+        finally:
+            temporary.cleanup()
 
     def test_manifest_question_hash_is_stable_across_newline_conventions(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
@@ -178,6 +199,37 @@ class PublicBenchmarkTests(unittest.TestCase):
         self.assertEqual(comparison["paired_metrics"]["route"]["difference"], 1.0)
         self.assertEqual(comparison["paired_metrics"]["answer"]["system_rate"], 1.0)
         self.assertIn("mcnemar_exact_two_sided_pvalue", comparison["paired_metrics"]["route"]["paired_statistics"])
+
+    def test_report_metadata_mismatch_fails_closed(self) -> None:
+        rows = load_public_benchmark(BENCHMARK)[:1]
+        question_hash = "sha256:" + hashlib.sha256(
+            json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+        def report(variant: str) -> dict[str, object]:
+            return {
+                "schema_version": "public-adc-benchmark-report-v1",
+                "system_variant": variant,
+                "question_set_sha256": question_hash,
+                "question_count": 1,
+                "network_enabled": False,
+                "model": "extractive-offline-v1",
+                "prompt_version": PUBLIC_BENCHMARK_PROMPT_VERSION,
+                "evaluation_conditions": dict(PUBLIC_EVALUATION_CONDITIONS),
+                "database_data_version": {"data_version": "db-v1"},
+            }
+
+        system = report("adc_evidence_public")
+        baseline = report("offline_rag_baseline")
+        metadata = validate_public_benchmark_report_metadata(system, baseline, rows)
+        self.assertEqual(metadata["database_data_version"], {"data_version": "db-v1"})
+        self.assertEqual(metadata["question_count"], 1)
+        baseline["evaluation_conditions"] = {
+            **PUBLIC_EVALUATION_CONDITIONS,
+            "retrieval_top_k": 10,
+        }
+        with self.assertRaisesRegex(ValueError, "evaluation conditions"):
+            validate_public_benchmark_report_metadata(system, baseline, rows)
 
 
 if __name__ == "__main__":

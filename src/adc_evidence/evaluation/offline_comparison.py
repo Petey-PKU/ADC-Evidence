@@ -6,6 +6,7 @@ from typing import Any
 
 from adc_evidence.evaluation.benchmark import (
     OFFLINE_BASELINE_VERSION,
+    OFFLINE_EVALUATION_CONDITIONS,
     IMPLEMENTATION_VERSION,
     validate_arm_report,
 )
@@ -37,6 +38,12 @@ def compare_offline_reports(
         raise ValueError("Offline reports must record database_data_version")
     if system_data != baseline_data:
         raise ValueError("Offline reports disagree on database_data_version")
+    if system_report.get("evaluation_conditions") != OFFLINE_EVALUATION_CONDITIONS:
+        raise ValueError("System report has unexpected offline evaluation conditions")
+    if baseline_report.get("evaluation_conditions") != OFFLINE_EVALUATION_CONDITIONS:
+        raise ValueError("Baseline report has unexpected offline evaluation conditions")
+    if system_report["evaluation_conditions"] != baseline_report["evaluation_conditions"]:
+        raise ValueError("Offline reports disagree on evaluation_conditions")
     expected = {str(row["question_id"]): row for row in questions}
     system = {str(row["question_id"]): row for row in system_report["questions"]}
     baseline = {str(row["question_id"]): row for row in baseline_report["questions"]}
@@ -76,6 +83,7 @@ def compare_offline_reports(
         "question_id_sha256": system_report["question_id_sha256"],
         "evaluation_window_id": system_report["evaluation_window_id"],
         "database_data_version": system_data,
+        "evaluation_conditions": dict(OFFLINE_EVALUATION_CONDITIONS),
         "question_count": len(questions),
         "system_diagnostics": system_report.get("automatic_diagnostics"),
         "baseline_diagnostics": baseline_report.get("automatic_diagnostics"),

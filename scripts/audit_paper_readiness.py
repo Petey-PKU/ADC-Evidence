@@ -16,6 +16,8 @@ def main() -> None:
     parser.add_argument("--human-review-manifest", type=Path)
     parser.add_argument("--independent-holdout-manifest", type=Path)
     parser.add_argument("--independent-holdout-questions", type=Path)
+    parser.add_argument("--public-dataset-audit", type=Path)
+    parser.add_argument("--public-catalog-source-audit", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = audit_public_paper_readiness(
@@ -24,6 +26,8 @@ def main() -> None:
         human_review_manifest=args.human_review_manifest,
         independent_holdout_manifest=args.independent_holdout_manifest,
         independent_holdout_questions=args.independent_holdout_questions,
+        public_dataset_audit=args.public_dataset_audit,
+        public_catalog_source_audit=args.public_catalog_source_audit,
     )
     rendered = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:

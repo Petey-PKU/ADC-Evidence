@@ -15,6 +15,14 @@ from adc_evidence.workbench import evidence_data_version
 
 
 ABLATION_SCHEMA_VERSION = "v0.6-component-ablation-v1"
+ABLATION_PROMPT_VERSION = "extractive-offline-v1"
+ABLATION_EVALUATION_CONDITIONS = {
+    "network_enabled": False,
+    "retrieval_mode": "sparse",
+    "retrieval_top_k": 5,
+    "candidate_limit": 60,
+    "generator": "extractive-offline-v1",
+}
 
 
 def _digest(questions: list[dict[str, object]]) -> str:
@@ -54,9 +62,12 @@ def run_identifier_routing_ablation(
             generator=ExtractiveGenerator(),
         ),
         "without_identifier_routing": EvidenceAnsweringService(
+            # Keep the structured engine and the same database in both arms;
+            # only exact PMID/NCT routing is disabled in this arm.
             database_path=database_path,
             retriever=_RankedOnlyRetriever(database_path),
             generator=ExtractiveGenerator(),
+            enable_identifier_routing=False,
         ),
     }
     arms: dict[str, object] = {}
@@ -64,7 +75,9 @@ def run_identifier_routing_ablation(
         outputs = [_system_row(row, service.answer(str(row["question"]))) for row in questions]
         arms[name] = {
             "network_enabled": False,
-            "model": "v0.6-structured-validator-v4",
+            "model": "deterministic-extractive-v1",
+            "prompt_version": ABLATION_PROMPT_VERSION,
+            "evaluation_conditions": dict(ABLATION_EVALUATION_CONDITIONS),
             "automatic_diagnostics": automatic_diagnostics(outputs, questions),
             "questions": outputs,
         }
@@ -94,6 +107,9 @@ def run_identifier_routing_ablation(
     return {
         "schema_version": ABLATION_SCHEMA_VERSION,
         "ablation_component": "exact_identifier_routing",
+        "model": "deterministic-extractive-v1",
+        "prompt_version": ABLATION_PROMPT_VERSION,
+        "evaluation_conditions": dict(ABLATION_EVALUATION_CONDITIONS),
         "question_set_hash": f"sha256:{_digest(questions)}",
         "question_id_sha256": question_id_sha256(
             str(row["question_id"]) for row in questions

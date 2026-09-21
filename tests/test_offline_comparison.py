@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from adc_evidence.evaluation.benchmark import build_external_arm_report
+from adc_evidence.evaluation.benchmark import (
+    OFFLINE_EVALUATION_CONDITIONS,
+    build_external_arm_report,
+)
 from adc_evidence.evaluation.offline_comparison import compare_offline_reports
 from adc_evidence.evaluation.statistics import holm_bonferroni_adjust, paired_binary_summary
 
@@ -25,6 +28,7 @@ def report(arm: str, status: str, route: str) -> dict[str, object]:
         questions=rows,
     )
     result["database_data_version"] = {"data_version": "test-db-v1"}
+    result["evaluation_conditions"] = dict(OFFLINE_EVALUATION_CONDITIONS)
     return result
 
 
@@ -58,6 +62,16 @@ class OfflineComparisonTests(unittest.TestCase):
         baseline = report("offline_rag_baseline", "refused", "literature_evidence")
         baseline["database_data_version"] = {"data_version": "different-db"}
         with self.assertRaises(ValueError):
+            compare_offline_reports(system, baseline, questions())
+
+    def test_retrieval_budget_mismatch_fails_closed(self) -> None:
+        system = report("adc_evidence", "answered", "structured_fact")
+        baseline = report("offline_rag_baseline", "refused", "literature_evidence")
+        baseline["evaluation_conditions"] = {
+            **OFFLINE_EVALUATION_CONDITIONS,
+            "retrieval_top_k": 10,
+        }
+        with self.assertRaisesRegex(ValueError, "evaluation conditions"):
             compare_offline_reports(system, baseline, questions())
 
     def test_paired_binary_summary_is_deterministic_and_pair_aware(self) -> None:

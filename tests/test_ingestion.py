@@ -1,11 +1,14 @@
 from tests.support import WorkspaceTemporaryDirectory
 import unittest
+import json
 from pathlib import Path
+from unittest.mock import patch
 
 from adc_evidence.database import initialize_database
 from adc_evidence.ingestion.adcdb import parse_adcdb_detail, parse_adcdb_search_results
 from adc_evidence.ingestion.clinical_trials import parse_trials_page
-from adc_evidence.ingestion.pubmed import parse_pubmed_xml
+from adc_evidence.ingestion.clinical_trials import collect_clinical_trials
+from adc_evidence.ingestion.pubmed import build_pubmed_query, parse_pubmed_xml
 from adc_evidence.processing.normalize import EntityNormalizer, normalize_text
 from adc_evidence.processing.standardize import (
     document_links_and_evidence,
@@ -143,6 +146,24 @@ class IngestionTests(unittest.TestCase):
         self.assertTrue(any(link.entity_id == "adc_001" for link in links))
         self.assertTrue(any(item.value == "RECRUITING" for item in evidence))
 
+    def test_clinical_trials_caps_large_page_size(self) -> None:
+        version = b'{"dataTimestamp":"2026-09-13"}'
+        page = json.dumps({"studies": [], "totalCount": 0}).encode()
+        with WorkspaceTemporaryDirectory() as temporary_directory:
+            with patch(
+                "adc_evidence.ingestion.clinical_trials.fetch_bytes",
+                side_effect=[version, page],
+            ) as fetched:
+                _, _, _, info = collect_clinical_trials(
+                    ["Trastuzumab deruxtecan"],
+                    Path(temporary_directory) / "raw",
+                    page_size=1000,
+                    max_pages=1,
+                )
+        self.assertEqual(info["requested_page_size"], 1000)
+        self.assertEqual(info["page_size"], 100)
+        self.assertIn("pageSize=100", fetched.call_args_list[1].args[0])
+
     def test_repository_round_trip_and_quality_metrics(self) -> None:
         documents = parse_pubmed_xml(
             PUBMED_XML,
@@ -173,6 +194,14 @@ class IngestionTests(unittest.TestCase):
     def test_normalize_text_is_punctuation_insensitive(self) -> None:
         self.assertEqual(normalize_text("TROP-2"), "trop 2")
         self.assertEqual(normalize_text("TROP 2"), "trop 2")
+
+    def test_pubmed_query_includes_aliases_outside_broad_adc_gate(self) -> None:
+        query = build_pubmed_query(["Cetuximab sarotalocan", "RM-1929", "Akalux"])
+        self.assertIn('"RM-1929"[Title/Abstract]', query)
+        self.assertIn('"Akalux"[Title/Abstract]', query)
+        # The direct alias clause is present after the broad ADC/target clause,
+        # so papers that omit the phrase "antibody-drug conjugate" are kept.
+        self.assertIn(") OR (\"Cetuximab sarotalocan\"[Title/Abstract]", query)
 
 
 if __name__ == "__main__":

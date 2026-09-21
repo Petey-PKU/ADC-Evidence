@@ -82,6 +82,7 @@ class EvidenceAnsweringService:
         guard: EvidenceGuard | None = None,
         database_path: Path | None = None,
         seed_path: Path | None = None,
+        enable_identifier_routing: bool = True,
     ) -> None:
         if retriever is None:
             retriever = (
@@ -96,6 +97,7 @@ class EvidenceAnsweringService:
         self.generator = generator or create_generator("auto")
         self.guard = guard or EvidenceGuard()
         self.database_path = database_path
+        self.enable_identifier_routing = enable_identifier_routing
         self.structured = (
             StructuredAnswerEngine(database_path) if database_path is not None else None
         )
@@ -198,7 +200,10 @@ class EvidenceAnsweringService:
                 if plan is not None and plan.route == "literature_evidence"
                 else infer_source_type(question)
             )
-            identifier_search = getattr(self.retriever, "identifier_search", None)
+            identifier_search = (
+                getattr(self.retriever, "identifier_search", None)
+                if self.enable_identifier_routing else None
+            )
             results = (
                 identifier_search(
                     question,

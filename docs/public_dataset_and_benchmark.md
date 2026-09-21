@@ -4,13 +4,26 @@
 
 公共目录位于 `data/public/marketed_adc_catalog.csv`，包含 23 个截至
 2026-06-30 已有监管批准记录的 ADC 候选（包括 1 个历史撤回记录）。在 2026-09-13
-构建的本地快照中，目录扩展为 23 个 ADC、1,750 条 ClinicalTrials.gov 试验和 998
-篇 PubMed 文献，其中 956 篇含摘要。请求的 `2026-09-30` 是未来目标窗口，因此本次
+构建的本地快照中，目录扩展为 23 个 ADC、3,503 条 ClinicalTrials.gov 试验和 1,410
+篇 PubMed 文献，其中 1,366 篇含摘要；23 个 ADC 均至少有一条文献实体关联。请求的 `2026-09-30` 是未来目标窗口，因此本次
 清单将 `as_of_status` 标为 `future_target_pending`，不把未来日期当作已观察数据。
 
 本目录是可审阅的公共种子，字段仍标为 `primary_check_pending`。每个字段在公开发布前
 必须绑定监管标签、注册库记录或其他一手来源；当前目录的总览来源只是范围参考，不能
 直接充当人工金标准。私有 SQLite、原始响应、评审身份和评审导出不会复制到本目录。
+
+范围边界由 `data/public/catalog_scope_policy.json` 声明：核心集合只计入传统
+`antibody_drug_conjugate`；`photoimmunoconjugate` 和 `recombinant_immunotoxin`
+作为扩展模态单独报告。当前目录的核心/扩展数量为 21/2。分类本身仍是
+`provisional_pending_primary_source_review`，不能替代结构字段的一手来源复核。
+
+`data/public/catalog_source_locator_candidates.jsonl` 已加入全部 23 个目录条目的 FDA/PMDA 标签、临床试验注册、
+监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 299 个 ADC-字段组合，共 302 条候选；其中三组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
+表示仍需其他结构来源或术语核对；所有条目保持 `pending_independent_primary_source_review`，
+因此不计入人工金标准或论文主结果。
+
+当前三组竞争字段为 `adc_016.dar`、`adc_016.payload_name` 和
+`adc_019.payload_name`；它们的来源值和复核要求见[字段冲突审计记录](catalog_field_conflict_audit_2026-09-20.md)。
 
 ## 构建流程
 
@@ -22,14 +35,71 @@ python scripts/build_public_dataset.py `
   --catalog data/public/marketed_adc_catalog.csv `
   --as-of 2026-09-30 `
   --pubmed-max 1000 `
-  --trial-page-size 1000 `
-  --trial-max-pages 10
+  --trial-page-size 100 `
+  --trial-max-pages 20
 ```
 
 命令只调用公开数据源，不调用生成模型。SQLite、原始响应和质量报告默认写入
 `data/processed` 与 `data/raw` 的忽略路径；manifest 记录请求日期、实际数据窗口、
 来源运行状态、数量和哈希。PubMed 结果可能因解析或来源使用限制而不适合直接再分发，
 所以发布前应按记录检查许可证，必要时只发布 PMID、标题、摘要 URL 和哈希。
+
+可对本地快照生成不含记录正文的去重、实体链接、字段事实覆盖和来源完整性审计：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/audit_public_dataset.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --output artifacts/evaluation/public_dataset_audit.json
+```
+
+审计会将计划中的抓取上限记录为 `partial`，不会把部分 PubMed 结果解释为全集覆盖；
+`link_coverage_by_adc`、`missing_trial_link_adc_ids`、`missing_document_link_adc_ids` 和
+`orphan_link_counts` 用于发现实体关联缺口，
+不会把没有关联记录的 ADC 静默计入文献或试验覆盖率。
+`entity_link_integrity` 还检查 ADC 实体、匹配别名和逻辑重复链接；`source_url_quality` 检查
+ClinicalTrials.gov/PubMed 记录是否有可追溯 HTTPS 来源；`record_date_quality` 按显式 `--as-of`
+日期报告缺失、格式异常和超出窗口的记录。任何 `needs_review` 或 `unknown` 状态都不能被解释为
+完整覆盖或正确实体关联。
+对晚卷期日期可显式提供 `--raw-root data/raw/public_2026-09-30`，生成
+`late_publication_date_review`：绑定原始 XML 哈希和 PMID，分开记录电子发表日期、
+NLM 处理日期和日期顺序异常；不提供原始文件目录时保持 unknown。该检查不自动删除记录、
+更改来源日期或证明历史时点的内容可用性。实例见
+[文献日期边界核查](publication_date_audit_2026-09-20.md)。
+其中 `adc_fact_provenance` 的 `source_types=["curated_seed"]` 只表示字段已绑定候选来源
+链接；只有后续人工确认并记录为相应一级来源类型，才可用于论文中的金标准统计。
+审计还输出 `adc_fact_source_quality`，对当前字段 evidence 的空 URL 和通用首页 URL
+计数；`adc_fact_source_quality_status=needs_review` 时，不能把该快照当作字段来源已核验。
+数据库可能保留多次采集尝试。审计报告同时保留 `source_runs` 历史，并按
+`finished_at`/`started_at` 选择每个来源的 `latest_source_runs`；`incomplete_sources`
+只根据最新一次运行判断，避免把旧的失败尝试误读成当前快照状态。
+`source_coverage` 进一步为每个最新来源输出 `coverage_state`、expected/collected 数量和可计算的
+`coverage_ratio`；`partial_sources` 与 `unknown_sources` 分开列出。缺少来源总数、跳过或失败的
+运行不会被编码成 0% 覆盖，而会保持 `unknown` 并给出不可计算原因。
+
+可对候选 URL 做一次带超时的内容预核验（不修改目录字段，也不生成人工 verdict）：
+
+```powershell
+$env:PYTHONPATH="src"
+$env:HTTP_PROXY="http://127.0.0.1:7890"
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
+python scripts/audit_public_catalog_sources.py `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --candidate-locators data/public/catalog_source_locator_candidates.jsonl `
+  --output artifacts/evaluation/public_catalog_source_content_audit.json
+```
+
+报告只记录 HTTP 状态、内容类型、ADC 名称/别名是否出现在响应文本中、来源类别和字段评估。
+`candidate_support_only` 是待人工定位的线索，`candidate_locator_pending_human_review` 表示候选
+文件已经给出字段级 URL 线索但尚未完成独立人工核验，`field_level_source_missing` 表示仍没有
+字段级候选 URL；自动匹配永远不计入金标准。按 7 个结构字段计算，当前候选文件覆盖
+161/161 个结构 ADC-字段组合均已有候选定位；把 `indication` 纳入论文所需
+核心事实后，覆盖为 184/184。23 个适应证字段均已有候选定位，但仍未完成人工复核。
+这些数字都不等同于字段已经被证实。2026-09-21 的实际运行
+结果为 23 行均返回 HTTP 响应（21 行可访问、2 行 HTTP 错误），16 行文本出现
+名称/别名；17 行文本被扫描、4 个 PDF 未提取正文、2 行待处理；自动预筛得到
+68/222 个候选值匹配（`0.3063`）；状态为
+`triage_only_pending_human_source_locator_review`。
 
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
 词法初筛，主题包括 `mechanism`、`efficacy` 和 `safety`。表中保存命中的词、规则版本和
@@ -51,26 +121,52 @@ embedding 模型后重新构建。
 发布包的示例配置同时设置 `ADC_OFFLINE_ONLY=true` 和
 `ADC_LLM_BACKEND=extractive`，确保下载者不配置 API 也能运行。
 
-如果要提供“下载后直接查询”的版本，可运行 `scripts/package_public_release.py`。脚本会
+如果要在本地验证“下载后直接查询”的版本，可运行 `scripts/package_public_release.py --research-only`。
+该模式明确禁止上传或再分发；只有完成来源许可核查并提供独立 attestation 文件后，才可用
+`--redistribution-attestation` 生成公开版本。脚本会
 先验证 SQLite 与向量索引的 retrieval corpus 版本一致，再生成包含数据库、索引、公开目录、
-benchmark 题集与 manifest、README 和 SHA-256 清单的外部发布包；这些二进制文件不会进入
+benchmark 题集与 manifest、查询程序、必要配置、README 和 SHA-256 清单的 v2 外部发布包；这些二进制文件不会进入
 Git 仓库。包内还包含 `marketed_adc_catalog.audit.json`，列出缺失字段、通用监管入口页和
 待做的一级来源核验，不把待核验记录伪装成金标准。
+attestation 必须使用 `public-redistribution-attestation-v2`，并为每个随包来源范围提供唯一
+的 HTTPS 许可链接、许可依据和 `review_status=approved`；格式与待核查范围见
+[`docs/redistribution_attestation.md`](redistribution_attestation.md)。
+打包前还会逐条比较 SQLite 与目录中重叠的 ADC 字段；如果数据库仍是旧来源或旧值，打包会
+直接失败，避免发布包中的可查询数据库与目录清单不一致。
+
+程序只从已被 Git 跟踪的公开 Python 源码和明确列出的运行配置打包，并执行文本卫生检查；
+本地 `.env`、缓存、未跟踪源码和其他配置不会自动进入发布包。manifest 的 `application`
+记录代码提交、工作区是否存在改动、实际数据库/目录/索引路径和 Python 要求；所有程序
+文件也进入 SHA-256 清单。开发时打包的脏工作区不能被报告为对应提交的原样发布。
+
+将 v2 压缩包解压到独立文件夹后，按 `RELEASE_README.md` 创建 Python 3.11+ 虚拟环境，
+执行 `python -m pip install -e .` 安装基础依赖，再运行：
+
+```powershell
+python scripts/run_public_release.py --check
+python scripts/run_public_release.py --question "T-DXd 的靶点和载荷是什么？"
+python scripts/run_public_release.py
+```
+
+最后一条命令启动本机网页 `http://127.0.0.1:8501`。启动器不依赖调用者所在目录，自动选择
+解压包内的数据，并强制离线抽取式配置。无需另行克隆代码、采集数据或下载模型；首次
+Python 依赖安装需要联网或自行提供依赖 wheel。发布包未捆绑 Python 解释器和第三方依赖。
 
 公共仓库还提供手动触发的 `.github/workflows/public-release.yml`。在 GitHub Actions 中输入
 快照日期和抓取上限后，它会在干净的 Ubuntu runner 上重建数据库、hashing 索引和 benchmark，
-执行脱敏、语料版本绑定及发布包校验，并将 zip 作为 Actions artifact 提供下载。工作流只有
-`workflow_dispatch` 入口，不会因普通代码 push 自动抓取或发布数据；下载者仍应先检查包内的
-`RELEASE_MANIFEST.json` 和来源许可。
+执行脱敏、语料版本绑定及研究包校验。由于当前尚无逐项许可批准，工作流明确使用
+`--research-only`，不会上传或发布 zip；只有提供 v2 redistribution attestation 后，才允许
+另行生成可再分发包。工作流只有 `workflow_dispatch` 入口，不会因普通代码 push 自动抓取或
+发布数据。
 `RELEASE_MANIFEST.json` 还记录数据库中的 ADC、试验、文献、摘要覆盖率、主题标签数量和
-最近采集运行状态；本地快照当前为 `partial`，因为 PubMed 达到抓取上限且实际收集为 998 条。
+最近采集运行状态；本地快照当前为 `partial`，因为 ClinicalTrials.gov 与 PubMed 均设置了抓取上限，当前数据库分别包含 3,503 和 1,410 条记录。
 打包过程会对 SQLite 副本中的本机绝对路径做脱敏，原始数据库不会被修改；发布包不含原始
 响应文件，因此无法用这些路径恢复本地采集缓存。
 
-下载者可以在解压前检查发布包：
+在本地生成研究包后，可以在解压前检查发布包：
 
 ```powershell
-python scripts/verify_public_release.py artifacts/releases/adc-public-2026-09-30.zip
+python scripts/verify_public_release.py .test_tmp/adc-public-research-only-current.zip
 ```
 
 只有输出 `status: verified` 且 `checked_file_count` 与发布清单一致时，才应把数据库和索引

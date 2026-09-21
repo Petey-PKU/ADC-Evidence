@@ -39,6 +39,16 @@ PROMPT_VERSION = "v0.6-comparison-prompt-v1"
 IMPLEMENTATION_VERSION = STRUCTURED_MODEL
 FROZEN_IMPLEMENTATION_VERSION = "v0.6-structured-validator-v1"
 OFFLINE_BASELINE_VERSION = "v0.6-rag-extractive-baseline-v1"
+# These conditions are part of the comparison identity.  Recording them in
+# each report prevents a later run from being described as same-corpus when it
+# silently changes the retrieval budget or generator.
+OFFLINE_EVALUATION_CONDITIONS = {
+    "network_enabled": False,
+    "retrieval_top_k": 5,
+    "candidate_limit": 60,
+    "retrieval_mode": "sparse",
+    "generator": "extractive-offline-v1",
+}
 ARM_NAMES = ("direct_model", "web_model", "adc_evidence", "offline_rag_baseline")
 COMPARISON_ARM_NAMES = ("direct_model", "web_model", "adc_evidence")
 CATEGORY_TARGETS = {
@@ -341,6 +351,8 @@ def build_external_arm_report(
         "prompt_version": PROMPT_VERSION,
         "questions": list(rows),
     }
+    if arm in {"adc_evidence", "offline_rag_baseline"}:
+        report["evaluation_conditions"] = dict(OFFLINE_EVALUATION_CONDITIONS)
     validate_arm_report(report, expected)
     return report
 
@@ -399,6 +411,7 @@ def run_adc_evidence_arm(
         "model": IMPLEMENTATION_VERSION,
         "network_enabled": False,
         "prompt_version": PROMPT_VERSION,
+        "evaluation_conditions": dict(OFFLINE_EVALUATION_CONDITIONS),
         "database_data_version": evidence_data_version(database_path),
         "question_count": len(outputs),
         "automatic_diagnostics": automatic_diagnostics(outputs, rows),
@@ -428,6 +441,7 @@ def run_offline_rag_baseline(
         database_path=None,
         retriever=HybridRetriever(database_path=database_path),
         generator=ExtractiveGenerator(),
+        enable_identifier_routing=False,
     )
     outputs = [_system_row(row, service.answer(str(row["question"]))) for row in rows]
     report = {
@@ -443,6 +457,7 @@ def run_offline_rag_baseline(
         "model": OFFLINE_BASELINE_VERSION,
         "network_enabled": False,
         "prompt_version": PROMPT_VERSION,
+        "evaluation_conditions": dict(OFFLINE_EVALUATION_CONDITIONS),
         "database_data_version": evidence_data_version(database_path),
         "question_count": len(outputs),
         "automatic_diagnostics": automatic_diagnostics(outputs, rows),
@@ -472,6 +487,10 @@ def validate_arm_report(
         raise ValueError("Arm report must record evaluated_at")
     if report.get("prompt_version") != PROMPT_VERSION:
         raise ValueError("Arm report prompt version mismatch")
+    if arm in {"adc_evidence", "offline_rag_baseline"}:
+        conditions = report.get("evaluation_conditions")
+        if conditions != OFFLINE_EVALUATION_CONDITIONS:
+            raise ValueError("Offline arm report evaluation conditions mismatch")
     expected_ids = {str(row["question_id"]) for row in questions}
     output_rows = list(report.get("questions", []))
     actual_ids = [str(row.get("question_id", "")) for row in output_rows]

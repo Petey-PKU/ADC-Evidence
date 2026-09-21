@@ -7,8 +7,10 @@ from adc_evidence.evaluation.human_review import (
     summarize_human_paired_reviews,
     summarize_inter_rater_agreement,
 )
+from adc_evidence.evaluation.public_benchmark import load_public_benchmark
 from adc_evidence.evaluation.paper_readiness import (
     audit_public_paper_readiness,
+    build_independent_holdout_manifest,
     build_human_review_manifest,
     validate_independent_holdout_file,
     validate_independent_holdout_manifest,
@@ -92,6 +94,8 @@ class HumanReviewTests(unittest.TestCase):
             "question_count": 40,
             "evaluation_window_id": "window-1",
             "access_controlled": True,
+            "access_control_method": "private ACL",
+            "access_control_attestation": "operator_asserted; verify independently before publication",
             "evaluation_use": {
                 "status": "unseen_holdout",
                 "eligible_for_unseen_test_claim": True,
@@ -104,6 +108,8 @@ class HumanReviewTests(unittest.TestCase):
             "question_file_sha256",
             "question_count",
             "evaluation_window_id",
+            "access_control_method",
+            "access_control_attestation",
         ):
             invalid = dict(valid)
             invalid[field] = (
@@ -117,33 +123,123 @@ class HumanReviewTests(unittest.TestCase):
                 validate_independent_holdout_manifest(invalid)
 
     def test_independent_holdout_file_binding_checks_hash_and_count(self) -> None:
-        questions_path = PROJECT_ROOT / "data" / "annotations" / "v0.6_public_holdout_questions.jsonl"
+        rows = [{
+            "question_id": "q1",
+            "question": "T-DXd 的靶点是什么？",
+            "category": "structured_fact",
+            "expected_route": "structured_fact",
+            "expected_status": ["answered", "partial"],
+            "standard_answer": {"kind": "structured", "field": "target", "value": "HER2"},
+            "evidence_sources": [{"source_type": "fda", "source_record_id": "label-1", "source_url": "https://example.org/label", "field": "target"}],
+            "allow_partial": False,
+            "should_refuse": False,
+            "scoring": {"primary_metric": "answer_field_accuracy", "automatic_fields": ["route"], "human_fields": ["answer_verdict"]},
+        }]
+        with WorkspaceTemporaryDirectory() as directory:
+            questions_path = Path(directory) / "private_holdout.jsonl"
+            questions_path.write_text(
+                "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            manifest = {
+                "question_count": 1,
+                "question_file_sha256": "sha256:" + hashlib.sha256(questions_path.read_bytes()).hexdigest(),
+                "question_set_hash": "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+                "question_id_sha256": question_id_sha256(str(row["question_id"]) for row in rows),
+            }
+            bound = validate_independent_holdout_file(questions_path, manifest)
+            self.assertEqual(bound["question_count"], 1)
+            self.assertEqual(bound["question_set_hash"], manifest["question_set_hash"])
+            self.assertIsNone(bound["disjointness"])
+            invalid = dict(manifest, question_file_sha256="sha256:" + "0" * 64)
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                validate_independent_holdout_file(questions_path, invalid)
+            invalid_set = dict(manifest, question_set_hash="sha256:" + "0" * 64)
+            with self.assertRaisesRegex(ValueError, "question set hash mismatch"):
+                validate_independent_holdout_file(questions_path, invalid_set)
+            invalid_ids = dict(manifest, question_id_sha256="sha256:" + "0" * 64)
+            with self.assertRaisesRegex(ValueError, "question ID hash mismatch"):
+                validate_independent_holdout_file(questions_path, invalid_ids)
+
+    def test_independent_holdout_rejects_overlap_with_exposed_questions(self) -> None:
+        exposed = load_public_benchmark(
+            PROJECT_ROOT / "data" / "annotations" / "public_benchmark_v1.jsonl"
+        )
+        source = dict(exposed[0])
+        source["question_id"] = "external-overlap"
+        with WorkspaceTemporaryDirectory() as directory:
+            questions_path = Path(directory) / "overlap.jsonl"
+            questions_path.write_text(
+                json.dumps(source, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            manifest = build_independent_holdout_manifest(
+                questions_path,
+                question_set_version="holdout-v1",
+                evaluation_window_id="window-1",
+                access_control_method="private ACL",
+            )
+            with self.assertRaisesRegex(ValueError, "Holdout overlaps exposed question text"):
+                validate_independent_holdout_file(
+                    questions_path,
+                    manifest,
+                    exposed_questions=exposed,
+                )
+
+    def test_independent_holdout_builder_rejects_question_without_gold_schema(self) -> None:
+        with WorkspaceTemporaryDirectory() as directory:
+            questions_path = Path(directory) / "incomplete.jsonl"
+            questions_path.write_text(
+                json.dumps({"question_id": "q1", "question": "T-DXd 的靶点是什么？"}, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "missing fields"):
+                build_independent_holdout_manifest(
+                    questions_path,
+                    question_set_version="holdout-v1",
+                    evaluation_window_id="window-1",
+                    access_control_method="private ACL",
+                )
+
+    def test_independent_holdout_manifest_builder_binds_external_file(self) -> None:
         rows = [
-            json.loads(line)
-            for line in questions_path.read_text(encoding="utf-8-sig").splitlines()
-            if line.strip()
+            {
+                "question_id": "holdout-1", "question": "T-DXd 的靶点是什么？", "category": "structured_fact",
+                "expected_route": "structured_fact", "expected_status": ["answered"],
+                "standard_answer": {"kind": "structured", "field": "target", "value": "HER2"},
+                "evidence_sources": [{"source_type": "fda", "source_record_id": "label-1", "source_url": "https://example.org/label", "field": "target"}],
+                "allow_partial": False, "should_refuse": False,
+                "scoring": {"primary_metric": "answer_field_accuracy", "automatic_fields": ["route"], "human_fields": ["answer_verdict"]},
+            },
+            {
+                "question_id": "holdout-2", "question": "T-DM1 的载荷是什么？", "category": "structured_fact",
+                "expected_route": "structured_fact", "expected_status": ["answered"],
+                "standard_answer": {"kind": "structured", "field": "payload_name", "value": "DM1"},
+                "evidence_sources": [{"source_type": "fda", "source_record_id": "label-2", "source_url": "https://example.org/label2", "field": "payload_name"}],
+                "allow_partial": False, "should_refuse": False,
+                "scoring": {"primary_metric": "answer_field_accuracy", "automatic_fields": ["route"], "human_fields": ["answer_verdict"]},
+            },
         ]
-        canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        manifest = {
-            "question_count": 20,
-            "question_file_sha256": "sha256:" + hashlib.sha256(questions_path.read_bytes()).hexdigest(),
-            "question_set_hash": "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
-            "question_id_sha256": question_id_sha256(
-                str(row["question_id"]) for row in rows
-            ),
-        }
-        bound = validate_independent_holdout_file(questions_path, manifest)
-        self.assertEqual(bound["question_count"], 20)
-        self.assertEqual(bound["question_set_hash"], manifest["question_set_hash"])
-        invalid = dict(manifest, question_file_sha256="sha256:" + "0" * 64)
-        with self.assertRaisesRegex(ValueError, "hash mismatch"):
-            validate_independent_holdout_file(questions_path, invalid)
-        invalid_set = dict(manifest, question_set_hash="sha256:" + "0" * 64)
-        with self.assertRaisesRegex(ValueError, "question set hash mismatch"):
-            validate_independent_holdout_file(questions_path, invalid_set)
-        invalid_ids = dict(manifest, question_id_sha256="sha256:" + "0" * 64)
-        with self.assertRaisesRegex(ValueError, "question ID hash mismatch"):
-            validate_independent_holdout_file(questions_path, invalid_ids)
+        with WorkspaceTemporaryDirectory() as directory:
+            questions_path = Path(directory) / "private_holdout.jsonl"
+            questions_path.write_text(
+                "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            manifest = build_independent_holdout_manifest(
+                questions_path,
+                question_set_version="holdout-v1",
+                evaluation_window_id="window-1",
+                access_control_method="private ACL",
+                database_data_version="data-v1",
+                code_commit="abc123",
+            )
+            self.assertTrue(manifest["access_controlled"])
+            self.assertEqual(validate_independent_holdout_manifest(manifest), manifest)
+            bound = validate_independent_holdout_file(questions_path, manifest)
+            self.assertEqual(bound["question_count"], 2)
+            self.assertNotIn("private_holdout.jsonl", json.dumps(manifest))
 
     def test_readiness_does_not_pass_manifest_without_question_file(self) -> None:
         manifest = {
@@ -154,6 +250,8 @@ class HumanReviewTests(unittest.TestCase):
             "question_count": 1,
             "evaluation_window_id": "window-1",
             "access_controlled": True,
+            "access_control_method": "private ACL",
+            "access_control_attestation": "operator_asserted; verify independently before publication",
             "evaluation_use": {
                 "status": "unseen_holdout",
                 "eligible_for_unseen_test_claim": True,

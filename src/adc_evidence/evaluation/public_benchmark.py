@@ -23,6 +23,14 @@ VALID_SPLITS = {"dev", "public_smoke"}
 VALID_REVIEW_STATUSES = {"pending", "complete"}
 VALID_EXPECTED_STATUSES = {"answered", "partial", "refused", "error"}
 VALID_ANSWER_KINDS = {"structured", "comparison", "trial_record", "evidence_document", "refusal", "gap"}
+PUBLIC_BENCHMARK_PROMPT_VERSION = "public-benchmark-v1"
+PUBLIC_EVALUATION_CONDITIONS = {
+    "network_enabled": False,
+    "retrieval_mode": "sparse",
+    "retrieval_top_k": 5,
+    "candidate_limit": 60,
+    "generator": "extractive-offline-v1",
+}
 
 
 def _canonical(value: object) -> str:
@@ -398,4 +406,51 @@ def compare_public_benchmark_reports(
         },
         "human_review_required": True,
         "method_note": "Automatic paired diagnostics only; semantic correctness and publication claims require independent human review on a hidden holdout.",
+    }
+
+
+def validate_public_benchmark_report_metadata(
+    system_report: dict[str, object],
+    baseline_report: dict[str, object],
+    benchmark_rows: list[dict[str, object]],
+) -> dict[str, object]:
+    """Require paired public reports to describe the same evaluation conditions."""
+    if not benchmark_rows:
+        raise ValueError("Public benchmark must not be empty")
+    expected_question_hash = f"sha256:{_sha256(benchmark_rows)}"
+    expected_variants = {
+        "system": (system_report, "adc_evidence_public"),
+        "baseline": (baseline_report, "offline_rag_baseline"),
+    }
+    database_versions: list[object] = []
+    for label, (report, expected_variant) in expected_variants.items():
+        if report.get("schema_version") != "public-adc-benchmark-report-v1":
+            raise ValueError(f"{label} report schema version is not supported")
+        if report.get("system_variant") != expected_variant:
+            raise ValueError(f"{label} report has unexpected system_variant")
+        if report.get("question_set_sha256") != expected_question_hash:
+            raise ValueError(f"{label} report question set hash mismatch")
+        if report.get("question_count") != len(benchmark_rows):
+            raise ValueError(f"{label} report question count mismatch")
+        if report.get("network_enabled") is not False:
+            raise ValueError(f"{label} report must have network_enabled=false")
+        if report.get("model") != "extractive-offline-v1":
+            raise ValueError(f"{label} report model mismatch")
+        if report.get("prompt_version") != PUBLIC_BENCHMARK_PROMPT_VERSION:
+            raise ValueError(f"{label} report prompt version mismatch")
+        if report.get("evaluation_conditions") != PUBLIC_EVALUATION_CONDITIONS:
+            raise ValueError(f"{label} report evaluation conditions mismatch")
+        database_version = report.get("database_data_version")
+        if not isinstance(database_version, dict) or not database_version:
+            raise ValueError(f"{label} report must record database_data_version")
+        database_versions.append(database_version)
+    if database_versions[0] != database_versions[1]:
+        raise ValueError("Public benchmark reports disagree on database_data_version")
+    return {
+        "question_set_sha256": expected_question_hash,
+        "question_count": len(benchmark_rows),
+        "database_data_version": database_versions[0],
+        "prompt_version": PUBLIC_BENCHMARK_PROMPT_VERSION,
+        "evaluation_conditions": dict(PUBLIC_EVALUATION_CONDITIONS),
+        "network_enabled": False,
     }
