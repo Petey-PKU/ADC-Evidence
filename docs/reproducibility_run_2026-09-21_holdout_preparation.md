@@ -34,12 +34,18 @@ refusal route. These are routing and execution diagnostics only; they do not
 measure semantic correctness or replace human review.
 
 A private two-arm review packet has now been generated from the same offline
-run. It contains 20 questions, 40 blinded candidate outputs, and 80 blank
-review slots for two independent reviewers per candidate. The arm identity map
-is stored separately and remains undisclosed until both ratings are saved and
-any disagreements are adjudicated. The packet contains no standard answers;
-automatic system-versus-baseline diagnostics remain private and are not a
-publication result. Review status is still `awaiting_independent_human_review`.
+run using `scripts/build_blinded_holdout_review.py`. It contains 20 questions,
+40 blinded candidate outputs, and 80 blank review slots for two independent
+reviewers per candidate. The arm identity map is stored separately and remains
+undisclosed until both ratings are saved and any disagreements are adjudicated.
+The packet contains no standard answers; automatic system-versus-baseline
+diagnostics remain private and are not a publication result. Review status is
+still `awaiting_independent_human_review`. The run used the public smoke report
+format and remains diagnostic: packet generation does not certify a prospective
+freeze, equal execution conditions, or source-answer validity. Runtime route
+and automatic validation metadata are excluded from the reviewer view; a
+private random key controls A/B assignment. Answer style and cited sources may
+still suggest method identity. Existing review files are never overwritten.
 
 Reproduce the content-free manifest in a private directory with:
 
