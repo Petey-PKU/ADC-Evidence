@@ -20,14 +20,14 @@ python scripts/validate_catalog_field_review.py `
   --catalog data/public/marketed_adc_catalog.csv
 ```
 
-The current packet contains 256 candidate source locators covering 253 unique
+The current packet contains 302 candidate source locators covering 299 unique
 ADC-field pairs. They are hints for
 human checking and are not accepted as field-level evidence until a reviewer
 records a source locator, a controlled verdict, and an independent human
 review origin. The packet SHA-256 is
-`40f78d722492443efe7039106072d06252eca671ead22fb46f1bbc031fb1d805`; its
+`4085e3cc1b5489bd600abcd4ca825680a3cabeab3fd4bd1e7ae09e78b1504880`; its
 manifest SHA-256 is
-`dc2d2680c37de0b464e6de7cebff5f14c392e10566576524bb305772048dcc6f`.
+`9e53920b026a3a08f7fdb3959666ab43e21aad24775117a9469298f2c3a211e7`.
 
 Until the required independent primary and secondary reviews are supplied,
 the catalog source-quality gate remains `needs_review` and the project must
@@ -41,7 +41,7 @@ do not independently establish regulatory status.
 
 The source-content triage was rerun on 2026-09-21 against all 23 candidate
 URLs. The updated report SHA-256 is
-`86edcff96c8fd58599e405c0465236f950340c116643babc2b66ccf353c232d5`.
+`6924542a309592e58f2f49289f8d3fedca04f31953bdcf04fcc2aa67921c1184`.
 For the eight core fact fields, candidate locator coverage is:
 
 | Field | Locator pairs | Missing pairs |
@@ -55,10 +55,10 @@ For the eight core fact fields, candidate locator coverage is:
 | dar | 23 / 23 | 0 |
 | indication | 23 / 23 | 0 |
 
-The remaining 46 review items currently have no field-level candidate
-locator: `development_status` and `catalog_status` each have 23 missing
-pairs, while `company`, `approval_date`, and `approval_jurisdictions` now
-have candidate locators for all 23 rows. FDA Purple Book pages now provide
+All 299 review items now have at least one field-level candidate locator.
+The candidate locators for `development_status` and `catalog_status` are
+explicitly provisional: approval or withdrawal records do not automatically
+establish current global marketing status. FDA Purple Book pages now provide
 candidate locators for the FDA member, U.S. applicant, and original U.S.
 approval date of all 16 FDA-jurisdiction rows. NMPA/PMDA government and
 first-party issuer records now provide candidate locators for all seven
@@ -74,8 +74,8 @@ catalog, add a locator to the relevant regulator decision, label, or other
 first-party record, record the jurisdiction and effective date, and complete
 the same independent review and provenance checks as the eight core fields.
 
-The automatic value pre-screen found 55 matches among 188 eligible candidate
-values (`0.2926`). This is a triage signal only: PDFs and page structure can
+The automatic value pre-screen found 68 matches among 222 eligible candidate
+values (`0.3063`). This is a triage signal only: PDFs and page structure can
 hide values, terminology can differ, and no match is treated as a verified
 claim. All candidate locators and values remain pending independent human
 source review.

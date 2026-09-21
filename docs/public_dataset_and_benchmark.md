@@ -18,7 +18,7 @@
 `provisional_pending_primary_source_review`，不能替代结构字段的一手来源复核。
 
 `data/public/catalog_source_locator_candidates.jsonl` 已加入全部 23 个目录条目的 FDA/PMDA 标签、临床试验注册、
-监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 253 个 ADC-字段组合，共 256 条候选；其中三组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
+监管数据库、发行人文件或政府/同行评议来源字段定位（覆盖 299 个 ADC-字段组合，共 302 条候选；其中三组保留了相互竞争的来源值）。其中 `candidate_direct` 表示来源文本有直接候选支持，`partial`
 表示仍需其他结构来源或术语核对；所有条目保持 `pending_independent_primary_source_review`，
 因此不计入人工金标准或论文主结果。
 
@@ -98,7 +98,7 @@ python scripts/audit_public_catalog_sources.py `
 这些数字都不等同于字段已经被证实。2026-09-21 的实际运行
 结果为 23 行均返回 HTTP 响应（21 行可访问、2 行 HTTP 错误），16 行文本出现
 名称/别名；17 行文本被扫描、4 个 PDF 未提取正文、2 行待处理；自动预筛得到
-55/188 个候选值匹配（`0.2926`）；状态为
+68/222 个候选值匹配（`0.3063`）；状态为
 `triage_only_pending_human_source_locator_review`。
 
 构建器还会生成 `literature_topics` 表，按 `literature-topic-rule-v1` 对标题和摘要做透明的
