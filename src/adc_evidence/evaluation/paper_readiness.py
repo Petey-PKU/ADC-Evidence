@@ -420,10 +420,13 @@ def public_dataset_audit_check(
             raise ValueError("catalog source audit has an unsupported schema_version")
         row_count = report.get("catalog_row_count")
         pair_count = report.get("core_fact_candidate_locator_count")
+        total_pair_count = report.get("candidate_locator_pair_count", pair_count)
         if not isinstance(row_count, int) or row_count < 1:
             raise ValueError("catalog source audit needs a positive catalog_row_count")
         if not isinstance(pair_count, int) or pair_count < 0:
             raise ValueError("catalog source audit needs core fact locator count")
+        if not isinstance(total_pair_count, int) or total_pair_count < pair_count:
+            raise ValueError("catalog source audit needs a valid total candidate locator count")
         review_status = report.get("review_status")
         if not isinstance(review_status, str) or not review_status.strip():
             raise ValueError("catalog source audit needs review_status")
@@ -432,7 +435,8 @@ def public_dataset_audit_check(
         if review_status != "verified_primary_source_review":
             status = "warning"
         details.append(
-            f"catalog source audit covers {row_count} rows and {pair_count} candidate locators; "
+            f"catalog source audit covers {row_count} rows and {pair_count} core-fact candidate locators "
+            f"({total_pair_count} total candidate pairs); "
             f"review_status={review_status}"
         )
     return status, "; ".join(details)

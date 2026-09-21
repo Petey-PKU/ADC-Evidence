@@ -42,6 +42,7 @@ class QualityReportTests(unittest.TestCase):
                         "schema_version": "public-adc-source-content-audit-v1",
                         "catalog_row_count": 23,
                         "core_fact_candidate_locator_count": 158,
+                        "candidate_locator_pair_count": 200,
                         "review_status": "triage_only_pending_human_source_locator_review",
                         "ai_or_automatic_labels_are_gold": False,
                     }
@@ -51,6 +52,7 @@ class QualityReportTests(unittest.TestCase):
             status, detail = public_dataset_audit_check(dataset_path, catalog_path)
         self.assertEqual(status, "warning")
         self.assertIn("status=partial", detail)
+        self.assertIn("(200 total candidate pairs)", detail)
         self.assertIn("review_status=triage_only_pending_human_source_locator_review", detail)
 
     def test_public_audit_rejects_malformed_report(self) -> None:
