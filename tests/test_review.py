@@ -2,6 +2,7 @@ from __future__ import annotations
 from tests.support import WorkspaceTemporaryDirectory
 
 import json
+import hashlib
 import sqlite3
 import unittest
 from contextlib import closing
@@ -177,6 +178,89 @@ class ReviewRepositoryTests(unittest.TestCase):
         stale = list_review_items(self.database, status="stale")
         self.assertEqual(len(stale), 1)
         self.assertTrue(stale[0]["is_stale"])
+
+    def test_review_stays_current_when_report_path_changes(self) -> None:
+        import_generation_report(self.generation_path, self.database)
+        save_expert_review(
+            item_id="generation:gen_001",
+            reviewer="reviewer-01",
+            question_verdict="valid",
+            evidence_verdict="correct",
+            answer_verdict="correct",
+            refusal_verdict="not_applicable",
+            severity="none",
+            error_categories=[],
+            notes="Evidence checked.",
+            database_path=self.database,
+        )
+        moved_directory = self.root / "docker-mounted-artifacts"
+        moved_directory.mkdir()
+        moved_report = moved_directory / "generation.json"
+        moved_payload = generation_report()
+        moved_payload["evaluated_at"] = "2026-02-02T00:00:00+00:00"
+        moved_payload["questions"][0]["latency_ms"] = 9999
+        moved_payload["questions"][0]["usage"] = {"input_tokens": 42}
+        moved_payload["questions"][0]["response_id"] = "response-after-relocation"
+        moved_report.write_text(
+            json.dumps(moved_payload, ensure_ascii=False), encoding="utf-8"
+        )
+
+        import_generation_report(moved_report, self.database)
+
+        stats = review_stats(self.database)
+        self.assertEqual(stats["reviewed_items"], 1)
+        self.assertEqual(stats["stale_items"], 0)
+
+    def test_legacy_review_hash_is_migrated_without_reviving_stale_content(self) -> None:
+        import_generation_report(self.generation_path, self.database)
+        save_expert_review(
+            item_id="generation:gen_001",
+            reviewer="reviewer-01",
+            question_verdict="valid",
+            evidence_verdict="correct",
+            answer_verdict="correct",
+            refusal_verdict="not_applicable",
+            severity="none",
+            error_categories=[],
+            notes="Evidence checked.",
+            database_path=self.database,
+        )
+        item = list_review_items(self.database)[0]
+        content_keys = (
+            "item_type", "evaluation_run_id", "question_id", "category",
+            "question", "expected_refusal", "expected_document_ids",
+            "system_status", "system_output", "system_document_ids", "backend",
+            "model_name", "metadata",
+        )
+        legacy_payload = {key: item[key] for key in content_keys}
+        legacy_hash = hashlib.sha256(
+            json.dumps(legacy_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute(
+                "UPDATE review_items SET content_hash = ? WHERE item_id = ?",
+                (legacy_hash, "generation:gen_001"),
+            )
+            connection.execute(
+                "UPDATE expert_reviews SET item_content_hash = ? WHERE item_id = ?",
+                (legacy_hash, "generation:gen_001"),
+            )
+            connection.commit()
+
+        moved_directory = self.root / "legacy-docker-mounted-artifacts"
+        moved_directory.mkdir()
+        moved_report = moved_directory / "generation.json"
+        moved_payload = generation_report()
+        moved_payload["evaluated_at"] = "2026-02-02T00:00:00+00:00"
+        moved_payload["questions"][0]["latency_ms"] = 9999
+        moved_report.write_text(
+            json.dumps(moved_payload, ensure_ascii=False), encoding="utf-8"
+        )
+        import_generation_report(moved_report, self.database)
+
+        stats = review_stats(self.database)
+        self.assertEqual(stats["reviewed_items"], 1)
+        self.assertEqual(stats["stale_items"], 0)
 
     def test_generation_runs_are_isolated_and_keep_model_identity(self) -> None:
         first_path = self.root / "run_a.json"

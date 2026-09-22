@@ -1,0 +1,93 @@
+{
+  "schema_version": "adc-research-cutoff-v1",
+  "research_id": "adc-evidence-v0.6-primary-scope",
+  "cutoff_date": "2026-09-18",
+  "status": "scope_locked_audit_pending_historical_freeze",
+  "primary_scope": {
+    "targets": ["HER2", "TROP2"],
+    "entity_classes": ["antibody_drug_conjugate"],
+    "excluded_entity_classes": ["photoimmunoconjugate", "recombinant_immunotoxin"],
+    "interpretation": "The paper's main claims are limited to HER2/TROP2 ADC research information. The wider public catalog is supplementary coverage, not an additional primary endpoint."
+  },
+  "adc_fields": [
+    "adc.target",
+    "adc.antibody",
+    "adc.linker_name",
+    "adc.linker_type",
+    "adc.payload_name",
+    "adc.payload_class",
+    "adc.dar",
+    "adc.indication",
+    "adc.development_status",
+    "adc.company"
+  ],
+  "trial_fields": [
+    "trial.overall_status",
+    "trial.phases",
+    "trial.conditions",
+    "trial.interventions",
+    "trial.primary_outcomes",
+    "trial.enrollment",
+    "trial.start_date",
+    "trial.completion_date"
+  ],
+  "publication_fields": [
+    "publication.title",
+    "publication.abstract",
+    "publication.publication_date",
+    "publication.publication_type"
+  ],
+  "catalog_review_fields": [
+    "target",
+    "antibody",
+    "linker_name",
+    "linker_type",
+    "payload_name",
+    "payload_class",
+    "dar",
+    "indication",
+    "development_status",
+    "company",
+    "approval_date",
+    "approval_jurisdictions",
+    "catalog_status"
+  ],
+  "known_conflicts_requiring_adjudication": [
+    {
+      "adc_id": "adc_016",
+      "field": "dar",
+      "candidate_values": ["5.7", "6"],
+      "resolution": "preserve_both_until_primary_source_adjudication"
+    },
+    {
+      "adc_id": "adc_016",
+      "field": "payload_name",
+      "candidate_values": ["SHR9265", "rezetecan"],
+      "resolution": "resolve_name_scope_against_structure_and_product_source"
+    },
+    {
+      "adc_id": "adc_019",
+      "field": "payload_name",
+      "candidate_values": ["DGN549", "DGN549C", "FGN849"],
+      "resolution": "distinguish_conjugate_linker_payload_from_released_cytotoxic_component"
+    }
+  ],
+  "date_boundary_policy": {
+    "publication": "Use an electronic publication date on or before the cutoff when available. Issue dates after the cutoff remain candidate_pending_review; indexing or processing dates alone do not establish publication before the cutoff.",
+    "clinical_trials": "Include records whose source last-update date is on or before the cutoff; report the source snapshot time separately.",
+    "approval": "Approval dates after the cutoff are excluded from cutoff claims; jurisdiction and current marketing status require first-party source review.",
+    "historical_freeze": "The current 2026-09-30-labelled local database is not a reconstructed 2026-09-18 historical snapshot. A cutoff-specific database, raw snapshot manifest, and matching index must be frozen before confirmation results are reported."
+  },
+  "current_audit_input": {
+    "database": "data/processed/adc_public_2026-09-30.db",
+    "database_as_of_label": "2026-09-30",
+    "audit_as_of": "2026-09-18",
+    "interpretation": "diagnostic date audit only; not a historical database freeze"
+  },
+  "required_before_formal_results": [
+    "build_or_verify_a_cutoff_specific_database_and_raw_snapshot_manifest",
+    "rebuild_the_matching_retrieval_index",
+    "complete_independent_primary_source_review_for_catalog_fields_used_in_claims",
+    "run_the_independent_holdout_with_two_human_reviewers_and_adjudication"
+  ]
+}

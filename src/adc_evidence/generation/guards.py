@@ -70,8 +70,43 @@ FUTURE_PATTERNS = (
     "预测",
 )
 
-PERSONAL_CONTEXT_PATTERNS = ("患者", "病人", "个人")
-PERSONAL_ACTION_PATTERNS = ("停用", "继续使用", "换药", "调整用药", "治疗", "是否应该", "该不该")
+PERSONAL_CONTEXT_PATTERNS = (
+    "患者", "病人", "个人", "本人", "我患", "我得了", "我被诊断",
+    "我的病", "我的肿瘤", "我的癌", "我正在用", "我正在使用",
+    "我应该", "我该", "我能否", "我能不能", "我可以", "我适合",
+    "适合我", "给我用", "给我推荐", "给我开", "我妈妈", "我爸爸",
+    "我的母亲", "我的父亲", "我的孩子", "我的妻子", "我的丈夫",
+)
+PERSONAL_ACTION_PATTERNS = (
+    "停用", "继续使用", "换药", "调整用药", "是否应该", "该不该",
+    "应该使用", "应该用", "能不能用", "能否用", "可以用", "适合",
+    "推荐", "选择哪种", "用哪种", "哪种 adc", "什么剂量", "多少剂量",
+    "剂量是多少", "用多少", "怎么用药", "如何用药", "调整剂量", "剂量方案",
+)
+PERSONAL_CONTEXT_EN = re.compile(
+    r"\b(?:i (?:have|was diagnosed|am taking|am on)|"
+    r"my (?:patient|cancer|tumou?r|mother|father|child|wife|husband)|"
+    r"this patient|for me|(?:should|can|could) i)\b"
+)
+PERSONAL_ACTION_EN = re.compile(
+    r"\b(?:(?:should|can|could) (?:i|we|this patient)|"
+    r"which (?:adc|drug|treatment)|what (?:dose|dosage)|how much|"
+    r"recommend(?:ation|ed)?|suitable|appropriate|prescribe|"
+    r"(?:adjust|increase|reduce) (?:the |my )?(?:dose|dosage)|"
+    r"(?:start|stop|switch|continue) (?:taking|using|treatment))\b"
+)
+
+
+def _asks_for_personalized_treatment(question: str) -> bool:
+    # Pair patient context with an action request. A general trial dose or
+    # treatment-evidence question must remain available for evidence lookup.
+    has_context = any(term in question for term in PERSONAL_CONTEXT_PATTERNS) or bool(
+        PERSONAL_CONTEXT_EN.search(question)
+    )
+    has_action = any(term in question for term in PERSONAL_ACTION_PATTERNS) or bool(
+        PERSONAL_ACTION_EN.search(question)
+    )
+    return has_context and has_action
 
 # These intents require an explicit lexical anchor in the retrieved evidence.
 # Without this small gate, a generally related abstract can pass citation and
@@ -99,16 +134,14 @@ class EvidenceGuard:
 
     def check_question(self, question: str) -> GateDecision:
         stripped = question.strip()
-        lowered = stripped.casefold()
+        lowered = " ".join(unicodedata.normalize("NFKC", stripped).casefold().split())
         if not stripped:
             return GateDecision(False, "empty_question")
         if len(stripped) > 500:
             return GateDecision(False, "question_too_long")
         if any(pattern in lowered for pattern in UNSAFE_PATTERNS):
             return GateDecision(False, "personalized_medical_advice")
-        if any(context in lowered for context in PERSONAL_CONTEXT_PATTERNS) and any(
-            action in lowered for action in PERSONAL_ACTION_PATTERNS
-        ):
+        if _asks_for_personalized_treatment(lowered):
             return GateDecision(False, "personalized_medical_advice")
         if any(pattern in lowered for pattern in FUTURE_PATTERNS):
             return GateDecision(False, "future_or_unpublished_claim")

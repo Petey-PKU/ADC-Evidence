@@ -156,6 +156,24 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "personalized_medical_advice")
 
+    def test_personalized_treatment_paraphrases_are_refused(self) -> None:
+        questions = (
+            "我患有乳腺癌，应该使用哪种 ADC 和什么剂量？",
+            "我的患者适合用 T-DXd 吗？",
+            "I have breast cancer; which ADC and what dose should I take?",
+        )
+        for question in questions:
+            with self.subTest(question=question):
+                decision = self.guard.check_question(question)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.reason, "personalized_medical_advice")
+
+    def test_general_trial_dose_evidence_remains_allowed(self) -> None:
+        decision = self.guard.check_question(
+            "DESTINY-Breast03 中 T-DXd 的给药剂量是多少？"
+        )
+        self.assertTrue(decision.allowed)
+
     def test_forecast_and_investment_claim_is_refused(self) -> None:
         decision = self.guard.check_question("预测 SKB264 临床成功率和目标价")
         self.assertFalse(decision.allowed)

@@ -284,6 +284,8 @@ python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/p
 
 面向公开快照的 ADC 目录位于 `data/public/marketed_adc_catalog.csv`。它与 10 条演示种子分开维护，当前包含 23 条监管批准候选记录；使用 `scripts/build_public_dataset.py` 可在本地生成带文献和试验来源哈希的 SQLite 快照。详细范围、未来截止日处理和 Benchmark v1 见 [`docs/public_dataset_and_benchmark.md`](docs/public_dataset_and_benchmark.md)。
 
+当前论文核验以 HER2/TROP2 传统 ADC 为主范围，截止日固定为 `2026-09-18`；字段、冲突值和日期边界见 [`docs/research_cutoff_2026-09-18.md`](docs/research_cutoff_2026-09-18.md)。
+
 需要验证下载后直接查询的完整快照，可在 GitHub Actions 手动运行
 [`Build public dataset release`](.github/workflows/public-release.yml)。工作流会生成并校验
 数据库、索引、benchmark、查询程序及配置的压缩包；普通代码 push 不会自动抓取或发布数据。

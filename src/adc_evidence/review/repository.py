@@ -45,9 +45,52 @@ def _json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+REVIEW_CONTENT_FIELDS = (
+    "item_type", "evaluation_run_id", "question_id", "category", "question",
+    "expected_refusal", "expected_document_ids", "system_status", "system_output",
+    "system_document_ids", "backend", "model_name", "metadata",
+)
+RUNTIME_METADATA_FIELDS = frozenset({
+    "report_path", "evaluated_at", "latency_ms", "usage", "response_id",
+})
+
+
 def _content_hash(payload: dict[str, object]) -> str:
-    encoded = _json(payload).encode("utf-8")
+    """Bind reviewed content, including evidence metadata, independent of transport."""
+    content = {
+        **payload,
+        "metadata": {
+            key: value for key, value in dict(payload.get("metadata", {})).items()
+            if key not in RUNTIME_METADATA_FIELDS
+        },
+    }
+    encoded = _json({"schema_version": "review-content-v2", "content": content}).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _migrate_current_review_hash(connection: Any, item_id: str) -> None:
+    """Rebind only reviews proven current against the stored legacy payload.
+
+    Normalize the stored version before importing the incoming version, so a
+    changed answer/evidence still expires the review. Previously stale or
+    unverifiable reviews are never revived. The caller's transaction also
+    covers the item update, so a failed import cannot leave mismatched hashes.
+    """
+    stored = connection.execute(
+        "SELECT * FROM review_items WHERE item_id = ?", (item_id,)
+    ).fetchone()
+    if stored is None:
+        return
+    item = _decode_row(stored)
+    payload = {key: item[key] for key in REVIEW_CONTENT_FIELDS}
+    legacy_hash = hashlib.sha256(_json(payload).encode("utf-8")).hexdigest()
+    if item["content_hash"] != legacy_hash:
+        return
+    connection.execute(
+        """UPDATE expert_reviews SET item_content_hash = ?
+           WHERE item_id = ? AND item_content_hash = ?""",
+        (_content_hash(payload), item_id, legacy_hash),
+    )
 
 
 def _run_item_id(
@@ -87,24 +130,7 @@ def _decode_row(row: Any) -> dict[str, object]:
 def _upsert_item(database_path: Path, item: dict[str, object]) -> None:
     create_database(database_path)
     now = _now()
-    payload = {
-        key: item[key]
-        for key in (
-            "item_type",
-            "evaluation_run_id",
-            "question_id",
-            "category",
-            "question",
-            "expected_refusal",
-            "expected_document_ids",
-            "system_status",
-            "system_output",
-            "system_document_ids",
-            "backend",
-            "model_name",
-            "metadata",
-        )
-    }
+    payload = {key: item[key] for key in REVIEW_CONTENT_FIELDS}
     values = {
         **item,
         "expected_refusal": int(bool(item["expected_refusal"])),
@@ -117,6 +143,7 @@ def _upsert_item(database_path: Path, item: dict[str, object]) -> None:
     }
     with closing(connect(database_path)) as connection:
         with connection:
+            _migrate_current_review_hash(connection, str(item["item_id"]))
             connection.execute(
                 """
                 INSERT INTO review_items (
