@@ -4,7 +4,7 @@ import json
 import csv
 from pathlib import Path
 
-from adc_evidence.evaluation.benchmark import load_benchmark_questions
+from adc_evidence.evaluation.automated import load_benchmark_questions
 from adc_evidence.evaluation.holdout import (
     load_holdout_questions,
     validate_holdout_disjoint,

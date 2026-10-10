@@ -26,13 +26,20 @@ def fetch_bytes(
     timeout: int = 30,
     retries: int = 2,
     extra_headers: dict[str, str] | None = None,
+    data: bytes | None = None,
 ) -> bytes:
+    """Fetch bytes with bounded retries.
+
+    Passing ``data`` sends a POST request.  This is needed for registry
+    endpoints such as PubMed ESearch when a transparent query becomes too
+    long for a proxy or server URL limit.
+    """
     headers = {"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
     headers.update(extra_headers or {})
     last_error: Exception | None = None
     for attempt in range(retries + 1):
         try:
-            request = Request(url, headers=headers)
+            request = Request(url, data=data, headers=headers)
             with urlopen(request, timeout=timeout) as response:
                 return response.read()
         except (HTTPError, URLError, TimeoutError) as error:
@@ -51,4 +58,3 @@ def write_snapshot(path: Path, content: bytes) -> tuple[str, str]:
 def write_json(path: Path, payload: object) -> tuple[str, str]:
     content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     return write_snapshot(path, content)
-

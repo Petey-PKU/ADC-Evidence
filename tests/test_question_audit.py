@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from adc_evidence.evaluation.benchmark import (
+from adc_evidence.evaluation.automated import (
     load_benchmark_questions,
     question_set_manifest,
     run_adc_evidence_arm,
@@ -45,14 +45,14 @@ class QuestionFileAuditTests(unittest.TestCase):
         self.assertIn("duplicate_question_id", [item["reason"] for item in result["issues"]])
 
     def test_loader_rejects_damaged_question_before_running(self) -> None:
-        from adc_evidence.evaluation.benchmark import _read_jsonl
+        from adc_evidence.evaluation.automated import _read_jsonl
 
         def damaged_rows(path):
             rows = _read_jsonl(path)
             rows[0]["question"] = "ADC \ufffd"
             return rows
 
-        with patch("adc_evidence.evaluation.benchmark._read_jsonl", side_effect=damaged_rows):
+        with patch("adc_evidence.evaluation.automated._read_jsonl", side_effect=damaged_rows):
             with self.assertRaisesRegex(ValueError, "Invalid question text"):
                 load_benchmark_questions()
 

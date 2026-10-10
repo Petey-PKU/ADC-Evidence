@@ -52,9 +52,9 @@ class EvidencePolicyTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             EvidencePolicy.model_validate(payload)
 
-    def test_required_review_status_cannot_be_removed(self) -> None:
+    def test_required_verification_status_cannot_be_removed(self) -> None:
         payload = copy.deepcopy(self.policy.model_dump(mode="json"))
-        payload["review_statuses"].remove("reviewed_conflicted")
+        payload["verification_statuses"].remove("reviewed_conflicted")
         with self.assertRaises(ValidationError):
             EvidencePolicy.model_validate(payload)
 

@@ -13,6 +13,13 @@ diagnostic and is not a human correctness study or a submission result.
 - Network access: disabled; generator: `extractive-offline-v1`
 - Arms: ADC-Evidence structured routing and an offline RAG baseline using the same database, index, questions, and retrieval budget
 
+The current report schema also binds `question_set_sha256`, `question_count`,
+`database_data_version`, `prompt_version`, and `evaluation_conditions`. The
+command-line comparator rejects reports whose database, question hash, prompt,
+network state, sparse top-k=5 budget, candidate limit 60, or deterministic
+generator differs. This metadata gate applies to engineering diagnostics only;
+it does not turn the exposed benchmark into an unseen test set.
+
 ## Automatic paired diagnostics
 
 | Metric | ADC-Evidence | Offline RAG baseline | Difference | 95% bootstrap CI | Exact McNemar p |
@@ -56,5 +63,5 @@ $env:ADC_OFFLINE_ONLY = "true"
 Before a paper uses these numbers, the benchmark must be replaced or extended
 with a separately frozen access-controlled set. At least two independent human
 reviewers must score answer correctness, evidence support, citation validity,
-completeness, and refusal appropriateness, with adjudication and a predeclared
+completeness, and refusal appropriateness, with a predeclared
 statistical analysis.

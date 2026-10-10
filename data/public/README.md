@@ -21,12 +21,57 @@ withdrawn. Use `catalog_status` to distinguish `marketed`, `withdrawn`, and
 `approved_not_marketed` records.
 
 The catalog is a public starting point, not a claim that every field has been
-independently verified. `verification_status=pending_primary_check` means a
+independently verified. `verification_status=primary_check_pending` means a
 primary regulator label or registry record still needs to be checked before a
 paper uses the field as a gold-standard fact.
 `marketed_adc_catalog.audit.json` is a deterministic review queue for these
 checks; it reports generic regulator landing pages and missing required fields
 without containing private notes.
+
+目录范围由 `catalog_scope_policy.json` 单独声明并机器校验。当前 23 条记录中，21 条属于
+核心 `antibody_drug_conjugate`，`adc_021` 是光免疫偶联物，`adc_023` 是重组免疫毒素，
+两者保留在扩展集合中但不计入核心 ADC 数量。该分类是待一手来源复核的范围元数据，不是
+结构字段的金标准：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/validate_public_catalog_scope.py
+```
+
+`catalog_source_locator_candidates.jsonl` 记录了 FDA/PMDA 标签、监管数据库、发行人文件以及政府或
+同行评议来源的字段级候选定位，当前覆盖 23 个目录条目。它只表示 `candidate_direct` 或 `partial` 线索，所有行仍为
+`pending_independent_primary_source_review`；不得直接用于论文金标准统计。
+
+要逐字段开展一级来源复核，可生成空白审核包（不会自动写入任何人工结论）：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/build_catalog_field_review_packet.py `
+  --catalog data/public/marketed_adc_catalog.csv `
+  --output artifacts/evaluation/catalog_field_review.jsonl `
+  --manifest artifacts/evaluation/catalog_field_review.manifest.json
+```
+
+审核包中的 `candidate_source.source_url` 是目录候选来源链接，
+`candidate_source.field_locator_candidates` 还会列出字段级 URL、章节或页码线索；
+`verification.status` 初始为 `pending_primary_check`。这些线索不能代替复核，只有人工逐项
+检查原始来源后才可填写 verdict、confirmed value 和 source locator。
+
+命令行仅对默认公共目录自动加载公共候选文件。传入其他 `--catalog` 时，必须通过
+`--candidate-locators` 显式指定匹配的候选文件；Python `build_packet()` 默认不绑定候选。
+显式指定的文件缺失、包含目录外 ADC 或未知字段时会报错，避免静默混入不匹配的来源。
+
+可在提交审核结果前运行严格的结构校验。默认模式允许待审核项存在，但会报告其数量；
+`--require-complete` 用作发布门禁，要求每个字段都有受控 verdict 和具体来源定位，
+不会把 URL 可访问性或自动文本匹配转换为审核结论：
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/validate_catalog_field_review.py `
+  --packet artifacts/evaluation/catalog_field_review.jsonl `
+  --manifest artifacts/evaluation/catalog_field_review.manifest.json `
+  --catalog data/public/marketed_adc_catalog.csv
+```
 
 ## Data policy
 
@@ -65,3 +110,39 @@ $env:ADC_SEED_PATH="data/public/marketed_adc_catalog.csv"
 $env:ADC_VECTOR_INDEX_PATH="artifacts/vector_index/public_2026-09-30"
 streamlit run src/adc_evidence/app.py
 ```
+
+## Use a downloaded release
+
+Download the ZIP artifact from the manual `Build public dataset release`
+workflow. Verify it before extraction, then expand it at the repository root:
+
+```powershell
+python scripts/verify_public_release.py .\adc-public-2026-09-30.zip
+Expand-Archive .\adc-public-2026-09-30.zip -DestinationPath . -Force
+$env:ADC_OFFLINE_ONLY="true"
+$env:ADC_DATABASE_PATH="data/processed/adc_public_2026-09-30.db"
+$env:ADC_SEED_PATH="data/public/marketed_adc_catalog.csv"
+$env:ADC_VECTOR_INDEX_PATH="artifacts/vector_index/public_2026-09-30"
+streamlit run src/adc_evidence/app.py
+```
+
+The release uses the offline extractive path and does not require a model API
+key. `RELEASE_MANIFEST.json` records the database, index, catalog, benchmark,
+and source-window hashes; retain it with the extracted files when reporting a
+reproduction.
+
+## Refresh entity links after alias edits
+
+The collectors search canonical ADC names and catalog aliases directly. After
+editing aliases, existing local snapshots can be relinked without downloading
+new records:
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts/relink_public_snapshot.py `
+  --database data/processed/adc_public_2026-09-30.db `
+  --seed data/public/marketed_adc_catalog.csv
+```
+
+This command only rebuilds trial/document links and evidence from records
+already in SQLite; it does not call a model API or any network source.

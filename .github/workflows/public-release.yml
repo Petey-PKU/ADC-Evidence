@@ -14,7 +14,7 @@ on:
       trial_max_pages:
         description: "Maximum ClinicalTrials.gov pages to collect"
         required: true
-        default: "10"
+        default: "20"
 
 permissions:
   contents: read
@@ -46,7 +46,7 @@ jobs:
           --catalog data/public/marketed_adc_catalog.csv
           --as-of "${{ inputs.as_of }}"
           --pubmed-max "${{ inputs.pubmed_max }}"
-          --trial-page-size 1000
+          --trial-page-size 100
           --trial-max-pages "${{ inputs.trial_max_pages }}"
       - name: Build matching retrieval index
         run: >-
@@ -60,9 +60,10 @@ jobs:
           --catalog data/public/marketed_adc_catalog.csv
           --database "data/processed/adc_public_${{ inputs.as_of }}.db"
           --requested-as-of "${{ inputs.as_of }}"
-      - name: Package and verify release
+      - name: Package and verify research-only release
         run: >-
           python scripts/package_public_release.py
+          --research-only
           --database "data/processed/adc_public_${{ inputs.as_of }}.db"
           --index-path "artifacts/vector_index/public_${{ inputs.as_of }}"
           --catalog data/public/marketed_adc_catalog.csv
@@ -75,10 +76,19 @@ jobs:
         run: >-
           python scripts/verify_public_release.py
           "artifacts/releases/adc-public-${{ inputs.as_of }}.zip"
-      - name: Upload release archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: adc-public-${{ inputs.as_of }}
-          path: artifacts/releases/adc-public-${{ inputs.as_of }}.zip
-          if-no-files-found: error
-          retention-days: 30
+      - name: Smoke test the extracted application
+        run: |
+          python -m zipfile -e "artifacts/releases/adc-public-${{ inputs.as_of }}.zip" "$RUNNER_TEMP/adc-release"
+          python -I "$RUNNER_TEMP/adc-release/scripts/run_public_release.py" --check
+          python -I "$RUNNER_TEMP/adc-release/scripts/run_public_release.py" --question "T-DXd 的靶点和载荷是什么？" > "$RUNNER_TEMP/release-answer.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          answer = json.loads((Path(os.environ['RUNNER_TEMP']) / 'release-answer.json').read_text())
+          assert answer['status'] == 'answered', answer
+          assert answer['generator_backend'] == 'structured', answer
+          assert answer['claim_validation']['valid'], answer
+          PY
+      - name: Report research-only release boundary
+        run: >-
+          echo "Research-only archive verified locally on the runner; it is not uploaded or published."

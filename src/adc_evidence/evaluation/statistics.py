@@ -55,7 +55,7 @@ def paired_binary_summary(
 ) -> dict[str, object]:
     """Summarize paired binary labels without treating them as semantic labels.
 
-    Callers must supply labels produced by a predeclared review rubric. The
+    Callers must supply binary outcomes produced by a predeclared rubric. The
     function only computes the paired statistics; it does not infer whether a
     label means correctness, safety, or another outcome.
     """
@@ -84,7 +84,7 @@ def paired_binary_summary(
     upper_index = max(0, min(bootstrap_iterations - 1, math.ceil((1 - alpha) * bootstrap_iterations) - 1))
     z = 1.959963984540054
     return {
-        "label_semantics": "caller_defined_binary_review_outcome",
+        "label_semantics": "caller_defined_binary_outcome",
         "question_count": n,
         "system_success_count": system_successes,
         "baseline_success_count": baseline_successes,

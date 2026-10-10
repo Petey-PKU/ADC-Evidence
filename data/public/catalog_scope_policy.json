@@ -1,0 +1,45 @@
+{
+  "schema_version": "public-adc-catalog-scope-v1",
+  "policy_status": "provisional_pending_primary_source_review",
+  "target_window": "2026-09-30",
+  "default_scope": "core_adc",
+  "classes": {
+    "antibody_drug_conjugate": {
+      "included_in_core": true,
+      "definition": "An antibody or antibody-derived targeting moiety covalently linked to a pharmacologically active small-molecule payload."
+    },
+    "photoimmunoconjugate": {
+      "included_in_core": false,
+      "definition": "An antibody-linked photosensitizer activated by light rather than a conventional cytotoxic payload."
+    },
+    "recombinant_immunotoxin": {
+      "included_in_core": false,
+      "definition": "An antibody-derived targeting protein genetically or recombinantly fused to a protein toxin."
+    }
+  },
+  "records": {
+    "adc_001": "antibody_drug_conjugate",
+    "adc_002": "antibody_drug_conjugate",
+    "adc_003": "antibody_drug_conjugate",
+    "adc_004": "antibody_drug_conjugate",
+    "adc_005": "antibody_drug_conjugate",
+    "adc_006": "antibody_drug_conjugate",
+    "adc_007": "antibody_drug_conjugate",
+    "adc_008": "antibody_drug_conjugate",
+    "adc_009": "antibody_drug_conjugate",
+    "adc_010": "antibody_drug_conjugate",
+    "adc_011": "antibody_drug_conjugate",
+    "adc_012": "antibody_drug_conjugate",
+    "adc_013": "antibody_drug_conjugate",
+    "adc_014": "antibody_drug_conjugate",
+    "adc_015": "antibody_drug_conjugate",
+    "adc_016": "antibody_drug_conjugate",
+    "adc_017": "antibody_drug_conjugate",
+    "adc_018": "antibody_drug_conjugate",
+    "adc_019": "antibody_drug_conjugate",
+    "adc_020": "antibody_drug_conjugate",
+    "adc_021": "photoimmunoconjugate",
+    "adc_022": "antibody_drug_conjugate",
+    "adc_023": "recombinant_immunotoxin"
+  }
+}

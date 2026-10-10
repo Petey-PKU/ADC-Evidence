@@ -34,17 +34,7 @@ BAD_CASE_REPORT_PATH = EVALUATION_PATH / "bad_case_report.json"
 BAD_CASE_MARKDOWN_PATH = PROJECT_ROOT / "docs" / "bad_case_report.md"
 BENCHMARK_EVALUATION_PATH = EVALUATION_PATH / "v0.6_benchmark"
 BENCHMARK_REPORT_PATH = BENCHMARK_EVALUATION_PATH / "comparison_report.json"
-BENCHMARK_REVIEW_PACKET_PATH = BENCHMARK_EVALUATION_PATH / "blind_review_packet.json"
-BENCHMARK_IDENTITY_MAP_PATH = BENCHMARK_EVALUATION_PATH / "blind_identity_map.json"
-BENCHMARK_SUMMARY_PATH = BENCHMARK_EVALUATION_PATH / "human_summary.json"
-BENCHMARK_BAD_CASE_PATH = BENCHMARK_EVALUATION_PATH / "human_bad_cases.json"
-BENCHMARK_REGRESSION_CANDIDATES_PATH = (
-    BENCHMARK_EVALUATION_PATH / "regression_candidates.jsonl"
-)
 BENCHMARK_REGRESSION_PATH = ANNOTATIONS_PATH / "v0.6_regression_questions.jsonl"
-REVIEW_EXPORT_JSONL_PATH = EVALUATION_PATH / "expert_reviews.jsonl"
-REVIEW_EXPORT_CSV_PATH = EVALUATION_PATH / "expert_reviews.csv"
-REVIEW_EXPORT_MANIFEST_PATH = EVALUATION_PATH / "expert_reviews_manifest.json"
 DEFAULT_EMBEDDING_MODEL = (
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )

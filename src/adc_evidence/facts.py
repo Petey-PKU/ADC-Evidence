@@ -326,7 +326,7 @@ def _reconcile_facts(
 
     statuses: dict[str, str]
     distinct_values = {value_by_fact[fact_id] for fact_id in active_fact_ids}
-    if field_policy.conflict_resolution == "require_review":
+    if field_policy.conflict_resolution == "flag_conflict":
         status = "conflicted" if len(distinct_values) > 1 else "current"
         statuses = {fact_id: status for fact_id in active_fact_ids}
     elif field_policy.conflict_resolution == "preserve_all":
@@ -435,7 +435,7 @@ def _insert_change_event(
             observation.source,
             observation.source_record_id,
             observation.snapshot_id,
-            int(event_policy.review_required),
+            int(event_policy.attention_required),
             "needs_review",
             details_json,
             content_hash,
@@ -489,7 +489,7 @@ def record_fact_sets(
                 raise ValueError(
                     f"Unknown evidence policy source: {observation.source}"
                 )
-            if observation.review_status not in policy.review_statuses:
+            if observation.review_status not in policy.verification_statuses:
                 raise ValueError(
                     f"Unknown review status: {observation.review_status}"
                 )
@@ -529,6 +529,7 @@ def record_fact_sets(
                     observation.source,
                     observation.source_record_id,
                     observation.snapshot_id or "",
+                    observation.source_url,
                     value.source_locator,
                     value_hash,
                     evidence_text,
@@ -717,7 +718,7 @@ def record_fact_sets(
                     event_type="fact.conflict_detected",
                     old_values=before_canonical,
                     new_values=after_canonical,
-                    details={"conflict_resolution": "require_review"},
+                    details={"conflict_resolution": "flag_conflict"},
                 )
             elif before_conflict and not after_conflict:
                 summary["changes_created"] += _insert_change_event(
@@ -727,7 +728,7 @@ def record_fact_sets(
                     event_type="fact.conflict_resolved",
                     old_values=before_canonical,
                     new_values=after_canonical,
-                    details={"conflict_resolution": "require_review"},
+                    details={"conflict_resolution": "flag_conflict"},
                 )
     return summary
 

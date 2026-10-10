@@ -147,6 +147,16 @@ class StructuredAnsweringTests(unittest.TestCase):
         self.assertEqual(plan.predicates, ["adc.payload_name"])
         self.assertEqual(set(plan.adc_ids), {"adc_001", "adc_002"})
 
+    def test_linker_type_paraphrases_do_not_route_to_linker_name(self) -> None:
+        for question in (
+            "T-DXd 使用的是哪一类连接子？",
+            "What type of linker does T-DXd use?",
+        ):
+            with self.subTest(question=question):
+                plan = route_question(self.database, question)
+                self.assertEqual(plan.route, "structured_fact")
+                self.assertEqual(plan.predicates, ["adc.linker_type"])
+
     def test_research_endpoints_never_return_default_adc_profile(self) -> None:
         for question in (
             "哪篇综述提到 T-DXd？",

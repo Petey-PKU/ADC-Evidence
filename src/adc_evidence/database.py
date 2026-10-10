@@ -12,8 +12,7 @@ from adc_evidence.models import ADCRecord
 
 FACTS_SCHEMA_VERSION = "0.6-facts-v1"
 SCHEMA_VERSION = "0.6-refresh-v1"
-REVIEW_SCHEMA_VERSION = "0.6-benchmark-review-v2"
-SCHEMA_VERSIONS = (FACTS_SCHEMA_VERSION, SCHEMA_VERSION, REVIEW_SCHEMA_VERSION)
+SCHEMA_VERSIONS = (FACTS_SCHEMA_VERSION, SCHEMA_VERSION)
 
 
 SCHEMA_SQL = """
@@ -222,52 +221,6 @@ CREATE INDEX IF NOT EXISTS idx_retrieval_documents_source
 CREATE INDEX IF NOT EXISTS idx_text_chunks_document
     ON text_chunks(retrieval_document_id, chunk_index);
 
-CREATE TABLE IF NOT EXISTS review_items (
-    item_id TEXT PRIMARY KEY,
-    item_type TEXT NOT NULL,
-    evaluation_run_id TEXT NOT NULL DEFAULT 'legacy',
-    question_id TEXT NOT NULL,
-    category TEXT NOT NULL,
-    question TEXT NOT NULL,
-    expected_refusal INTEGER NOT NULL,
-    expected_document_ids_json TEXT NOT NULL,
-    system_status TEXT NOT NULL,
-    system_output TEXT NOT NULL,
-    system_document_ids_json TEXT NOT NULL,
-    backend TEXT NOT NULL,
-    model_name TEXT NOT NULL DEFAULT 'unknown',
-    metadata_json TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS expert_reviews (
-    review_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    item_id TEXT NOT NULL,
-    reviewer TEXT NOT NULL,
-    question_verdict TEXT NOT NULL,
-    evidence_verdict TEXT NOT NULL,
-    answer_verdict TEXT NOT NULL,
-    citation_verdict TEXT NOT NULL DEFAULT 'not_applicable',
-    completeness_verdict TEXT NOT NULL DEFAULT 'not_applicable',
-    refusal_verdict TEXT NOT NULL,
-    reviewer_slot TEXT NOT NULL DEFAULT 'primary',
-    review_origin TEXT,
-    severity TEXT NOT NULL,
-    error_categories_json TEXT NOT NULL,
-    notes TEXT NOT NULL,
-    item_content_hash TEXT NOT NULL,
-    reviewed_at TEXT NOT NULL,
-    FOREIGN KEY (item_id) REFERENCES review_items(item_id) ON DELETE CASCADE,
-    UNIQUE (item_id, reviewer)
-);
-
-CREATE INDEX IF NOT EXISTS idx_review_items_type
-    ON review_items(item_type, category);
-CREATE INDEX IF NOT EXISTS idx_expert_reviews_item
-    ON expert_reviews(item_id, reviewer);
-
 CREATE TABLE IF NOT EXISTS schema_versions (
     version TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL
@@ -399,47 +352,8 @@ def create_database(database_path: Path) -> None:
     with closing(connect(database_path)) as connection:
         with connection:
             connection.executescript(SCHEMA_SQL)
-            columns = {
-                str(row[1])
-                for row in connection.execute("PRAGMA table_info(review_items)")
-            }
-            if "evaluation_run_id" not in columns:
-                connection.execute(
-                    "ALTER TABLE review_items ADD COLUMN "
-                    "evaluation_run_id TEXT NOT NULL DEFAULT 'legacy'"
-                )
-            if "model_name" not in columns:
-                connection.execute(
-                    "ALTER TABLE review_items ADD COLUMN "
-                    "model_name TEXT NOT NULL DEFAULT 'unknown'"
-                )
-            review_columns = {
-                str(row[1])
-                for row in connection.execute("PRAGMA table_info(expert_reviews)")
-            }
-            if "citation_verdict" not in review_columns:
-                connection.execute(
-                    "ALTER TABLE expert_reviews ADD COLUMN "
-                    "citation_verdict TEXT NOT NULL DEFAULT 'not_applicable'"
-                )
-            if "completeness_verdict" not in review_columns:
-                connection.execute(
-                    "ALTER TABLE expert_reviews ADD COLUMN "
-                    "completeness_verdict TEXT NOT NULL DEFAULT 'not_applicable'"
-                )
-            if "reviewer_slot" not in review_columns:
-                connection.execute(
-                    "ALTER TABLE expert_reviews ADD COLUMN "
-                    "reviewer_slot TEXT NOT NULL DEFAULT 'primary'"
-                )
-            if "review_origin" not in review_columns:
-                connection.execute(
-                    "ALTER TABLE expert_reviews ADD COLUMN review_origin TEXT"
-                )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_review_items_run "
-                "ON review_items(evaluation_run_id, item_type)"
-            )
+            # Legacy review tables are left untouched in existing databases.
+            # Fresh databases contain only evidence and automated diagnostics.
             applied_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
             connection.executemany(
                 """

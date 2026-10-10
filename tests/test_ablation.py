@@ -38,6 +38,28 @@ class AblationTests(unittest.TestCase):
         self.assertIn("paired_status_counts", report)
         self.assertIn("changed_question_ids", report)
         self.assertTrue(str(report["question_id_sha256"]).startswith("sha256:"))
+        self.assertEqual(report["model"], "deterministic-extractive-v1")
+        self.assertEqual(report["prompt_version"], "extractive-offline-v1")
+        self.assertEqual(report["evaluation_conditions"]["candidate_limit"], 60)
+        for arm in report["arms"].values():
+            self.assertEqual(arm["prompt_version"], "extractive-offline-v1")
+            self.assertEqual(arm["evaluation_conditions"]["retrieval_top_k"], 5)
+
+        # This public smoke question is a structured fact.  A component
+        # ablation must preserve the structured route in both arms.
+        structured = next(
+            row for row in questions if row.get("expected_route") == "structured_fact"
+        )
+        full_row = next(
+            row for row in report["arms"]["full_system"]["questions"]
+            if row["question_id"] == structured["question_id"]
+        )
+        ablation_row = next(
+            row for row in report["arms"]["without_identifier_routing"]["questions"]
+            if row["question_id"] == structured["question_id"]
+        )
+        self.assertEqual(full_row["route"], "structured_fact")
+        self.assertEqual(ablation_row["route"], "structured_fact")
 
     def test_identifier_routing_ablation_rejects_empty_or_duplicate_questions(self) -> None:
         with self.assertRaisesRegex(ValueError, "must not be empty"):

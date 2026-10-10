@@ -254,6 +254,40 @@ class TemporalFactTests(unittest.TestCase):
         self.assertEqual(events[0]["old_value"], [8.0])
         self.assertEqual(events[0]["new_value"], [7.6])
 
+    def test_source_url_change_refreshes_current_evidence(self) -> None:
+        first = self._observation(
+            predicate="adc.target",
+            value="HER2",
+            source="curated_seed",
+            source_record_id="adc_001",
+            observed_at="2026-08-21T00:00:00+00:00",
+            snapshot_id=None,
+        )
+        record_fact_sets(self.database, [first])
+        second = first.model_copy(
+            update={
+                "source_url": "https://example.test/updated-source",
+                "observed_at": "2026-08-22T00:00:00+00:00",
+            }
+        )
+
+        refreshed = record_fact_sets(self.database, [second])
+
+        self.assertEqual(refreshed["idempotent_groups"], 0)
+        self.assertEqual(refreshed["evidence_created"], 1)
+        with closing(connect(self.database)) as connection:
+            urls = connection.execute(
+                """
+                SELECT source_url, is_current
+                FROM fact_evidence
+                WHERE source = 'curated_seed' AND source_record_id = 'adc_001'
+                ORDER BY is_current DESC, source_url
+                """
+            ).fetchall()
+        self.assertEqual(urls[0][0], "https://example.test/updated-source")
+        self.assertEqual(urls[0][1], 1)
+        self.assertEqual(urls[1][1], 0)
+
     def test_cross_source_conflict_is_preserved_and_can_resolve(self) -> None:
         _, snapshot_id = self._snapshot(
             source="adcdb",

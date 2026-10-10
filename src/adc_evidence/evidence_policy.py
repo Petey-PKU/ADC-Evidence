@@ -43,7 +43,7 @@ class FieldPolicy(BaseModel):
     cardinality: Literal["one", "many"]
     preferred_sources: list[str] = Field(min_length=1)
     conflict_resolution: Literal[
-        "authoritative_first", "require_review", "preserve_all"
+        "authoritative_first", "flag_conflict", "preserve_all"
     ]
     material_change: bool
 
@@ -52,7 +52,7 @@ class ChangeTypePolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     severity: Literal["low", "medium", "high", "critical"]
-    review_required: bool
+    attention_required: bool
     tracked_field: str | None = None
 
 
@@ -64,7 +64,7 @@ class EvidencePolicy(BaseModel):
     sources: dict[str, SourcePolicy] = Field(min_length=1)
     fields: dict[str, FieldPolicy] = Field(min_length=1)
     fact_statuses: list[str] = Field(min_length=1)
-    review_statuses: list[str] = Field(min_length=1)
+    verification_statuses: list[str] = Field(min_length=1)
     change_types: dict[str, ChangeTypePolicy] = Field(min_length=1)
     answer_routes: list[str] = Field(min_length=1)
 
@@ -75,7 +75,7 @@ class EvidencePolicy(BaseModel):
             "scope.supported_jobs": self.scope.supported_jobs,
             "scope.prohibited_jobs": self.scope.prohibited_jobs,
             "fact_statuses": self.fact_statuses,
-            "review_statuses": self.review_statuses,
+            "verification_statuses": self.verification_statuses,
             "answer_routes": self.answer_routes,
         }
         for list_name, values in named_lists.items():
@@ -125,20 +125,20 @@ class EvidencePolicy(BaseModel):
                 + ", ".join(sorted(missing_fact_statuses))
             )
 
-        required_review_statuses = {
+        required_verification_statuses = {
             "needs_review",
             "reviewed_supported",
             "reviewed_unsupported",
             "reviewed_conflicted",
             "superseded",
         }
-        missing_review_statuses = required_review_statuses - set(
-            self.review_statuses
+        missing_verification_statuses = required_verification_statuses - set(
+            self.verification_statuses
         )
-        if missing_review_statuses:
+        if missing_verification_statuses:
             raise ValueError(
-                "missing required review statuses: "
-                + ", ".join(sorted(missing_review_statuses))
+                "missing required verification statuses: "
+                + ", ".join(sorted(missing_verification_statuses))
             )
 
         required_answer_routes = {

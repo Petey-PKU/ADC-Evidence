@@ -27,6 +27,7 @@ from adc_evidence.refresh_ops import RefreshLock, evaluate_refresh_gates, retry_
 from adc_evidence.repository import (
     finish_ingestion_run,
     finish_source_run,
+    recover_stale_ingestion_runs,
     start_ingestion_run,
     start_source_run,
 )
@@ -44,6 +45,32 @@ class RefreshOperationTests(unittest.TestCase):
 
     def _start_run(self, run_id: str) -> None:
         start_ingestion_run(self.database, run_id, f"{run_id}-start", {})
+
+    def test_recover_stale_ingestion_run_marks_sources_terminal(self) -> None:
+        run_id = "stale-run"
+        start_ingestion_run(self.database, run_id, "2020-01-01T00:00:00+00:00", {})
+        start_source_run(self.database, run_id, "clinicaltrials", "2020-01-01T00:00:00+00:00")
+
+        recovered = recover_stale_ingestion_runs(
+            self.database,
+            now="2020-01-02T00:00:00+00:00",
+            stale_after_seconds=3600,
+        )
+
+        self.assertEqual(recovered, [run_id])
+        with closing(connect(self.database)) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT status FROM ingestion_runs WHERE run_id = ?", (run_id,)
+                ).fetchone()[0],
+                "failed",
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT status FROM ingestion_source_runs WHERE run_id = ?", (run_id,)
+                ).fetchone()[0],
+                "failed",
+            )
 
     def _source_run(
         self,

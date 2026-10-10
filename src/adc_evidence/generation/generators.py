@@ -207,17 +207,41 @@ class ExtractiveGenerator:
                 requested_prefixes: list[str] = []
                 field_markers = (
                     (("靶点", "target"), "靶点 / target:"),
-                    (("载荷", "payload"), "载荷 / payload:"),
-                    (("payload class", "载荷类型"), "载荷类型 / payload class:"),
+                    (("载荷类型", "payload class", "payload type"), "载荷类型 / payload class:"),
+                    (("载荷名称", "payload name"), "载荷 / payload:"),
                     (("dar", "药物抗体比"), "药物抗体比 / DAR:"),
-                    (("linker", "连接子"), "连接子 / linker:"),
-                    (("linker 类型", "连接子类型"), "连接子类型 / linker type:"),
+                    (("连接子类型", "linker type", "linker类型"), "连接子类型 / linker type:"),
+                    (("连接子名称", "linker name"), "连接子 / linker:"),
                     (("研发状态", "development status"), "研发状态 / development status:"),
                     (("企业", "公司", "company"), "企业 / company:"),
                 )
                 for markers, prefix in field_markers:
                     if any(marker in lowered_question for marker in markers):
                         requested_prefixes.append(prefix.casefold())
+                # A bare "linker/连接子" request means the name. A specific
+                # type request must never select the name line as a substitute.
+                linker_type_requested = any(
+                    marker in lowered_question
+                    for marker in ("连接子类型", "linker type", "linker类型")
+                )
+                linker_name_requested = any(
+                    marker in lowered_question for marker in ("连接子名称", "linker name")
+                )
+                if not linker_type_requested and not linker_name_requested and any(
+                    marker in lowered_question for marker in ("linker", "连接子")
+                ):
+                    requested_prefixes.append("连接子 / linker:")
+                payload_type_requested = any(
+                    marker in lowered_question
+                    for marker in ("载荷类型", "payload class", "payload type")
+                )
+                payload_name_requested = any(
+                    marker in lowered_question for marker in ("载荷名称", "payload name")
+                )
+                if not payload_type_requested and not payload_name_requested and any(
+                    marker in lowered_question for marker in ("载荷", "payload")
+                ):
+                    requested_prefixes.append("载荷 / payload:")
                 for line in lines:
                     if any(line.casefold().startswith(prefix) for prefix in requested_prefixes):
                         add(line, primary.citation_id)
@@ -233,19 +257,32 @@ class ExtractiveGenerator:
                     if any(line.casefold().startswith(prefix) for prefix in wanted_prefixes):
                         add(line, primary.citation_id)
             elif primary.result.source_type == "pubmed":
-                add(
-                    f"文档 {primary.result.retrieval_document_id}：{primary.result.title}",
-                    primary.citation_id,
-                )
+                # Keep the offline answer strictly extractive.  A title or
+                # retrieval id is source metadata, not necessarily present in
+                # the cited abstract excerpt; emitting it as a claim makes
+                # the direct-support validator downgrade an otherwise valid
+                # literature answer.  The citation metadata remains available
+                # to callers through ``AnswerResult.citations``.
+                pass
 
+        profile_ids = set(primary.result.metadata.get("adc_ids", [])) if sources and primary.result.source_type == "adc_profile" else set()
+        profile_query = bool(requested_prefixes) if sources and primary.result.source_type == "adc_profile" else False
         candidates: list[tuple[int, int, int, str, str]] = []
         for source_index, source in enumerate(sources):
+            if profile_ids and source.result.source_type == "adc_profile":
+                source_ids = set(source.result.metadata.get("adc_ids", []))
+                if source_ids and not profile_ids.intersection(source_ids):
+                    continue
             units = [
                 unit.strip()
                 for unit in re.split(r"\n+|(?<=[.!?。！？])\s+", source.excerpt)
                 if unit.strip()
             ]
             for unit_index, unit in enumerate(units):
+                if profile_query and any(
+                    unit.casefold().startswith(prefix) for prefix in requested_prefixes
+                ) is False:
+                    continue
                 lowered = unit.casefold()
                 score = sum(term in lowered for term in terms)
                 if score:

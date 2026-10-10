@@ -8,14 +8,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from adc_evidence.evaluation.benchmark import (
+from adc_evidence.evaluation.automated import (
     BENCHMARK_SCHEMA_VERSION,
     IMPLEMENTATION_VERSION,
     OFFLINE_BASELINE_VERSION,
     _system_row,
     automatic_diagnostics,
 )
-from adc_evidence.evaluation.human_review import question_id_sha256
+from adc_evidence.evaluation.fingerprints import question_id_sha256
 from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.service import EvidenceAnsweringService
 from adc_evidence.rag.retriever import HybridRetriever
@@ -176,7 +176,7 @@ def holdout_manifest(questions: list[dict[str, object]]) -> dict[str, object]:
                 "The questions are public and may have informed development; use them only "
                 "for reproducible smoke checks, not a confirmation claim."
             ),
-            "confirmation_requires": "A separately frozen, access-controlled holdout with human review.",
+            "confirmation_requires": "A separately frozen, access-controlled holdout with pre-registered automatic checks.",
         },
     }
 

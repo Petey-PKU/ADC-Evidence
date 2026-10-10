@@ -35,6 +35,7 @@ REFUSAL_MESSAGES = {
     "question_too_long": "问题过长，请缩小到一个可核查的事实。",
     "personalized_medical_advice": "本工具不提供个体化诊断、处方或剂量建议。",
     "future_or_unpublished_claim": "当前证据无法支持未来预测或尚未公布的结果。",
+    "unsupported_fact_completion": "没有来源时不能补全精确事实或数值。",
     "out_of_scope": "该问题不属于当前 ADC 证据库的范围。",
     "no_retrieval_results": "当前数据库中没有检索到相关证据。",
     "low_retrieval_relevance": "检索结果相关性不足，无法可靠作答。",
@@ -82,6 +83,7 @@ class EvidenceAnsweringService:
         guard: EvidenceGuard | None = None,
         database_path: Path | None = None,
         seed_path: Path | None = None,
+        enable_identifier_routing: bool = True,
     ) -> None:
         if retriever is None:
             retriever = (
@@ -96,6 +98,7 @@ class EvidenceAnsweringService:
         self.generator = generator or create_generator("auto")
         self.guard = guard or EvidenceGuard()
         self.database_path = database_path
+        self.enable_identifier_routing = enable_identifier_routing
         self.structured = (
             StructuredAnswerEngine(database_path) if database_path is not None else None
         )
@@ -198,7 +201,10 @@ class EvidenceAnsweringService:
                 if plan is not None and plan.route == "literature_evidence"
                 else infer_source_type(question)
             )
-            identifier_search = getattr(self.retriever, "identifier_search", None)
+            identifier_search = (
+                getattr(self.retriever, "identifier_search", None)
+                if self.enable_identifier_routing else None
+            )
             results = (
                 identifier_search(
                     question,

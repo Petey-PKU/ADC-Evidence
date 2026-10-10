@@ -20,9 +20,16 @@ VALID_CATEGORIES = {
     "safety_refusal",
 }
 VALID_SPLITS = {"dev", "public_smoke"}
-VALID_REVIEW_STATUSES = {"pending", "complete"}
 VALID_EXPECTED_STATUSES = {"answered", "partial", "refused", "error"}
 VALID_ANSWER_KINDS = {"structured", "comparison", "trial_record", "evidence_document", "refusal", "gap"}
+PUBLIC_BENCHMARK_PROMPT_VERSION = "public-benchmark-v1"
+PUBLIC_EVALUATION_CONDITIONS = {
+    "network_enabled": False,
+    "retrieval_mode": "sparse",
+    "retrieval_top_k": 5,
+    "candidate_limit": 60,
+    "generator": "extractive-offline-v1",
+}
 
 
 def _canonical(value: object) -> str:
@@ -49,7 +56,7 @@ def load_public_benchmark(path: Path) -> list[dict[str, object]]:
             "question_id", "split", "category", "question", "expected_route",
             "expected_status", "standard_answer", "allowed_answers",
             "evidence_sources", "allow_partial", "should_refuse",
-            "human_scoring", "scoring",
+            "scoring",
         }
         missing = sorted(required - set(row))
         if missing:
@@ -87,19 +94,10 @@ def load_public_benchmark(path: Path) -> list[dict[str, object]]:
                 raise ValueError(
                     f"{row['question_id']}: each evidence source needs type, ID, URL, and field"
                 )
-        review = row["human_scoring"]
-        if not isinstance(review, dict) or review.get("status") not in VALID_REVIEW_STATUSES:
-            raise ValueError(f"{row['question_id']}: invalid human_scoring status")
-        if review.get("status") == "pending" and any(
-            review.get(key) is not None for key in ("primary", "secondary", "adjudicated")
-        ):
-            raise ValueError(f"{row['question_id']}: pending review cannot contain scores")
         if not isinstance(row["scoring"], dict) or not row["scoring"].get("primary_metric"):
             raise ValueError(f"{row['question_id']}: scoring.primary_metric is required")
-        if not isinstance(row["scoring"].get("automatic_fields"), list) or not isinstance(
-            row["scoring"].get("human_fields"), list
-        ):
-            raise ValueError(f"{row['question_id']}: scoring field lists are required")
+        if not isinstance(row["scoring"].get("automatic_fields"), list):
+            raise ValueError(f"{row['question_id']}: scoring.automatic_fields is required")
     return rows
 
 
@@ -128,12 +126,7 @@ def benchmark_manifest(
             "status": "development_exposed",
             "eligible_for_unseen_test_claim": False,
             "reason": "Questions and answers are distributed for reproducible development and smoke checks.",
-            "confirmation_requires": "A separately frozen access-controlled question set with independent human review.",
-        },
-        "human_review": {
-            "status": "pending",
-            "required_roles": ["primary_independent", "secondary_independent", "adjudicator_if_disagreement"],
-            "ai_assisted_review_counts_as": "not_independent_human_review",
+            "confirmation_requires": "A separately frozen access-controlled question set with pre-registered automatic checks.",
         },
         "metrics": {
             "route_accuracy": "expected_route == system.route",
@@ -142,12 +135,11 @@ def benchmark_manifest(
             "answer_exact_accuracy": "proportion of questions whose required answer fields are all correct",
             "evidence_recall": "intersection(system cited source IDs, evidence_sources) is nonempty when evidence is required",
             "refusal_precision_recall": "binary refusal correctness on safety_refusal and insufficient-evidence items",
-            "human_primary_endpoint": "independent reviewer answer and evidence verdicts; report paired difference with 95% CI",
         },
         "evidence_acceptance_policy": {
             "literature_public_smoke": "Any listed directly linked PubMed candidate is accepted for the natural-language 'a relevant paper' questions.",
             "candidate_cap_per_question": 50,
-            "strict_test_requirement": "Replace the candidate set with a human-curated answer set for publication claims.",
+            "strict_test_requirement": "Freeze the candidate set before any confirmatory run and report automatic diagnostics as engineering evidence.",
         },
     }
 
@@ -322,7 +314,7 @@ def score_public_benchmark(
         "refusal_correctness": refusal_hits / total,
         "by_category": by_category,
         "scoring_mode": "automatic_diagnostics_only",
-        "human_review_required": True,
+        "automatic_validation_only": True,
     }
 
 
@@ -396,6 +388,53 @@ def compare_public_benchmark_reports(
             category: summarize(sorted(ids))
             for category, ids in sorted(by_category.items())
         },
-        "human_review_required": True,
-        "method_note": "Automatic paired diagnostics only; semantic correctness and publication claims require independent human review on a hidden holdout.",
+        "automatic_validation_only": True,
+        "method_note": "Automatic paired diagnostics only; they are engineering evidence and do not establish semantic correctness or publication claims.",
+    }
+
+
+def validate_public_benchmark_report_metadata(
+    system_report: dict[str, object],
+    baseline_report: dict[str, object],
+    benchmark_rows: list[dict[str, object]],
+) -> dict[str, object]:
+    """Require paired public reports to describe the same evaluation conditions."""
+    if not benchmark_rows:
+        raise ValueError("Public benchmark must not be empty")
+    expected_question_hash = f"sha256:{_sha256(benchmark_rows)}"
+    expected_variants = {
+        "system": (system_report, "adc_evidence_public"),
+        "baseline": (baseline_report, "offline_rag_baseline"),
+    }
+    database_versions: list[object] = []
+    for label, (report, expected_variant) in expected_variants.items():
+        if report.get("schema_version") != "public-adc-benchmark-report-v1":
+            raise ValueError(f"{label} report schema version is not supported")
+        if report.get("system_variant") != expected_variant:
+            raise ValueError(f"{label} report has unexpected system_variant")
+        if report.get("question_set_sha256") != expected_question_hash:
+            raise ValueError(f"{label} report question set hash mismatch")
+        if report.get("question_count") != len(benchmark_rows):
+            raise ValueError(f"{label} report question count mismatch")
+        if report.get("network_enabled") is not False:
+            raise ValueError(f"{label} report must have network_enabled=false")
+        if report.get("model") != "extractive-offline-v1":
+            raise ValueError(f"{label} report model mismatch")
+        if report.get("prompt_version") != PUBLIC_BENCHMARK_PROMPT_VERSION:
+            raise ValueError(f"{label} report prompt version mismatch")
+        if report.get("evaluation_conditions") != PUBLIC_EVALUATION_CONDITIONS:
+            raise ValueError(f"{label} report evaluation conditions mismatch")
+        database_version = report.get("database_data_version")
+        if not isinstance(database_version, dict) or not database_version:
+            raise ValueError(f"{label} report must record database_data_version")
+        database_versions.append(database_version)
+    if database_versions[0] != database_versions[1]:
+        raise ValueError("Public benchmark reports disagree on database_data_version")
+    return {
+        "question_set_sha256": expected_question_hash,
+        "question_count": len(benchmark_rows),
+        "database_data_version": database_versions[0],
+        "prompt_version": PUBLIC_BENCHMARK_PROMPT_VERSION,
+        "evaluation_conditions": dict(PUBLIC_EVALUATION_CONDITIONS),
+        "network_enabled": False,
     }

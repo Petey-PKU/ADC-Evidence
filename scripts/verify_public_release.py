@@ -21,7 +21,13 @@ def _database_absolute_path_count(payload: bytes) -> int:
     connection = sqlite3.connect(":memory:")
     try:
         connection.deserialize(payload)
-        pattern = re.compile(r"(?:[A-Za-z]:[\\/]|/Users/|/home/|\\\\)")
+        # A doubled backslash is also how JSON encodes ordinary Windows
+        # separators (for example ``data\\processed``).  Treat it as an
+        # absolute path only at the beginning of a value or after a quote/
+        # whitespace, where it can denote a UNC path such as ``\\\\server``.
+        pattern = re.compile(
+            r"(?:[A-Za-z]:[\\/]|/Users/|/home/|(?:^|[\s\"'])\\\\)"
+        )
         count = 0
         tables = [
             str(row[0])
@@ -98,6 +104,26 @@ def verify_release(path: Path) -> dict[str, object]:
         if "RELEASE_README.md" not in names:
             raise ValueError("release is missing RELEASE_README.md")
 
+        application = manifest.get("application", {})
+        if manifest.get("schema_version") == "public-adc-release-v2":
+            if not isinstance(application, dict) or application.get("mode") != "bundled_source":
+                raise ValueError("v2 release is missing its bundled application metadata")
+            required_runtime = {
+                "pyproject.toml", "README.md", "configs/entities.json", "configs/evidence_policy.json",
+                "src/adc_evidence/__init__.py", "src/adc_evidence/app.py",
+                "scripts/run_public_release.py", "scripts/verify_public_release.py",
+            }
+            for key in ("database_path", "catalog_path"):
+                required_runtime.add(str(application.get(key, "")))
+            if application.get("scope_policy_path"):
+                required_runtime.add(str(application["scope_policy_path"]))
+            if application.get("candidate_locator_path"):
+                required_runtime.add(str(application["candidate_locator_path"]))
+            for name in ("manifest.json", "chunk_ids.json", "embeddings.npy"):
+                required_runtime.add(f"{application.get('index_path', '')}/{name}")
+            if missing := required_runtime - seen:
+                raise ValueError(f"v2 release is missing required runtime files: {sorted(missing)}")
+
         return {
             "status": "verified",
             "archive": str(path),
@@ -106,6 +132,9 @@ def verify_release(path: Path) -> dict[str, object]:
             "checked_file_count": len(checked),
             "database_absolute_path_count": database_absolute_path_count,
             "benchmark_question_file_present": "data/annotations/public_benchmark_v1.jsonl" in names,
+            "candidate_locator_file_present": "data/public/catalog_source_locator_candidates.jsonl" in names,
+            "bundled_application_present": application.get("mode") == "bundled_source",
+            "code_commit": application.get("code_commit"),
         }
 
 

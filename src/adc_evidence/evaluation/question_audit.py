@@ -13,14 +13,14 @@ from adc_evidence.config import (
     GENERATION_QUESTIONS_PATH,
     RETRIEVAL_QUESTIONS_PATH,
 )
-from adc_evidence.evaluation.benchmark import (
+from adc_evidence.evaluation.automated import (
     automatic_diagnostics,
     load_benchmark_questions,
     question_set_manifest,
     validate_arm_report,
     validate_question_text,
 )
-from adc_evidence.evaluation.human_review import question_id_sha256
+from adc_evidence.evaluation.fingerprints import question_id_sha256
 
 
 def inspect_question_file(path: Path) -> dict[str, object]:

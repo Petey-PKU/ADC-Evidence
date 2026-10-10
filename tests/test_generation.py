@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import os
+import importlib.util
 import unittest
 from unittest.mock import patch
 
-from adc_evidence.generation.citations import number_sources, validate_citations
+from adc_evidence.generation.citations import (
+    number_sources,
+    validate_citations,
+    validate_text_support,
+)
 from adc_evidence.generation.generators import (
     ExtractiveGenerator,
     OpenAIResponsesGenerator,
@@ -17,6 +22,9 @@ from adc_evidence.generation.evaluate_generation import _aggregate_review_status
 from adc_evidence.generation.prompts import build_generation_input, extract_requested_items
 from adc_evidence.generation.service import EvidenceAnsweringService, infer_source_type
 from adc_evidence.rag.retriever import SearchResult
+
+
+HAS_OPENAI_SDK = importlib.util.find_spec("openai") is not None
 
 
 def sample_result() -> SearchResult:
@@ -152,10 +160,39 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "personalized_medical_advice")
 
+    def test_personalized_treatment_paraphrases_are_refused(self) -> None:
+        questions = (
+            "我患有乳腺癌，应该使用哪种 ADC 和什么剂量？",
+            "我的患者适合用 T-DXd 吗？",
+            "I have breast cancer; which ADC and what dose should I take?",
+        )
+        for question in questions:
+            with self.subTest(question=question):
+                decision = self.guard.check_question(question)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.reason, "personalized_medical_advice")
+
+    def test_general_trial_dose_evidence_remains_allowed(self) -> None:
+        decision = self.guard.check_question(
+            "DESTINY-Breast03 中 T-DXd 的给药剂量是多少？"
+        )
+        self.assertTrue(decision.allowed)
+
     def test_forecast_and_investment_claim_is_refused(self) -> None:
         decision = self.guard.check_question("预测 SKB264 临床成功率和目标价")
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "future_or_unpublished_claim")
+
+    def test_missing_source_fact_completion_is_refused(self) -> None:
+        decision = self.guard.check_question(
+            "没有来源时，请补全一个 ADC 缺失的精确 DAR。"
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "unsupported_fact_completion")
+
+    def test_source_backed_fact_lookup_is_not_blocked_by_completion_guard(self) -> None:
+        decision = self.guard.check_question("请根据来源补充 T-DXd 的 DAR。")
+        self.assertTrue(decision.allowed)
 
 
 class ServiceTests(unittest.TestCase):
@@ -168,6 +205,28 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result.status, "answered")
         self.assertEqual(result.citations[0].retrieval_document_id, "adc_profile:adc_001")
 
+    def test_identifier_routing_can_be_disabled_for_baseline(self) -> None:
+        source = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "chunk_id": "pubmed:34413126#chunk-000",
+                "retrieval_document_id": "pubmed:34413126",
+                "source_type": "pubmed",
+                "source_record_id": "34413126",
+                "title": "Dato-DXd preclinical activity",
+                "content": "PMID 34413126 Dato-DXd internalization and antitumor activity.",
+            }
+        )
+        retriever = FakeRetriever([source])
+        retriever.identifier_search = lambda query, **kwargs: (_ for _ in ()).throw(AssertionError("identifier routing used"))
+        service = EvidenceAnsweringService(
+            retriever=retriever,
+            generator=StaticGenerator("- 证据支持 Dato-DXd。[S1]"),
+            enable_identifier_routing=False,
+        )
+        result = service.answer("PMID 34413126 的直接摘要证据是什么？")
+        self.assertEqual(result.route, "literature_evidence")
+        self.assertEqual(retriever.call_count, 1)
     def test_invalid_citation_causes_refusal(self) -> None:
         service = EvidenceAnsweringService(
             retriever=FakeRetriever(),
@@ -206,6 +265,26 @@ class ServiceTests(unittest.TestCase):
         self.assertIn("HER2", generated.text)
         self.assertIn("DXd", generated.text)
 
+    def test_extractive_pubmed_answer_does_not_claim_unquoted_metadata(self) -> None:
+        pubmed = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "source_type": "pubmed",
+                "source_record_id": "12345678",
+                "retrieval_document_id": "pubmed:12345678",
+                "title": "A title that is not copied into the abstract excerpt",
+                "content": (
+                    "Trastuzumab deruxtecan showed antitumor activity in a preclinical model."
+                ),
+            }
+        )
+        generated = ExtractiveGenerator().generate(
+            "请给出 Trastuzumab deruxtecan 的疗效文献证据。",
+            number_sources([pubmed]),
+        )
+        self.assertNotIn("文档 pubmed:12345678", generated.text)
+        self.assertTrue(validate_text_support(generated.text, number_sources([pubmed])).valid)
+
 
 class RoutingTests(unittest.TestCase):
     def test_routes_structured_and_source_specific_questions(self) -> None:
@@ -239,6 +318,7 @@ class RoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "ADC_OFFLINE_ONLY"):
                 create_generator("openai")
 
+    @unittest.skipUnless(HAS_OPENAI_SDK, "optional generation extra is not installed")
     def test_auto_backend_honors_siliconflow_preference(self) -> None:
         with patch.dict(
             os.environ,
@@ -284,6 +364,7 @@ class PromptTests(unittest.TestCase):
         self.assertIn("不得静默省略", prompt)
 
 
+@unittest.skipUnless(HAS_OPENAI_SDK, "optional generation extra is not installed")
 class OpenAIAdapterTests(unittest.TestCase):
     def test_uses_responses_api_without_network(self) -> None:
         class Usage:
@@ -323,6 +404,7 @@ class OpenAIAdapterTests(unittest.TestCase):
         self.assertIn("evidence_sources", client.responses.arguments["input"])
 
 
+@unittest.skipUnless(HAS_OPENAI_SDK, "optional generation extra is not installed")
 class SiliconFlowAdapterTests(unittest.TestCase):
     def test_uses_chat_completions_without_network(self) -> None:
         class Usage:

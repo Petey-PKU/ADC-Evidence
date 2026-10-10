@@ -9,6 +9,7 @@ from pathlib import Path
 from adc_evidence.database import create_database, initialize_database
 from adc_evidence.rag.documents import (
     RetrievalDocument,
+    TextChunk,
     build_retrieval_documents,
     chunk_documents,
     persist_retrieval_corpus,
@@ -85,6 +86,61 @@ class RetrievalTests(unittest.TestCase):
 
         self.assertEqual([item.source_record_id for item in results], ["34413126"])
         self.assertEqual(results[0].retrieval_document_id, "pubmed:34413126")
+
+    def test_pubmed_search_expands_selected_chunk_to_document_context(self) -> None:
+        document = RetrievalDocument(
+            retrieval_document_id="pubmed:context-expand",
+            source_type="pubmed",
+            source_record_id="context-expand",
+            title="HER2 internalization study",
+            content=(
+                "Title: HER2 internalization study\n"
+                "Abstract: HER2 ubiquitination and internalization explain the mechanism.\n"
+                "The later methods section repeats mechanism terms for retrieval."
+            ),
+            source_url="https://example.test/context-expand",
+            metadata={"adc_ids": ["adc_001"], "literature_topics": ["mechanism"]},
+        )
+        chunks = [
+            TextChunk(
+                chunk_id="pubmed:context-expand#chunk-000",
+                retrieval_document_id="pubmed:context-expand",
+                chunk_index=0,
+                title=document.title,
+                content="Title: HER2 internalization study. HER2 ubiquitination and internalization explain the mechanism.",
+                metadata={
+                    **document.metadata,
+                    "source_type": "pubmed",
+                    "source_record_id": document.source_record_id,
+                    "source_url": document.source_url,
+                },
+            ),
+            TextChunk(
+                chunk_id="pubmed:context-expand#chunk-001",
+                retrieval_document_id="pubmed:context-expand",
+                chunk_index=1,
+                title=document.title,
+                content="mechanism mechanism mechanism T-DXd mechanism terms for retrieval.",
+                metadata={
+                    **document.metadata,
+                    "source_type": "pubmed",
+                    "source_record_id": document.source_record_id,
+                    "source_url": document.source_url,
+                },
+            ),
+        ]
+        persist_retrieval_corpus(self.database_path, [document], chunks)
+
+        results = HybridRetriever(self.database_path).sparse_search(
+            "T-DXd mechanism",
+            top_k=1,
+            source_type="pubmed",
+            topic="mechanism",
+        )
+
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0].metadata["context_expanded"])
+        self.assertIn("HER2 ubiquitination and internalization", results[0].content)
 
     def test_persist_is_idempotent(self) -> None:
         documents = build_retrieval_documents(self.database_path)

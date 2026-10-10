@@ -99,7 +99,7 @@ python -m adc_evidence.ingestion.pipeline
 默认范围：
 
 - ADCdb：10 个指定 ADC 的低频精确查询；
-- ClinicalTrials.gov：当前查询命中的全部记录，单页最多 1000 条；
+- ClinicalTrials.gov：当前查询命中的全部记录，单页最多 100 条（通过多页游标继续抓取）；
 - PubMed：按相关度取前 200 条。
 
 可单独跳过某个来源：
@@ -202,15 +202,11 @@ python -m adc_evidence.generation.evaluate_generation --backend extractive
 python -m adc_evidence.generation.evaluate_generation `
   --backend siliconflow `
   --output artifacts/evaluation/generation_report_siliconflow.json
-python -m adc_evidence.review.prepare_review `
-  --generation-report artifacts/evaluation/generation_report_siliconflow.json
 ```
 
-远程模型评测会产生 API 调用费用，只应在单题验证通过后运行。每次新评测都会自动生成 `run_id`；不同运行导入审核队列后不会互相覆盖。完整的 Key 安全、单题验证、常见错误和 OpenAI 可选配置见 `docs/api_configuration.md`；设计与指标说明见 `docs/generation_design.md` 和 `docs/generation_evaluation.md`。
+远程模型评测会产生 API 调用费用，只应在单题验证通过后运行。每次新评测都会自动生成 `run_id`，结果写入评测报告并由自动规则检查。完整的 Key 安全、单题验证、常见错误和 OpenAI 可选配置见 `docs/api_configuration.md`；设计与指标说明见 `docs/generation_design.md` 和 `docs/generation_evaluation.md`。
 
-下面的远程模型数字是历史工程记录，不是当前离线研究的投稿结果；它们来自已暴露题集和单人复核，不能作为独立测试或系统优越性的证据。
-
-这些历史复核记录和远程运行产物保存在私有历史快照中，原始导出、评审者标识和本机运行元数据不随公共仓库发布。公共仓库当前没有真实人工金标准；投稿前必须重新提交带 `human_independent` / `human_adjudicated` provenance 的评审文件，并通过 readiness audit。
+下面的远程模型数字是历史工程记录，不是当前离线研究的投稿结果；它们来自已暴露题集，只用于复现和自动回归诊断。
 
 已完成的硅基流动 `deepseek-ai/DeepSeek-V4-Flash` 真实运行包含 12 次 API 调用：回答成功率、拒答召回、引用有效率与 Gold citation hit 均为 1.0000，关键事实词召回为 0.7639，合计使用 25,922 tokens。单人领域复核确认 11/12 可回答题正确、1/12 部分正确、4/4 拒答合理；唯一确认 Bad Case 是 `gen_profile_005` 遗漏两个关键事实。
 
@@ -218,22 +214,18 @@ python -m adc_evidence.review.prepare_review `
 
 私有历史快照中的 56 条主队列曾完成单人复核。离线基线为10/12答案正确、2/12部分正确、4/4拒答合理；真实模型为11/12答案正确、1/12部分正确、4/4拒答合理。离线自动词面召回更高，但人工正确率更低，原因是两条答案混入错误来源。完整比较见 `docs/generation_human_comparison.md`；这些数字不构成公共仓库的独立测试证据。
 
-## 专家复核与 Bad Case
+## 自动验证与 Bad Case
 
-基础检索与离线生成评测构成 40 条审核队列；导入硅基流动运行后，当前队列扩展为 56 条：
-
-```powershell
-python -m adc_evidence.review.prepare_review
-```
-
-在 Streamlit 的“专家复核”页核对问题、gold 文档、原始证据、答案和拒答。复核完成或模型结果更新后，生成 Bad Case 报告：
+离线检索、结构化路由、引用有效性和答案字段都由自动规则检查。公开 Benchmark v1 可以直接运行：
 
 ```powershell
-python -m adc_evidence.review.bad_cases
-python -m adc_evidence.review.export_reviews
+python scripts/run_public_benchmark.py `
+  --questions data/annotations/public_benchmark_v1.jsonl `
+  --database data/processed/adc_public_2026-09-30.db `
+  --output artifacts/evaluation/public_benchmark_v1_report.json
 ```
 
-导出命令生成 `expert_reviews.jsonl`、`expert_reviews.csv` 和带文件哈希的 manifest。详细口径见 `docs/expert_review_guide.md`。私有历史快照中的 24 条检索问题曾完成单人复核，问题与 Gold 均通过；自动规则仍标出 3 条检索低排名和 1 条生成关键事实覆盖不足。公共版本只保留方法说明，不把这些历史结果包装成独立人工证据。
+报告中的 `automatic_scoring` 和 `automatic_validation` 是工程诊断信号；它们不会把候选答案包装成语义金标准。
 
 ## Docker 部署
 
@@ -265,37 +257,43 @@ python -m unittest discover -s tests -v
 
 项目测试使用 Python 标准库 `unittest`，因此即使没有安装 pytest 也能运行。
 
-## 投稿前审计
+## 自动验证状态
 
 ```powershell
 $env:PYTHONPATH="src"
-python scripts/audit_paper_readiness.py --output artifacts/evaluation/paper_readiness.json
+python scripts/validate_public_benchmark.py `
+  --questions data/annotations/public_benchmark_v1.jsonl `
+  --manifest data/annotations/public_benchmark_v1.manifest.json `
+  --catalog data/public/marketed_adc_catalog.csv
 python scripts/build_public_artifact_manifest.py --output artifacts/evaluation/public_artifact_manifest.json
 ```
 
-默认审计应返回 `not_ready_for_submission`，直到真实独立人工标签和访问受控的未见 holdout
-同时通过；公开 smoke holdout、自动指标和 AI 辅助复核不能替代这两项证据。
-
-若提供真实人工标签，必须同时传入 `--human-review-manifest`；审计会校验标签文件哈希、题号集合哈希、题数、版本和评测窗口。
+项目当前面向可运行性验证，状态保持 `not_ready_for_submission`。自动验证可以证明流程、数据绑定和回归行为可复现，但不宣称论文语义正确性。
 
 ## 数据说明
 
-`data/sample/adcs.csv` 是项目范围与实体别名的种子数据。`aliases` 字段使用竖线 `|` 分隔多个别名。自动采集证据仍统一标记为 `needs_review`；只有人工复核后才能改为 `reviewed`。
+`data/sample/adcs.csv` 是项目范围与实体别名的种子数据。`aliases` 字段使用竖线 `|` 分隔多个别名。自动采集证据会标记来源验证状态和冲突注意项，系统始终保留原始来源与证据链。
 
 面向公开快照的 ADC 目录位于 `data/public/marketed_adc_catalog.csv`。它与 10 条演示种子分开维护，当前包含 23 条监管批准候选记录；使用 `scripts/build_public_dataset.py` 可在本地生成带文献和试验来源哈希的 SQLite 快照。详细范围、未来截止日处理和 Benchmark v1 见 [`docs/public_dataset_and_benchmark.md`](docs/public_dataset_and_benchmark.md)。
 
-需要下载后直接查询的完整快照，可在 GitHub Actions 手动运行
+当前论文核验以 HER2/TROP2 传统 ADC 为主范围，截止日固定为 `2026-09-18`；字段、冲突值和日期边界见 [`docs/research_cutoff_2026-09-18.md`](docs/research_cutoff_2026-09-18.md)。
+
+需要验证下载后直接查询的完整快照，可在 GitHub Actions 手动运行
 [`Build public dataset release`](.github/workflows/public-release.yml)。工作流会生成并校验
-数据库、索引和 benchmark 压缩包；普通代码 push 不会自动抓取或发布数据。
+数据库、索引、benchmark、查询程序及配置的压缩包；普通代码 push 不会自动抓取或发布数据。
+当前工作流只生成并校验 `research_only` 包，不上传或发布压缩包；完成逐项来源许可核查并提供
+v2 redistribution attestation 后，才可在本地生成可再分发包。研究包可解压到独立文件夹，无需另行克隆仓库或重建数据库。按包内
+`RELEASE_README.md` 安装 Python 3.11+ 的基础依赖后，运行
+`python scripts/run_public_release.py` 启动网页，或使用 `--question` 执行单次查询。
+启动器自动选择包内数据，固定使用离线结构化/抽取式回答；首次依赖安装仍需联网，
+包内不包含 Python 解释器、依赖 wheel 或生成模型。
 
 ## 后续工作
 
-历史阶段 5 记录了 120 题内部评测协议、三组同窗协议、盲评对象、第二复核与裁决规则。
-面向公开快照的当前 Benchmark v1 已独立生成 98 道开发/公开 smoke 题，并明确标记为
-`development_exposed`；它用于复现和回归检查，不能代替论文的独立人工复核和隐藏测试集。
+面向公开快照的当前 Benchmark v1 已生成 98 道开发/公开 smoke 题，并明确标记为
+`development_exposed`；它用于复现和自动回归检查，不能作为隐藏测试集或论文语义金标准。
 完整的公共数据范围、下载包和评测门禁见
-[公共数据集与 Benchmark 说明](docs/public_dataset_and_benchmark.md)及
-[阶段 5 说明](docs/v0.6_stage5_benchmark_review.md)。
+[公共数据集与 Benchmark 说明](docs/public_dataset_and_benchmark.md)。
 
 v0.6 将项目从带引用问答演示升级为 ADC 证据核查、比较和变化追踪工作台。阶段 0 已固定
 [产品范围](docs/v0.6_product_scope.md)、[数据与证据规范](docs/v0.6_data_spec.md)和
@@ -306,6 +304,5 @@ configs/evidence_policy.json。阶段 1 已实现
 [安全持续刷新](docs/v0.6_stage2_continuous_refresh.md)、
 [证据工作台](docs/v0.6_stage3_evidence_workbench.md)和
 [结构化优先问答与结论验证](docs/v0.6_stage4_structured_answering.md)。
-[盲评、对照评测与回归闭环](docs/v0.6_stage5_benchmark_review.md)已把差异化优势转成可审计
-的人工作答正确性、证据支持、引用对应、完整性和拒答指标；结果只有在真实三组同窗运行并
-完成规定复核后才可发布。
+[自动对照评测与回归闭环](docs/public_dataset_and_benchmark.md)已把差异化优势转成可审计
+的路由、证据、引用和拒答诊断；这些结果用于工程回归，不直接宣称论文语义正确性。
