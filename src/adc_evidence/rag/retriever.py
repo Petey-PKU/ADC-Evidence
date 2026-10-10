@@ -77,8 +77,17 @@ class HybridRetriever:
             self._embedder = embedder_for_index(self._vector_index)
             self._loaded_asset_signature = asset_signature
 
-    def _row_to_result(self, row, score: float, rank: int) -> SearchResult:
+    def _row_to_result(
+        self,
+        row,
+        score: float,
+        rank: int,
+        *,
+        content: str | None = None,
+    ) -> SearchResult:
         metadata = json.loads(row["metadata_json"])
+        if content is not None and str(row["source_type"]) == "pubmed":
+            metadata = {**metadata, "context_expanded": True}
         return SearchResult(
             rank=rank,
             chunk_id=str(row["chunk_id"]),
@@ -86,11 +95,40 @@ class HybridRetriever:
             source_type=str(row["source_type"]),
             source_record_id=str(row["source_record_id"]),
             title=str(row["title"]),
-            content=str(row["content"]),
+            content=str(content if content is not None else row["content"]),
             source_url=str(row["source_url"]),
             score=float(score),
             metadata=metadata,
         )
+
+    def _pubmed_contexts(self, rows) -> dict[str, str]:
+        """Return full PubMed documents for selected chunk rows.
+
+        Retrieval still ranks chunks, but generation should see the document
+        context around a winning chunk. This prevents a later abstract chunk
+        from hiding the mechanism or outcome sentence that appears earlier.
+        """
+        document_ids = {
+            str(row["retrieval_document_id"])
+            for row in rows
+            if str(row["source_type"]) == "pubmed"
+        }
+        if not document_ids:
+            return {}
+        placeholders = ",".join("?" for _ in document_ids)
+        with closing(connect(self.database_path)) as connection:
+            fetched = connection.execute(
+                f"""
+                SELECT retrieval_document_id, content
+                FROM retrieval_documents
+                WHERE retrieval_document_id IN ({placeholders})
+                """,
+                list(document_ids),
+            ).fetchall()
+        return {
+            str(row["retrieval_document_id"]): str(row["content"])
+            for row in fetched
+        }
 
     def sparse_search(
         self,
@@ -149,6 +187,7 @@ class HybridRetriever:
             return bool(matched_adc_ids & linked_adc_ids), score
 
         scored_rows.sort(key=ranking_key, reverse=True)
+        contexts = self._pubmed_contexts([row for row, _ in scored_rows])
         results: list[SearchResult] = []
         seen_documents: set[str] = set()
         for row, score in scored_rows:
@@ -156,7 +195,14 @@ class HybridRetriever:
             if document_id in seen_documents:
                 continue
             seen_documents.add(document_id)
-            results.append(self._row_to_result(row, score, len(results) + 1))
+            results.append(
+                self._row_to_result(
+                    row,
+                    score,
+                    len(results) + 1,
+                    content=contexts.get(str(row["retrieval_document_id"])),
+                )
+            )
             if len(results) == top_k:
                 break
         return results
@@ -248,6 +294,7 @@ class HybridRetriever:
                 query, top_k=top_k, source_type=source_type, adc_id=adc_id, topic=None
             )
         rows_by_id = {str(row["chunk_id"]): row for row in rows}
+        contexts = self._pubmed_contexts(rows)
         results: list[SearchResult] = []
         seen_documents: set[str] = set()
         for chunk_id, _ in ranked:
@@ -259,7 +306,12 @@ class HybridRetriever:
                 continue
             seen_documents.add(document_id)
             results.append(
-                self._row_to_result(row, scores[chunk_id], len(results) + 1)
+                self._row_to_result(
+                    row,
+                    scores[chunk_id],
+                    len(results) + 1,
+                    content=contexts.get(str(row["retrieval_document_id"])),
+                )
             )
             if len(results) == top_k:
                 break
