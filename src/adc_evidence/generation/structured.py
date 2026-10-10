@@ -46,7 +46,10 @@ DEFAULT_PROFILE_FIELDS = (
 _ADC_FIELD_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("adc.payload_class", ("payload class", "载荷类型", "载荷类别", "作用机制类型")),
     ("adc.payload_name", ("payload name", "payload", "载荷名称", "载荷")),
-    ("adc.linker_type", ("linker type", "连接子类型", "linker类型")),
+    (
+        "adc.linker_type",
+        ("linker type", "type of linker", "linker kind", "哪一类连接子", "哪类连接子", "连接子类型", "linker类型"),
+    ),
     ("adc.linker_name", ("linker name", "连接子名称", "linker", "连接子")),
     ("adc.development_status", ("研发状态", "开发状态", "获批状态", "development status")),
     ("adc.company", ("开发企业", "企业", "公司", "company", "sponsor")),

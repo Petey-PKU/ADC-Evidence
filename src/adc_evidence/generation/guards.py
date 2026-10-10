@@ -70,6 +70,28 @@ FUTURE_PATTERNS = (
     "预测",
 )
 
+UNSUPPORTED_FACT_COMPLETION_PATTERNS = (
+    "没有来源时",
+    "没有来源",
+    "缺少来源时",
+    "无来源时",
+    "without a source",
+    "without sources",
+    "no source",
+)
+
+UNSUPPORTED_FACT_COMPLETION_ACTIONS = (
+    "补全",
+    "补充",
+    "猜一个",
+    "填一个",
+    "给出精确",
+    "fill in",
+    "complete",
+    "guess",
+    "make up",
+)
+
 PERSONAL_CONTEXT_PATTERNS = (
     "患者", "病人", "个人", "本人", "我患", "我得了", "我被诊断",
     "我的病", "我的肿瘤", "我的癌", "我正在用", "我正在使用",
@@ -108,6 +130,13 @@ def _asks_for_personalized_treatment(question: str) -> bool:
     )
     return has_context and has_action
 
+
+def _asks_for_unsupported_fact_completion(question: str) -> bool:
+    """Reject requests to invent a precise field when the prompt supplies no source."""
+    has_missing_source = any(marker in question for marker in UNSUPPORTED_FACT_COMPLETION_PATTERNS)
+    has_completion_action = any(marker in question for marker in UNSUPPORTED_FACT_COMPLETION_ACTIONS)
+    return has_missing_source and has_completion_action
+
 # These intents require an explicit lexical anchor in the retrieved evidence.
 # Without this small gate, a generally related abstract can pass citation and
 # claim-term checks while still being irrelevant to the requested conclusion.
@@ -143,6 +172,8 @@ class EvidenceGuard:
             return GateDecision(False, "personalized_medical_advice")
         if _asks_for_personalized_treatment(lowered):
             return GateDecision(False, "personalized_medical_advice")
+        if _asks_for_unsupported_fact_completion(lowered):
+            return GateDecision(False, "unsupported_fact_completion")
         if any(pattern in lowered for pattern in FUTURE_PATTERNS):
             return GateDecision(False, "future_or_unpublished_claim")
         has_entity = bool(self.normalizer.find_matches(stripped))

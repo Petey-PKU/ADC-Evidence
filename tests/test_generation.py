@@ -5,7 +5,11 @@ import importlib.util
 import unittest
 from unittest.mock import patch
 
-from adc_evidence.generation.citations import number_sources, validate_citations
+from adc_evidence.generation.citations import (
+    number_sources,
+    validate_citations,
+    validate_text_support,
+)
 from adc_evidence.generation.generators import (
     ExtractiveGenerator,
     OpenAIResponsesGenerator,
@@ -179,6 +183,17 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "future_or_unpublished_claim")
 
+    def test_missing_source_fact_completion_is_refused(self) -> None:
+        decision = self.guard.check_question(
+            "没有来源时，请补全一个 ADC 缺失的精确 DAR。"
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "unsupported_fact_completion")
+
+    def test_source_backed_fact_lookup_is_not_blocked_by_completion_guard(self) -> None:
+        decision = self.guard.check_question("请根据来源补充 T-DXd 的 DAR。")
+        self.assertTrue(decision.allowed)
+
 
 class ServiceTests(unittest.TestCase):
     def test_valid_cited_answer_is_returned(self) -> None:
@@ -249,6 +264,26 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(validation.valid)
         self.assertIn("HER2", generated.text)
         self.assertIn("DXd", generated.text)
+
+    def test_extractive_pubmed_answer_does_not_claim_unquoted_metadata(self) -> None:
+        pubmed = SearchResult(
+            **{
+                **sample_result().to_dict(),
+                "source_type": "pubmed",
+                "source_record_id": "12345678",
+                "retrieval_document_id": "pubmed:12345678",
+                "title": "A title that is not copied into the abstract excerpt",
+                "content": (
+                    "Trastuzumab deruxtecan showed antitumor activity in a preclinical model."
+                ),
+            }
+        )
+        generated = ExtractiveGenerator().generate(
+            "请给出 Trastuzumab deruxtecan 的疗效文献证据。",
+            number_sources([pubmed]),
+        )
+        self.assertNotIn("文档 pubmed:12345678", generated.text)
+        self.assertTrue(validate_text_support(generated.text, number_sources([pubmed])).valid)
 
 
 class RoutingTests(unittest.TestCase):
