@@ -14,7 +14,6 @@ from adc_evidence.evaluation.public_benchmark import (
     score_public_benchmark,
     validate_public_benchmark_report_metadata,
 )
-from scripts.prepare_public_benchmark_review import prepare_packet
 from scripts.validate_public_benchmark import validate_public_benchmark
 from tests.support import WorkspaceTemporaryDirectory
 
@@ -32,7 +31,8 @@ class PublicBenchmarkTests(unittest.TestCase):
             categories,
             {"structured_fact", "comparison", "trial_lookup", "literature_evidence", "safety_refusal"},
         )
-        self.assertTrue(all(row["human_scoring"]["status"] == "pending" for row in rows))
+        self.assertTrue(all("human_scoring" not in row for row in rows))
+        self.assertTrue(all(isinstance(row["scoring"].get("automatic_fields"), list) for row in rows))
 
     def test_manifest_records_exposed_use_and_metrics(self) -> None:
         rows = load_public_benchmark(BENCHMARK)
@@ -155,7 +155,6 @@ class PublicBenchmarkTests(unittest.TestCase):
             "evidence_sources": [],
             "allow_partial": True,
             "should_refuse": False,
-            "human_scoring": {"status": "pending", "primary": None, "secondary": None, "adjudicated": None},
             "scoring": {"primary_metric": "answer_field_accuracy"},
         }
         output = {
@@ -170,25 +169,6 @@ class PublicBenchmarkTests(unittest.TestCase):
         row["allow_partial"] = False
         score = score_public_benchmark([output], [row])
         self.assertEqual(score["answer_field_accuracy"], 0.0)
-
-    def test_review_packet_leaves_human_verdicts_pending(self) -> None:
-        rows = load_public_benchmark(BENCHMARK)[:2]
-        temporary = WorkspaceTemporaryDirectory()
-        try:
-            root = Path(temporary.name)
-            questions = root / "questions.jsonl"
-            report = root / "report.json"
-            questions.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
-            report.write_text(json.dumps({"questions": [
-                {"question_id": row["question_id"], "route": row["expected_route"], "status": "answered", "answer": "x"}
-                for row in rows
-            ]}), encoding="utf-8")
-            packet, manifest = prepare_packet(questions, report)
-        finally:
-            temporary.cleanup()
-        self.assertEqual(manifest["status"], "awaiting_independent_human_review")
-        self.assertTrue(all(item["review"]["status"] == "pending" for item in packet))
-        self.assertTrue(all(item["review"]["review_origin"] is None for item in packet))
 
     def test_paired_comparison_reports_differences(self) -> None:
         rows = load_public_benchmark(BENCHMARK)[:1]

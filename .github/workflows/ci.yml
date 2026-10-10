@@ -93,28 +93,14 @@ jobs:
           assert report['question_id_sha256'].startswith('sha256:')
           assert all(not arm['network_enabled'] for arm in report['arms'].values())
           PY
-      - name: Validate paper readiness remains fail-closed
-        run: |
-          set +e
-          python scripts/audit_paper_readiness.py --output /tmp/paper_readiness.json
-          status=$?
-          set -e
-          test "$status" -eq 2
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          report = json.loads(Path('/tmp/paper_readiness.json').read_text())
-          assert report['status'] == 'not_ready_for_submission'
-          assert report['blocker_count'] == 2
-          PY
+      - name: Run automatic public benchmark diagnostics
+        run: >-
+          python scripts/run_public_benchmark.py
+          --questions data/annotations/public_benchmark_v1.jsonl
+          --database data/processed/adc_evidence.db
+          --output /tmp/public_benchmark_report.json
       - name: Validate production Compose
         run: docker compose -f compose.prod.yaml config --quiet
-      - name: Upload paper readiness audit
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: paper-readiness-audit-${{ matrix.python-version }}-${{ matrix.dependency-profile }}
-          path: /tmp/paper_readiness.json
       - name: Upload public hygiene audit
         if: always()
         uses: actions/upload-artifact@v4

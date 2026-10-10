@@ -255,7 +255,7 @@ def _late_publication_dates(
         "reason_counts": dict(sorted(Counter(row["reason"] for row in records).items())),
         "records": records,
         "method_note": "Issue dates, electronic publication dates and NLM processing dates are distinct. "
-                       "This audit does not reconstruct an as-of database or establish independent human review; "
+                       "This audit does not reconstruct an as-of database or establish semantic correctness; "
                        "retrieval and source revision times still require a frozen snapshot protocol.",
     }
 

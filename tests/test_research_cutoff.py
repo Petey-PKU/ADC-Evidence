@@ -18,7 +18,7 @@ class ResearchCutoffConfigTests(unittest.TestCase):
         self.assertEqual(len(config["adc_fields"]), 10)
         self.assertEqual(len(config["trial_fields"]), 8)
         self.assertEqual(len(config["publication_fields"]), 4)
-        self.assertEqual(len(config["known_conflicts_requiring_adjudication"]), 3)
+        self.assertEqual(len(config["known_conflicts_requiring_resolution"]), 3)
         self.assertIn("historical_freeze", config["date_boundary_policy"])
         self.assertEqual(
             config["current_audit_input"]["interpretation"],

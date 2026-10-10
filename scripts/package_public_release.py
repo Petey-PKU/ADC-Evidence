@@ -49,7 +49,10 @@ def _runtime_files() -> tuple[list[tuple[Path, str]], dict[str, object]]:
     if missing := required - tracked:
         raise ValueError(f"Runtime files must be tracked before packaging: {sorted(missing)}")
     paths = sorted(required | {
-        name for name in tracked if name.startswith("src/adc_evidence/") and name.endswith(".py")
+        name for name in tracked
+        if name.startswith("src/adc_evidence/")
+        and name.endswith(".py")
+        and (ROOT / name).is_file()
     })
     files = []
     for name in paths:
@@ -417,7 +420,7 @@ Queries use local data without a model API or model download. The source commit,
 working-tree status and file hashes are recorded under `application` and `files`.
 
 The dataset remains a partial, pending-review snapshot. A working query does not
-establish clinical validity, full source coverage, or independent human review.
+establish clinical validity, full source coverage, or semantic correctness.
 Release mode: `{redistribution_status}`. If this says `research_only`, the archive
 must remain local and must not be uploaded or redistributed. Abstract and full-text
 redistribution remains subject to the original source license. Raw response files are not included; local paths stored in the source

@@ -15,7 +15,7 @@ from adc_evidence.config import (
     DEFAULT_TAVILY_BASE_URL,
     load_local_environment,
 )
-from adc_evidence.evaluation.benchmark import build_external_arm_report
+from adc_evidence.evaluation.automated import build_external_arm_report
 
 
 DIRECT_SYSTEM_PROMPT = """你是三组对照评测中的通用大模型直接回答组。

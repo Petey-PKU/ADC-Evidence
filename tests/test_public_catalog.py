@@ -32,8 +32,8 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(report["name_or_alias_match_count"], 1)
         self.assertEqual(report["field_level_source_missing_count"], 7)
         self.assertEqual(report["core_fact_field_level_source_missing_count"], 8)
-        self.assertEqual(report["review_status"], "triage_only_pending_human_source_locator_review")
-        self.assertFalse(report["ai_or_automatic_labels_are_gold"])
+        self.assertEqual(report["verification_status"], "automatic_triage_pending_source_locator_verification")
+        self.assertFalse(report["automatic_labels_are_gold"])
         record = report["records"][0]
         self.assertEqual(record["inspection_status"], "text_scanned")
         self.assertEqual(record["field_assessment"]["dar"], "field_level_source_missing")
@@ -92,7 +92,7 @@ class PublicCatalogAuditTests(unittest.TestCase):
             report["field_candidate_summary"]["dar"]["candidate_locator_missing_count"],
             1,
         )
-        self.assertEqual(report["records"][0]["field_assessment"]["target"], "candidate_locator_pending_human_review")
+        self.assertEqual(report["records"][0]["field_assessment"]["target"], "candidate_locator_pending_verification")
         self.assertEqual(report["records"][0]["field_assessment"]["dar"], "field_level_source_missing")
         self.assertEqual(report["records"][0]["field_assessment"]["indication"], "field_level_source_missing")
     def test_audit_reports_generic_sources_and_pending_primary_checks(self) -> None:
@@ -123,8 +123,8 @@ class PublicCatalogAuditTests(unittest.TestCase):
         self.assertEqual(report["source_specificity_counts"]["generic"], 1)
         self.assertEqual(report["field_coverage_counts"]["adc_name"], 1)
         self.assertEqual(report["field_coverage_counts"]["dar"], 1)
-        self.assertEqual(report["review_status"], "needs_primary_source_review")
-        self.assertEqual(report["manual_review_queue"][0]["adc_id"], "adc_001")
+        self.assertEqual(report["verification_status"], "needs_primary_source_verification")
+        self.assertEqual(report["attention_items"][0]["adc_id"], "adc_001")
 
     def test_catalog_hash_is_stable_across_newline_conventions(self) -> None:
         temporary = WorkspaceTemporaryDirectory()
@@ -135,7 +135,7 @@ class PublicCatalogAuditTests(unittest.TestCase):
             lf.write_bytes(content.encode("utf-8"))
             crlf.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
             # The minimal fixture is intentionally incomplete; the audit still
-            # computes provenance before reporting its review queue.
+            # computes provenance before reporting its attention items.
             lf_report = audit_catalog(lf, requested_as_of="2026-09-30")
             crlf_report = audit_catalog(crlf, requested_as_of="2026-09-30")
         finally:

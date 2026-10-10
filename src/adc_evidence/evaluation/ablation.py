@@ -6,8 +6,8 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
-from adc_evidence.evaluation.benchmark import _system_row, automatic_diagnostics
-from adc_evidence.evaluation.human_review import question_id_sha256
+from adc_evidence.evaluation.automated import _system_row, automatic_diagnostics
+from adc_evidence.evaluation.fingerprints import question_id_sha256
 from adc_evidence.generation.generators import ExtractiveGenerator
 from adc_evidence.generation.service import EvidenceAnsweringService
 from adc_evidence.rag.retriever import HybridRetriever
@@ -131,5 +131,5 @@ def run_identifier_routing_ablation(
             )
         },
         "changed_question_ids": changed_ids,
-        "interpretation": "Component-level engineering comparison only; semantic correctness needs review labels.",
+        "interpretation": "Component-level engineering comparison only; semantic correctness requires a separately defined validation set.",
     }

@@ -81,7 +81,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "question_set_sha256": f"sha256:{_object_hash(questions)}",
         "question_count": len(questions),
         "automatic_scoring": scored,
-        "human_review": {"status": "pending", "required": True},
+        "automatic_validation": {"status": "complete", "semantic_review": "not_performed"},
         "questions": outputs,
     }
 

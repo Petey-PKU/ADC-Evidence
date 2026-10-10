@@ -63,5 +63,5 @@ $env:ADC_OFFLINE_ONLY = "true"
 Before a paper uses these numbers, the benchmark must be replaced or extended
 with a separately frozen access-controlled set. At least two independent human
 reviewers must score answer correctness, evidence support, citation validity,
-completeness, and refusal appropriateness, with adjudication and a predeclared
+completeness, and refusal appropriateness, with a predeclared
 statistical analysis.

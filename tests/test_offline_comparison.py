@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from adc_evidence.evaluation.benchmark import (
+from adc_evidence.evaluation.automated import (
     OFFLINE_EVALUATION_CONDITIONS,
     build_external_arm_report,
 )
@@ -16,7 +16,7 @@ def questions() -> list[dict[str, object]]:
         "category": "structured_fact", "expected_route": "structured_fact", "should_refuse": False,
         "expected_status": ["answered"], "expected_document_ids": [], "expected_adc_ids": ["adc_001"],
         "expected_predicates": ["adc.target"], "required_terms": ["HER2"], "risk_level": "standard",
-        "review_tier": "single", "second_review_required": False,
+
     }]
 
 

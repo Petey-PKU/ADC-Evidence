@@ -1,7 +1,10 @@
 {
   "policy_version": "0.6.0",
   "scope": {
-    "targets": ["HER2", "TROP2"],
+    "targets": [
+      "HER2",
+      "TROP2"
+    ],
     "supported_jobs": [
       "adc_evidence_card",
       "adc_comparison",
@@ -47,231 +50,284 @@
     "adc.target": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.antibody": {
       "value_type": "string",
       "cardinality": "one",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.linker_name": {
       "value_type": "string",
       "cardinality": "one",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.linker_type": {
       "value_type": "enum",
       "cardinality": "one",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.payload_name": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.payload_class": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.dar": {
       "value_type": "decimal",
       "cardinality": "one",
-      "preferred_sources": ["adcdb", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.indication": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["adcdb", "clinicaltrials", "curated_seed"],
+      "preferred_sources": [
+        "adcdb",
+        "clinicaltrials",
+        "curated_seed"
+      ],
       "conflict_resolution": "preserve_all",
       "material_change": true
     },
     "adc.development_status": {
       "value_type": "enum",
       "cardinality": "one",
-      "preferred_sources": ["adcdb", "clinicaltrials", "curated_seed"],
-      "conflict_resolution": "require_review",
+      "preferred_sources": [
+        "adcdb",
+        "clinicaltrials",
+        "curated_seed"
+      ],
+      "conflict_resolution": "flag_conflict",
       "material_change": true
     },
     "adc.company": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["adcdb", "curated_seed"],
+      "preferred_sources": [
+        "adcdb",
+        "curated_seed"
+      ],
       "conflict_resolution": "preserve_all",
       "material_change": true
     },
     "trial.overall_status": {
       "value_type": "enum",
       "cardinality": "one",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.phases": {
       "value_type": "enum",
       "cardinality": "many",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.conditions": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.interventions": {
       "value_type": "object",
       "cardinality": "many",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.primary_outcomes": {
       "value_type": "object",
       "cardinality": "many",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.enrollment": {
       "value_type": "integer",
       "cardinality": "one",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.start_date": {
       "value_type": "date",
       "cardinality": "one",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "trial.completion_date": {
       "value_type": "date",
       "cardinality": "one",
-      "preferred_sources": ["clinicaltrials"],
+      "preferred_sources": [
+        "clinicaltrials"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "publication.title": {
       "value_type": "string",
       "cardinality": "one",
-      "preferred_sources": ["pubmed"],
+      "preferred_sources": [
+        "pubmed"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": false
     },
     "publication.abstract": {
       "value_type": "text",
       "cardinality": "one",
-      "preferred_sources": ["pubmed"],
+      "preferred_sources": [
+        "pubmed"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": true
     },
     "publication.publication_date": {
       "value_type": "date",
       "cardinality": "one",
-      "preferred_sources": ["pubmed"],
+      "preferred_sources": [
+        "pubmed"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": false
     },
     "publication.publication_type": {
       "value_type": "string",
       "cardinality": "many",
-      "preferred_sources": ["pubmed"],
+      "preferred_sources": [
+        "pubmed"
+      ],
       "conflict_resolution": "authoritative_first",
       "material_change": false
     }
   },
-  "fact_statuses": ["current", "superseded", "conflicted"],
-  "review_statuses": [
-    "needs_review",
-    "reviewed_supported",
-    "reviewed_unsupported",
-    "reviewed_conflicted",
-    "superseded"
+  "fact_statuses": [
+    "current",
+    "superseded",
+    "conflicted"
   ],
   "change_types": {
     "source.collection_failed": {
       "severity": "high",
-      "review_required": false,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": false
     },
     "source.record_missing": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": true
     },
     "adc.record_created": {
       "severity": "medium",
-      "review_required": true,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": true
     },
     "adc.development_status.changed": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": "adc.development_status"
+      "tracked_field": "adc.development_status",
+      "attention_required": true
     },
     "adc.structure.changed": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": "adc.payload_name"
+      "tracked_field": "adc.payload_name",
+      "attention_required": true
     },
     "trial.record_created": {
       "severity": "medium",
-      "review_required": false,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": false
     },
     "trial.overall_status.changed": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": "trial.overall_status"
+      "tracked_field": "trial.overall_status",
+      "attention_required": true
     },
     "trial.phases.changed": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": "trial.phases"
+      "tracked_field": "trial.phases",
+      "attention_required": true
     },
     "trial.primary_outcomes.changed": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": "trial.primary_outcomes"
+      "tracked_field": "trial.primary_outcomes",
+      "attention_required": true
     },
     "publication.record_created": {
       "severity": "medium",
-      "review_required": false,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": false
     },
     "fact.conflict_detected": {
       "severity": "high",
-      "review_required": true,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": true
     },
     "fact.conflict_resolved": {
       "severity": "medium",
-      "review_required": true,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": true
     },
     "fact.value_changed": {
       "severity": "medium",
-      "review_required": true,
-      "tracked_field": null
+      "tracked_field": null,
+      "attention_required": true
     }
   },
   "answer_routes": [
@@ -281,5 +337,12 @@
     "trial_lookup",
     "literature_evidence",
     "refusal"
+  ],
+  "verification_statuses": [
+    "needs_review",
+    "reviewed_supported",
+    "reviewed_unsupported",
+    "reviewed_conflicted",
+    "superseded"
   ]
 }

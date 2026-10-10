@@ -127,8 +127,8 @@ def audit_catalog(catalog: Path, *, requested_as_of: str) -> dict[str, object]:
             value: sum(str(row.get("verification_status", "")).strip() == value for row in rows)
             for value in sorted({str(row.get("verification_status", "")).strip() for row in rows})
         },
-        "review_status": "needs_primary_source_review" if queue else "ready_for_catalog_review",
-        "manual_review_queue": queue,
+        "verification_status": "needs_primary_source_verification" if queue else "ready_for_automatic_catalog_checks",
+        "attention_items": queue,
     }
 
 
@@ -141,7 +141,7 @@ def main() -> None:
     report = audit_catalog(args.catalog, requested_as_of=args.requested_as_of)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({key: report[key] for key in ("review_status", "row_count", "generic_source_url_count", "rows_with_missing_required_fields")}, ensure_ascii=False))
+    print(json.dumps({key: report[key] for key in ("verification_status", "row_count", "generic_source_url_count", "rows_with_missing_required_fields")}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

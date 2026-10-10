@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from adc_evidence.evaluation.benchmark import (
+from adc_evidence.evaluation.automated import (
     OFFLINE_BASELINE_VERSION,
     OFFLINE_EVALUATION_CONDITIONS,
     IMPLEMENTATION_VERSION,

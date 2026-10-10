@@ -112,7 +112,7 @@ def audit_catalog_sources(
             "candidate_value_count": 0, "candidate_value_match_count": 0,
             "candidate_value_match_eligible_count": 0, "candidate_value_match_fields": [],
             "candidate_value_match_values": [],
-            "candidate_value_unmatched_fields": [], "review_required": True,
+            "candidate_value_unmatched_fields": [], "attention_required": True,
         }
         match = False
         try:
@@ -159,7 +159,7 @@ def audit_catalog_sources(
         for field in KEY_FIELDS:
             if field in CORE_FACT_FIELDS:
                 assessment = (
-                    "candidate_locator_pending_human_review"
+                    "candidate_locator_pending_verification"
                     if (adc_id, field) in candidate_pairs
                     else "field_level_source_missing"
                 )
@@ -259,8 +259,8 @@ def audit_catalog_sources(
         "field_level_source_missing_count": len(structural_pairs - candidate_pairs),
         "core_fact_field_level_source_missing_count": len(core_fact_pairs - candidate_pairs),
         "field_candidate_summary": field_candidate_summary,
-        "review_status": "triage_only_pending_human_source_locator_review",
-        "ai_or_automatic_labels_are_gold": False, "records": results,
+        "verification_status": "automatic_triage_pending_source_locator_verification",
+        "automatic_labels_are_gold": False, "records": results,
     }
 
 
@@ -279,7 +279,7 @@ def main() -> None:
         "name_or_alias_match_count", "structural_field_candidate_locator_count",
         "structural_field_candidate_locator_missing_count", "core_fact_candidate_locator_count",
         "core_fact_candidate_locator_missing_count", "candidate_value_match_count",
-        "candidate_value_match_eligible_count", "candidate_value_match_rate", "review_status",
+        "candidate_value_match_eligible_count", "candidate_value_match_rate", "verification_status",
     )}, ensure_ascii=False, indent=2))
 
 

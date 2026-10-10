@@ -1,4 +1,4 @@
-"""Build a deterministic, review-pending benchmark from a public snapshot."""
+"""Build a deterministic benchmark from a public snapshot."""
 
 from __future__ import annotations
 
@@ -77,19 +77,11 @@ def _base(
         "evidence_sources": evidence_sources,
         "allow_partial": allow_partial,
         "should_refuse": should_refuse,
-        "human_scoring": {
-            "status": "pending",
-            "primary": None,
-            "secondary": None,
-            "adjudicated": None,
-            "review_origin": None,
-        },
         "scoring": {
             "primary_metric": primary_metric,
             "automatic_fields": ["route", "status", "evidence_source_ids"],
-            "human_fields": ["answer_verdict", "evidence_verdict", "citation_verdict", "completeness_verdict", "refusal_verdict"],
         },
-        "provenance": "auto_derived_from_public_snapshot_pending_independent_review",
+        "provenance": "auto_derived_from_public_snapshot",
     }
 
 

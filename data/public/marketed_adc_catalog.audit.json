@@ -52,8 +52,8 @@
   "verification_status_counts": {
     "primary_check_pending": 23
   },
-  "review_status": "needs_primary_source_review",
-  "manual_review_queue": [
+  "verification_status": "needs_primary_source_verification",
+  "attention_items": [
     {
       "adc_id": "adc_001",
       "adc_name": "Trastuzumab deruxtecan",

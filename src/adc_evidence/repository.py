@@ -233,7 +233,7 @@ def _insert_source_event(
             detected_at,
             source,
             source_record_id,
-            int(policy.review_required),
+            int(policy.attention_required),
             "needs_review",
             details_json,
             digest,
