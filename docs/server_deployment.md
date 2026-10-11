@@ -70,6 +70,8 @@ ADC_HOST_PORT=8501
 ADC_DATA_DIR=/srv/adc-evidence-data
 ADC_BACKUP_DIR=/srv/adc-evidence-backups
 ADC_BUILD_NETWORK=host
+ADC_DATABASE_PATH=/app/data/processed/adc_public_2026-09-30.db
+ADC_BOOTSTRAP_DEMO=false
 ```
 
 不要在公开服务中填写模型 API Key。后续如要开放远程模型，应先增加身份验证、
@@ -91,7 +93,9 @@ curl --fail http://127.0.0.1:8501/_stcore/health
 ```
 
 应看到 `ok`，且 `docker compose -f compose.prod.yaml ps` 中服务状态为 healthy。首次
-启动会自动生成 10 条公开演示记录和轻量 hashing 索引，不会使用私有仓库数据。
+启动前必须把公共快照 `adc_public_2026-09-30.db` 放入
+`/srv/adc-evidence-data/processed/`；容器会校验快照并创建或更新轻量 hashing 索引，
+不会自动生成 10 条 seed 小库。快照缺失或为空时，服务会直接失败并在日志中提示挂载路径。
 
 无域名时，先从自己的电脑建立 SSH 隧道测试：
 

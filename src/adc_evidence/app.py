@@ -7,7 +7,7 @@ import streamlit as st
 
 from adc_evidence.config import (
     DEFAULT_DATABASE_PATH,
-    DEFAULT_SEED_PATH,
+    PUBLIC_DATABASE_FILENAME,
     VECTOR_INDEX_PATH,
 )
 from adc_evidence.database import (
@@ -32,7 +32,6 @@ from adc_evidence.workbench import (
     evidence_data_version,
     get_adc_evidence_card,
     list_changes,
-    sync_public_seed_facts,
 )
 
 
@@ -43,7 +42,23 @@ st.set_page_config(
 )
 
 def ensure_database() -> None:
-    sync_public_seed_facts(DEFAULT_DATABASE_PATH, DEFAULT_SEED_PATH)
+    if not DEFAULT_DATABASE_PATH.is_file():
+        raise FileNotFoundError(
+            "The configured public database is missing: "
+            f"{DEFAULT_DATABASE_PATH}. Mount or copy the full public snapshot "
+            "before starting the app."
+        )
+    if DEFAULT_DATABASE_PATH.name == PUBLIC_DATABASE_FILENAME:
+        stats = database_stats(DEFAULT_DATABASE_PATH)
+        if (
+            stats["adc_count"] <= 10
+            or stats["document_count"] == 0
+            or stats["trial_count"] == 0
+        ):
+            raise RuntimeError(
+                "The configured public database does not look like the v0.7 "
+                "public snapshot. Check ADC_DATABASE_PATH before starting."
+            )
 
 
 FIELD_STATUS_LABELS = {
@@ -265,7 +280,7 @@ def display_answer_result(result) -> None:
 ensure_database()
 
 st.title("ADC-Evidence")
-st.caption("v0.6：证据卡、比较、变化、检索与自动证据校验")
+st.caption("v0.7：连接完整公共快照的证据卡、比较、变化、检索与自动证据校验")
 st.warning(
     "页面展示可追溯来源与自动校验结果；请在使用前核对原始来源，系统不提供个体化医疗或投资建议。"
 )
@@ -652,11 +667,11 @@ with answer_tab:
 
 with st.sidebar:
     st.header("当前版本")
-    st.write("v0.6-auto-validation")
+    st.write("v0.7.0-public-snapshot")
     st.caption(f"数据：{active_version['data_version'][:21]}…")
     st.caption(f"策略：{active_version['policy_version']}")
     git_sha = os.getenv("ADC_GIT_SHA", "").strip()
     if git_sha and git_sha != "unknown":
         st.caption(f"部署提交：{git_sha[:12]}")
-    st.write("数据源：ADC 种子数据、PubMed、ClinicalTrials.gov、ADCdb")
+    st.write("数据源：公共 ADC 快照（PubMed、ClinicalTrials.gov、ADCdb）")
     st.write("当前边界：证据约束回答，不提供个体化医疗建议。")

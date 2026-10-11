@@ -8,7 +8,7 @@
 
 English is the primary project introduction. [中文说明](#中文说明) follows below.
 
-> Research software · v0.6 baseline · Not for clinical, regulatory, investment, or individualized medical decisions.
+> Research software · v0.7.0 public snapshot runtime · Not for clinical, regulatory, investment, or individualized medical decisions.
 
 ## What it does
 
@@ -40,14 +40,16 @@ The public-source layer can ingest ADC seed records, PubMed, ClinicalTrials.gov,
 
 ## Data and scope
 
-- The v0.6 research baseline focuses on public ADC information, with HER2/TROP2 as the primary deep-validation scope.
-- `data/sample/adcs.csv` provides the 10-record demo seed. `data/public/marketed_adc_catalog.csv` is maintained as a separate public catalog.
-- Live ingestion is explicit and bounded; a clean demo database is not a claim of complete source coverage.
+- The v0.7 runtime uses the external public snapshot `data/processed/adc_public_2026-09-30.db` as its default database. The snapshot contains 23 ADC records, 1,410 PubMed records, and 3,503 clinical trials, with versioned facts, evidence, source snapshots, and retrieval documents.
+- SQLite snapshots and generated indexes are intentionally excluded from GitHub. Obtain the public snapshot from the release/data host or place an approved local copy at the documented path before starting the app.
+- `data/sample/adcs.csv` remains only as an explicit development/test seed. The production and public demo startup never falls back to that ten-record database.
+- Live ingestion is explicit and bounded; the snapshot is the reproducible public baseline, not a claim of complete global source coverage.
 - The default answer backend is deterministic and offline. Remote model backends are optional and must be enabled locally.
 - Public benchmark questions are exposed development/smoke tests. They support regression checks, not semantic gold-standard claims; the current validation status remains `not_ready_for_submission`.
 - This repository must not contain private review records, raw private datasets, credentials, or `.env` files.
 
 See [data sources and boundaries](docs/data_sources.md), [public dataset and Benchmark v1](docs/public_dataset_and_benchmark.md), and the [research cutoff](docs/research_cutoff_2026-09-18.md) for the current evidence boundary.
+The external database filename, checksum, counts, and mount instructions are in [public snapshot runtime data](docs/public_snapshot.md).
 
 ## Quick start
 
@@ -83,14 +85,20 @@ python -m pip install -e .
 python -m pip install -e ".[rag,generation]"
 ```
 
-### 2. Initialize and launch the app
+### 2. Mount the public snapshot and launch the app
 
 ```bash
-python -m adc_evidence.init_db
-streamlit run src/adc_evidence/app.py
+# Place adc_public_2026-09-30.db in data/processed/ first.
+python -m adc_evidence.deploy
 ```
 
-Open <http://localhost:8501>. The demo initializes a local SQLite database at `data/processed/adc_evidence.db`.
+Open <http://localhost:8501>. Startup validates the public snapshot and rebuilds a lightweight hashing index when the existing index does not match it. If the snapshot is missing, startup stops with an actionable error instead of creating the small seed database.
+
+For an isolated development fixture only, choose a separate database path and initialize it explicitly:
+
+```bash
+python -m adc_evidence.init_db --database data/processed/adc_demo.db
+```
 
 The offline extractive backend needs no API key:
 
@@ -102,8 +110,19 @@ python -m adc_evidence.generation.answer \
 
 ### 3. Ingest public sources (optional)
 
+For the mounted public snapshot, use the guarded refresh flow so the existing
+facts remain versioned and the seed database is never mixed into the snapshot:
+
 ```bash
-python -m adc_evidence.ingestion.pipeline
+python -m adc_evidence.refresh
+```
+
+The lower-level pipeline is for an explicitly selected development database or
+an approved source refresh. It does not bootstrap the default public snapshot:
+
+```bash
+python -m adc_evidence.ingestion.pipeline --database data/processed/adc_demo.db \
+  --bootstrap-seed --skip-adcdb --skip-trials --skip-pubmed
 ```
 
 The pipeline records source metadata and raw responses under `data/raw/<run_id>/` (ignored by Git). Skip a source when needed:
@@ -114,11 +133,7 @@ python -m adc_evidence.ingestion.pipeline --skip-trials
 python -m adc_evidence.ingestion.pipeline --skip-pubmed
 ```
 
-Use the guarded refresh flow for a versioned update with quality gates and rollback support:
-
-```bash
-python -m adc_evidence.refresh
-```
+Use the guarded refresh flow for a versioned update with quality gates and rollback support.
 
 ### 4. Build and query an index
 
@@ -143,7 +158,9 @@ python scripts/validate_public_benchmark.py \
 
 ## Docker
 
-Start the lightweight offline demo:
+Place `data/processed/adc_public_2026-09-30.db` in the mounted host directory first;
+the container validates that snapshot and never creates the ten-record seed by default.
+Then start the lightweight offline public snapshot service:
 
 ```bash
 docker compose up --build
@@ -174,11 +191,13 @@ tests/                   standard-library unittest suite
 
 - [Product scope and user tasks](docs/v0.6_product_scope.md)
 - [Data sources and collection boundaries](docs/data_sources.md)
+- [Public snapshot runtime data](docs/public_snapshot.md)
 - [Public dataset and Benchmark v1](docs/public_dataset_and_benchmark.md)
 - [Retrieval design](docs/retrieval_design.md) · [Generation design](docs/generation_design.md)
 - [Deployment](docs/deployment.md) · [Server deployment](docs/server_deployment.md)
 - [API configuration](docs/api_configuration.md)
 - [System design](docs/system_design.md)
+- [v0.7.0 release notes](docs/release_v0.7.md)
 
 ## 中文说明
 
@@ -198,15 +217,17 @@ ADC-Evidence 是一个面向抗体药物偶联物（ADC）研发信息核查的�
 
 ```bash
 python -m pip install -e ".[rag,generation]"
-python -m adc_evidence.init_db
-streamlit run src/adc_evidence/app.py
+# Place adc_public_2026-09-30.db in data/processed/ first.
+python -m adc_evidence.deploy
 ```
 
-浏览器打开 <http://localhost:8501>。默认使用无需 API key 的离线抽取式后端；远程模型仅用于明确批准的本地实验，配置方式见 [`docs/api_configuration.md`](docs/api_configuration.md)。也可以直接使用 `docker compose up --build` 启动离线演示。
+浏览器打开 <http://localhost:8501>。默认使用无需 API key 的离线抽取式后端；远程模型仅用于明确批准的本地实验，配置方式见 [`docs/api_configuration.md`](docs/api_configuration.md)。在挂载公共快照后，也可以使用 `docker compose up --build` 启动离线演示。
 
 ### 研究边界
 
-当前 v0.6 以公开 ADC 信息和 HER2/TROP2 深度验证为主。公开 Benchmark 仅用于开发和回归诊断，不是语义金标准。项目不提供诊断、处方、剂量、投资建议，也不预测未来临床或监管结果。公开仓库不包含私有复核记录、私有数据集或密钥；10 条演示 seed 与公开目录用于流程复现，不代表完整覆盖。
+当前 v0.7 默认接入外部提供的公开快照 `data/processed/adc_public_2026-09-30.db`，包含 23 个 ADC、1,410 条 PubMed 文献和 3,503 条临床试验记录，以及版本化事实、证据、来源快照和检索文档。SQLite 数据库和生成索引按仓库规则不提交到 GitHub，需要在启动前从发布/数据主机挂载或复制到本地。10 条 seed 仅用于显式开发测试，生产和公开演示启动不会自动回退到小库。
+
+公开 Benchmark 仅用于开发和回归诊断，不是语义金标准。项目不提供诊断、处方、剂量、投资建议，也不预测未来临床或监管结果。公开仓库不包含私有复核记录、私有数据集或密钥。
 
 ### 相关文档
 

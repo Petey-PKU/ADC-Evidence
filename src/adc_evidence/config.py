@@ -9,10 +9,12 @@ EVIDENCE_POLICY_PATH = PROJECT_ROOT / "configs" / "evidence_policy.json"
 DEFAULT_SEED_PATH = Path(
     os.getenv("ADC_SEED_PATH", str(PROJECT_ROOT / "data" / "sample" / "adcs.csv"))
 )
+PUBLIC_DATABASE_FILENAME = "adc_public_2026-09-30.db"
+PUBLIC_CATALOG_PATH = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 DEFAULT_DATABASE_PATH = Path(
     os.getenv(
         "ADC_DATABASE_PATH",
-        str(PROJECT_ROOT / "data" / "processed" / "adc_evidence.db"),
+        str(PROJECT_ROOT / "data" / "processed" / PUBLIC_DATABASE_FILENAME),
     )
 )
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw"
@@ -25,7 +27,10 @@ FROZEN_BENCHMARK_QUESTIONS_PATH = (
     ANNOTATIONS_PATH / "v0.6_frozen_test_questions.jsonl"
 )
 VECTOR_INDEX_PATH = Path(
-    os.getenv("ADC_VECTOR_INDEX_PATH", str(PROJECT_ROOT / "artifacts" / "vector_index"))
+    os.getenv(
+        "ADC_VECTOR_INDEX_PATH",
+        str(PROJECT_ROOT / "artifacts" / "vector_index" / "public_2026-09-30"),
+    )
 )
 EVALUATION_PATH = PROJECT_ROOT / "artifacts" / "evaluation"
 GENERATION_REPORT_PATH = EVALUATION_PATH / "generation_report.json"

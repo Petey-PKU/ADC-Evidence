@@ -9,6 +9,7 @@ from adc_evidence.config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_SEED_PATH,
     VECTOR_INDEX_PATH,
+    environment_flag,
 )
 from adc_evidence.database import connect, create_database, initialize_database
 from adc_evidence.rag.documents import build_and_persist_corpus, retrieval_corpus_version
@@ -22,22 +23,73 @@ def ensure_runtime_assets(
     seed_path: Path = DEFAULT_SEED_PATH,
     index_path: Path = VECTOR_INDEX_PATH,
     bootstrap_backend: str = "hashing",
+    allow_seed_bootstrap: bool | None = None,
 ) -> dict[str, object]:
-    """Create a runnable demo only when persisted assets are absent.
+    """Validate or bootstrap the configured database and retrieval assets.
 
-    Existing real data and vector indexes are never replaced. A clean deployment
-    receives the ten-row seed database and a lightweight hashing index.
+    The public runtime defaults to the external public snapshot. It is never
+    silently replaced by the ten-row demo seed. Seed bootstrapping remains
+    available for an explicitly supplied development/test database, or when
+    ``ADC_BOOTSTRAP_DEMO=true`` is set deliberately.
     """
+    database_path = Path(database_path)
+    seed_path = Path(seed_path)
+    index_path = Path(index_path)
+    is_default_database = database_path.resolve() == DEFAULT_DATABASE_PATH.resolve()
+    if allow_seed_bootstrap is None:
+        allow_seed_bootstrap = (
+            not is_default_database
+            or environment_flag("ADC_BOOTSTRAP_DEMO", default=False)
+        )
+    if is_default_database and not database_path.exists() and not allow_seed_bootstrap:
+        raise FileNotFoundError(
+            "The configured public database is missing: "
+            f"{database_path}. Mount or copy the public snapshot before starting. "
+            "For an isolated demo only, set ADC_DATABASE_PATH to a separate "
+            "development path and ADC_BOOTSTRAP_DEMO=true."
+        )
     create_database(database_path)
     with closing(connect(database_path)) as connection:
         adc_count = int(connection.execute("SELECT COUNT(*) FROM adcs").fetchone()[0])
     if adc_count == 0:
+        if not allow_seed_bootstrap:
+            raise RuntimeError(
+                "The configured public database is empty. The v0.7 runtime "
+                "requires the full public snapshot; it will not create the "
+                "ten-record demo database automatically."
+            )
         initialize_database(database_path, seed_path)
         with closing(connect(database_path)) as connection:
             adc_count = int(
                 connection.execute("SELECT COUNT(*) FROM adcs").fetchone()[0]
             )
-    seed_fact_sync = sync_public_seed_facts(database_path, seed_path)
+    if is_default_database and not allow_seed_bootstrap:
+        with closing(connect(database_path)) as connection:
+            document_count = int(
+                connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            )
+            trial_count = int(
+                connection.execute("SELECT COUNT(*) FROM trials").fetchone()[0]
+            )
+        if adc_count <= 10 or document_count == 0 or trial_count == 0:
+            raise RuntimeError(
+                "The configured public database does not look like the v0.7 "
+                "public snapshot (expected more than the ten-record demo plus "
+                "literature and trial records). Check ADC_DATABASE_PATH."
+            )
+    if allow_seed_bootstrap:
+        seed_fact_sync: dict[str, object] = sync_public_seed_facts(
+            database_path, seed_path
+        )
+    else:
+        seed_fact_sync = {
+            "adc_count": adc_count,
+            "facts_created": 0,
+            "evidence_created": 0,
+            "change_events_created": 0,
+            "idempotent_groups": 0,
+            "skipped": True,
+        }
 
     with closing(connect(database_path)) as connection:
         chunk_count = int(

@@ -2,16 +2,24 @@ from __future__ import annotations
 
 import argparse
 import traceback
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
 from adc_evidence.config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_SEED_PATH,
+    PUBLIC_CATALOG_PATH,
     QUALITY_REPORT_PATH,
     RAW_DATA_PATH,
 )
-from adc_evidence.database import initialize_database, load_seed_records, upsert_records
+from adc_evidence.database import (
+    connect,
+    create_database,
+    initialize_database,
+    load_seed_records,
+    upsert_records,
+)
 from adc_evidence.facts import (
     adc_seed_fact_sets,
     adcdb_fact_sets,
@@ -79,8 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--seed",
         type=Path,
-        default=DEFAULT_SEED_PATH,
-        help="CSV seed/catalog used to define the ADC scope for this run.",
+        default=None,
+        help="CSV seed/catalog used to define the ADC scope for this run. "
+        "The public snapshot defaults to data/public/marketed_adc_catalog.csv.",
     )
     parser.add_argument("--raw-root", type=Path, default=RAW_DATA_PATH)
     parser.add_argument("--quality-report", type=Path, default=QUALITY_REPORT_PATH)
@@ -92,6 +101,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-trials", action="store_true")
     parser.add_argument("--skip-adcdb", action="store_true")
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument(
+        "--bootstrap-seed",
+        action="store_true",
+        help="Explicitly allow the ten-record seed on a clean development database.",
+    )
     parser.add_argument("--source-retries", type=int, default=3)
     parser.add_argument("--source-retry-delay", type=float, default=1.0)
     return parser
@@ -101,7 +115,34 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     run_id = getattr(args, "run_id", None) or _run_id()
     started_at = utc_now()
     run_directory = args.raw_root / run_id
-    seed_path = Path(getattr(args, "seed", DEFAULT_SEED_PATH))
+    database_path = Path(args.database)
+    is_default_public = database_path.resolve() == DEFAULT_DATABASE_PATH.resolve()
+    configured_seed = getattr(args, "seed", None)
+    if configured_seed is None:
+        seed_path = PUBLIC_CATALOG_PATH if is_default_public else DEFAULT_SEED_PATH
+    else:
+        seed_path = Path(configured_seed)
+    bootstrap_seed = bool(getattr(args, "bootstrap_seed", False))
+    if is_default_public and not bootstrap_seed:
+        if not database_path.is_file():
+            raise FileNotFoundError(
+                "The configured public database is missing. Mount the public "
+                "snapshot before running ingestion."
+            )
+        create_database(database_path)
+        with closing(connect(database_path)) as connection:
+            adc_count = int(connection.execute("SELECT COUNT(*) FROM adcs").fetchone()[0])
+            document_count = int(
+                connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            )
+            trial_count = int(
+                connection.execute("SELECT COUNT(*) FROM trials").fetchone()[0]
+            )
+        if adc_count <= 10 or document_count == 0 or trial_count == 0:
+            raise RuntimeError(
+                "The configured public database does not look like the v0.7 "
+                "public snapshot; refusing to run the ten-record seed flow."
+            )
     seed_records = load_seed_records(seed_path)
     seed_by_id = {record.adc_id: record for record in seed_records}
     normalizer = EntityNormalizer(seed_path=seed_path)
@@ -125,23 +166,34 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, object]:
     parameters = vars(args).copy()
     parameters = {key: str(value) if isinstance(value, Path) else value for key, value in parameters.items()}
 
-    initialize_database(args.database, seed_path)
+    if is_default_public and not bootstrap_seed:
+        seed_fact_sync: dict[str, object] = {
+            "adc_count": len(seed_records),
+            "facts_created": 0,
+            "evidence_created": 0,
+            "change_events_created": 0,
+            "idempotent_groups": 0,
+            "skipped": True,
+        }
+    else:
+        initialize_database(database_path, seed_path)
+        seed_fact_sync = record_fact_sets(
+            database_path,
+            [
+                fact_set
+                for seed_record in seed_records
+                for fact_set in adc_seed_fact_sets(
+                    seed_record,
+                    observed_at=started_at,
+                )
+            ],
+        )
     recovered_runs = recover_stale_ingestion_runs(args.database)
     upsert_entity_aliases(args.database, _alias_rows(normalizer))
     start_ingestion_run(args.database, run_id, started_at, parameters)
     if recovered_runs:
         summary["recovered_stale_run_ids"] = recovered_runs
-    summary["seed_fact_sync"] = record_fact_sets(
-        args.database,
-        [
-            fact_set
-            for seed_record in seed_records
-            for fact_set in adc_seed_fact_sets(
-                seed_record,
-                observed_at=started_at,
-            )
-        ],
-    )
+    summary["seed_fact_sync"] = seed_fact_sync
 
     source_retries = int(getattr(args, "source_retries", 3))
     source_retry_delay = float(getattr(args, "source_retry_delay", 1.0))
