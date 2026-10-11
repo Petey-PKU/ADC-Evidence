@@ -14,18 +14,22 @@ docker compose up --build
 docker compose down
 ```
 
-`compose.yaml` 将数据库和评测报告挂载到宿主机，并将 hashing 索引保存在 Docker volume，因此容器重建不会删除人工复核记录。
+`compose.yaml` 将外部公共数据库和评测报告挂载到宿主机，并将 hashing 索引保存在 Docker volume，因此容器重建不会删除数据或评测记录。
 
 ## 两种启动状态
 
-### 干净仓库演示
+### 公共快照运行时
 
-如果没有数据库和索引，启动脚本会自动：
+启动前先将 `adc_public_2026-09-30.db` 放入 `data/processed/`，或在 `.env` 中将
+`ADC_DATABASE_PATH` 指向挂载路径。启动脚本会：
 
-1. 导入 10 条 ADC 样例数据；
-2. 构建可检索文档和切片；
-3. 创建轻量 hashing 向量索引；
+1. 校验公共快照存在且不是空库；
+2. 在快照缺少检索切片时构建切片；
+3. 在向量索引与快照版本不匹配时重建轻量 hashing 索引；
 4. 启动 Streamlit。
+
+公共快照缺失时会直接报错，不会自动创建 10 条 seed 小库。10 条 seed 仅供显式开发测试，
+可使用 `python -m adc_evidence.init_db --database data/processed/adc_demo.db` 创建独立 fixture。
 
 hashing 只保证部署流程可跑通，不代表正式语义检索效果。默认镜像不安装 PyTorch，构建时间和镜像体积更适合演示。
 
@@ -64,7 +68,7 @@ docker compose logs adc-evidence
 
 镜像健康检查访问 Streamlit 的 `/_stcore/health`。GitHub Actions 会在 push 和 pull request 时执行编译检查与全部单元测试。
 
-2026-08-20 本地验证结果：默认 demo 镜像构建成功，大小 185,427,334 bytes；空数据容器自动生成 10 个切片的 hashing 索引，并在约 8 秒内返回 `HTTP 200 / ok`。完整 CPU 配置已通过 Compose 合并解析，但首次构建仍需下载较大的 PyTorch CPU 依赖。
+2026-10-11 本地验证结果：公共快照包含 23 个 ADC、1,410 条 PubMed 记录和 3,503 条临床试验；容器健康检查返回 `HTTP 200 / ok`。完整 CPU 配置已通过 Compose 合并解析，但首次构建仍需下载较大的 PyTorch CPU 依赖。
 
 ## 上云时的最小改动
 

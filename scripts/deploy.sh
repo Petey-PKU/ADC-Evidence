@@ -19,10 +19,10 @@ fi
 
 if docker compose -f "$COMPOSE_FILE" ps --status running --quiet adc-evidence | grep -q .; then
   echo "Creating a transaction-consistent SQLite backup..."
-  docker compose -f "$COMPOSE_FILE" exec -T adc-evidence \
-    python -m adc_evidence.backup \
-    --database /app/data/processed/adc_evidence.db \
-    --output-dir /app/backups
+  docker compose -f "$COMPOSE_FILE" exec -T adc-evidence sh -c \
+    'python -m adc_evidence.backup \
+      --database "${ADC_DATABASE_PATH:-/app/data/processed/adc_public_2026-09-30.db}" \
+      --output-dir /app/backups'
 fi
 
 git fetch origin "$EXPECTED_BRANCH"
