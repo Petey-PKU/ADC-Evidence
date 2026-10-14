@@ -87,6 +87,23 @@ python -m pip install -e ".[rag,generation]"
 
 ### 2. Mount the public snapshot and launch the app
 
+#### Reproduce from the pinned public release
+
+The database and retrieval index are runtime artifacts rather than Git files. Once the
+matching GitHub Release asset is published, a fresh clone can install the pinned snapshot
+without running source ingestion first:
+
+```powershell
+python scripts/install_public_release.py `
+  --tag v0.7.0 `
+  --asset adc-public-2026-09-30.zip
+python -m adc_evidence.deploy
+```
+
+The installer verifies `RELEASE_MANIFEST.json`, rejects unsafe archive paths, and refuses
+to overwrite an existing database or index unless `--force` is supplied. The release
+archive is the reproducibility distribution; it is not committed to `main`.
+
 ```bash
 # Place adc_public_2026-09-30.db in data/processed/ first.
 python -m adc_evidence.deploy
@@ -192,6 +209,7 @@ tests/                   standard-library unittest suite
 - [Product scope and user tasks](docs/v0.6_product_scope.md)
 - [Data sources and collection boundaries](docs/data_sources.md)
 - [Public snapshot runtime data](docs/public_snapshot.md)
+- [Public snapshot distribution](docs/public_release_distribution.md)
 - [Public dataset and Benchmark v1](docs/public_dataset_and_benchmark.md)
 - [Retrieval design](docs/retrieval_design.md) · [Generation design](docs/generation_design.md)
 - [Deployment](docs/deployment.md) · [Server deployment](docs/server_deployment.md)
