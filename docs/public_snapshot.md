@@ -1,7 +1,8 @@
 # 公共快照运行数据
 
-v0.7 的默认运行时使用一个独立于 Git 的 SQLite 公共快照。仓库只保存配置、代码和
-可复现的处理流程，不保存原始数据库或生成的向量索引。
+v0.7 的默认运行时使用用户授权的 SQLite 公共快照。数据库以压缩归档形式直接跟踪在
+公开仓库中，确保普通用户 clone 后可以直接复现；首次启动时自动校验并解压，生成的
+向量索引仍是本地运行时产物。
 
 ## 默认文件
 
@@ -23,16 +24,16 @@ data/processed/adc_public_2026-09-30.db
 数据采集窗口是有边界的，以上数量不代表全球全量覆盖；详细来源边界见
 [`data_sources.md`](data_sources.md)。
 
-## 挂载和校验
+## Clone、启动和校验
 
-把数据库从受信任的数据发布位置复制到 `data/processed/`，然后校验：
+clone 后直接启动即可；运行时会自动恢复数据库并校验：
 
 ```powershell
 Get-FileHash data/processed/adc_public_2026-09-30.db -Algorithm SHA256
 python -m adc_evidence.deploy
 ```
 
-Docker Compose 会把宿主机的 `data/processed` 挂载到容器，并通过
+Docker Compose 会把仓库中的 `data/processed` 挂载到容器，并通过
 `ADC_DATABASE_PATH=/app/data/processed/adc_public_2026-09-30.db` 使用该文件。生产部署使用
 `/srv/adc-evidence-data/processed/` 的同名文件。
 
@@ -43,4 +44,5 @@ Docker Compose 会把宿主机的 `data/processed` 挂载到容器，并通过
 python -m adc_evidence.init_db --database data/processed/adc_demo.db
 ```
 
-数据库、原始响应、模型缓存和向量索引均不应提交到 GitHub。
+原始响应、模型缓存和向量索引仍不提交到 GitHub；只有本文件明确列出的用户授权公共
+快照归档进入 `main`。如果部署环境无法使用仓库归档，可以使用仓库提供的校验发布包安装器。

@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from adc_evidence.config import DEFAULT_SEED_PATH
+from adc_evidence.config import DEFAULT_SEED_PATH, PUBLIC_DATABASE_ARCHIVE_PATH, PUBLIC_DATABASE_FILENAME
 from adc_evidence.workbench import sync_public_seed_facts
-from adc_evidence.deploy import ensure_runtime_assets
+from adc_evidence.deploy import ensure_runtime_assets, restore_public_snapshot_archive
 
 
 class DeploymentBootstrapTests(unittest.TestCase):
@@ -44,13 +44,27 @@ class DeploymentBootstrapTests(unittest.TestCase):
         with WorkspaceTemporaryDirectory() as temporary_directory:
             database = Path(temporary_directory) / "processed" / "adc_public_2026-09-30.db"
             index = Path(temporary_directory) / "index"
-            with patch("adc_evidence.deploy.DEFAULT_DATABASE_PATH", database):
+            with patch("adc_evidence.deploy.DEFAULT_DATABASE_PATH", database), patch(
+                "adc_evidence.deploy.PUBLIC_DATABASE_ARCHIVE_PATH",
+                Path(temporary_directory) / "missing.db.zip",
+            ):
                 with self.assertRaises(FileNotFoundError):
                     ensure_runtime_assets(
                         database_path=database,
                         index_path=index,
                         allow_seed_bootstrap=False,
                     )
+
+    def test_tracked_snapshot_archive_restores_verified_database(self) -> None:
+        with WorkspaceTemporaryDirectory() as temporary_directory:
+            database = Path(temporary_directory) / PUBLIC_DATABASE_FILENAME
+            result = restore_public_snapshot_archive(
+                database_path=database,
+                archive_path=PUBLIC_DATABASE_ARCHIVE_PATH,
+            )
+            self.assertTrue(result["restored"])
+            self.assertTrue(database.is_file())
+            self.assertEqual(result["sha256"], "d28939138a67f1493553a24af49198f8115bc3026591f9a2b97c3e5568ef6482")
 
     def test_existing_snapshot_skips_seed_sync_when_requested(self) -> None:
         with WorkspaceTemporaryDirectory() as temporary_directory:

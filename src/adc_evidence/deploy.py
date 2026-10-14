@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
+import shutil
+import zipfile
 from contextlib import closing
 from pathlib import Path
 
 from adc_evidence.config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_SEED_PATH,
+    PUBLIC_DATABASE_ARCHIVE_PATH,
+    PUBLIC_DATABASE_FILENAME,
+    PUBLIC_DATABASE_SHA256,
     VECTOR_INDEX_PATH,
     environment_flag,
 )
@@ -15,6 +21,46 @@ from adc_evidence.database import connect, create_database, initialize_database
 from adc_evidence.rag.documents import build_and_persist_corpus, retrieval_corpus_version
 from adc_evidence.rag.vector_index import build_vector_index
 from adc_evidence.workbench import sync_public_seed_facts
+
+
+def restore_public_snapshot_archive(
+    *,
+    database_path: Path = DEFAULT_DATABASE_PATH,
+    archive_path: Path = PUBLIC_DATABASE_ARCHIVE_PATH,
+) -> dict[str, object]:
+    """Restore the tracked public snapshot archive into its runtime path."""
+    database_path = Path(database_path)
+    archive_path = Path(archive_path)
+    if database_path.exists() or not archive_path.is_file():
+        return {"restored": False, "archive": str(archive_path)}
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = database_path.with_name(f".{database_path.name}.incoming")
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            names = [name for name in archive.namelist() if name == PUBLIC_DATABASE_FILENAME]
+            if names != [PUBLIC_DATABASE_FILENAME]:
+                raise RuntimeError(
+                    f"Public snapshot archive must contain exactly {PUBLIC_DATABASE_FILENAME}."
+                )
+            digest_builder = hashlib.sha256()
+            with archive.open(PUBLIC_DATABASE_FILENAME) as source, temporary_path.open("wb") as target:
+                while chunk := source.read(1024 * 1024):
+                    digest_builder.update(chunk)
+                    target.write(chunk)
+        digest = digest_builder.hexdigest()
+        if digest != PUBLIC_DATABASE_SHA256:
+            raise RuntimeError(
+                "Public snapshot archive checksum mismatch; refusing to start with an unverified database."
+            )
+        os.replace(temporary_path, database_path)
+        return {
+            "restored": True,
+            "archive": str(archive_path),
+            "database": str(database_path),
+            "sha256": digest,
+        }
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def ensure_runtime_assets(
@@ -27,8 +73,8 @@ def ensure_runtime_assets(
 ) -> dict[str, object]:
     """Validate or bootstrap the configured database and retrieval assets.
 
-    The public runtime defaults to the external public snapshot. It is never
-    silently replaced by the ten-row demo seed. Seed bootstrapping remains
+    The public runtime defaults to the tracked public snapshot archive. It is
+    never silently replaced by the ten-row demo seed. Seed bootstrapping remains
     available for an explicitly supplied development/test database, or when
     ``ADC_BOOTSTRAP_DEMO=true`` is set deliberately.
     """
@@ -41,10 +87,17 @@ def ensure_runtime_assets(
             not is_default_database
             or environment_flag("ADC_BOOTSTRAP_DEMO", default=False)
         )
+    archive_restore: dict[str, object] = {"restored": False}
+    if is_default_database and not database_path.exists() and not allow_seed_bootstrap:
+        archive_restore = restore_public_snapshot_archive(
+            database_path=database_path,
+            archive_path=PUBLIC_DATABASE_ARCHIVE_PATH,
+        )
     if is_default_database and not database_path.exists() and not allow_seed_bootstrap:
         raise FileNotFoundError(
             "The configured public database is missing: "
-            f"{database_path}. Mount or copy the public snapshot before starting. "
+            f"{database_path}. The tracked public snapshot archive was not found. "
+            "Restore the repository data archive before starting. "
             "For an isolated demo only, set ADC_DATABASE_PATH to a separate "
             "development path and ADC_BOOTSTRAP_DEMO=true."
         )
@@ -123,6 +176,7 @@ def ensure_runtime_assets(
         "corpus_built": corpus_built,
         "index_built": index_built,
         "embedding_backend": manifest["embedding_backend"],
+        "public_snapshot_restore": archive_restore,
         "seed_fact_sync": seed_fact_sync,
     }
 

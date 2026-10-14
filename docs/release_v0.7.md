@@ -1,7 +1,8 @@
 # ADC-Evidence v0.7.0
 
 v0.7.0 changes the public runtime baseline from the ten-record demo seed to the
-external public snapshot `adc_public_2026-09-30.db`.
+user-authorized public snapshot `adc_public_2026-09-30.db`, bundled as the tracked
+archive `data/processed/adc_public_2026-09-30.db.zip`.
 
 The application now:
 

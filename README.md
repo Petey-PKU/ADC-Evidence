@@ -40,8 +40,8 @@ The public-source layer can ingest ADC seed records, PubMed, ClinicalTrials.gov,
 
 ## Data and scope
 
-- The v0.7 runtime uses the external public snapshot `data/processed/adc_public_2026-09-30.db` as its default database. The snapshot contains 23 ADC records, 1,410 PubMed records, and 3,503 clinical trials, with versioned facts, evidence, source snapshots, and retrieval documents.
-- SQLite snapshots and generated indexes are intentionally excluded from GitHub. Obtain the public snapshot from the release/data host or place an approved local copy at the documented path before starting the app.
+- The v0.7 runtime uses the user-authorized public snapshot `data/processed/adc_public_2026-09-30.db` as its default database. Its compressed archive is tracked directly in Git at `data/processed/adc_public_2026-09-30.db.zip` and contains 23 ADC records, 1,410 PubMed records, and 3,503 clinical trials, with versioned facts, evidence, source snapshots, and retrieval documents.
+- On first start, the runtime verifies the archive checksum and restores the database automatically. The generated retrieval index remains a local runtime artifact and is rebuilt when needed.
 - `data/sample/adcs.csv` remains only as an explicit development/test seed. The production and public demo startup never falls back to that ten-record database.
 - Live ingestion is explicit and bounded; the snapshot is the reproducible public baseline, not a claim of complete global source coverage.
 - The default answer backend is deterministic and offline. Remote model backends are optional and must be enabled locally.
@@ -85,27 +85,21 @@ python -m pip install -e .
 python -m pip install -e ".[rag,generation]"
 ```
 
-### 2. Mount the public snapshot and launch the app
-
-#### Reproduce from the pinned public release
-
-The database and retrieval index are runtime artifacts rather than Git files. Once the
-matching GitHub Release asset is published, a fresh clone can install the pinned snapshot
-without running source ingestion first:
+### 2. Launch the app with the tracked public snapshot
 
 ```powershell
-python scripts/install_public_release.py `
-  --tag v0.7.0 `
-  --asset adc-public-2026-09-30.zip
 python -m adc_evidence.deploy
 ```
 
-The installer verifies `RELEASE_MANIFEST.json`, rejects unsafe archive paths, and refuses
-to overwrite an existing database or index unless `--force` is supplied. The release
-archive is the reproducibility distribution; it is not committed to `main`.
+Startup verifies and restores the tracked snapshot archive, rebuilds a lightweight hashing
+index when the local index is missing or stale, and never falls back to the ten-record seed
+database.
 
-```bash
-# Place adc_public_2026-09-30.db in data/processed/ first.
+If a deployment cannot use the tracked archive, the optional verified release installer
+remains available:
+
+```powershell
+python scripts/install_public_release.py --tag v0.7.0 --asset adc-public-2026-09-30.zip
 python -m adc_evidence.deploy
 ```
 
@@ -175,9 +169,8 @@ python scripts/validate_public_benchmark.py \
 
 ## Docker
 
-Place `data/processed/adc_public_2026-09-30.db` in the mounted host directory first;
-the container validates that snapshot and never creates the ten-record seed by default.
-Then start the lightweight offline public snapshot service:
+The tracked `data/processed/adc_public_2026-09-30.db` is mounted into the container by
+Compose. Start the lightweight offline public snapshot service directly after cloning:
 
 ```bash
 docker compose up --build

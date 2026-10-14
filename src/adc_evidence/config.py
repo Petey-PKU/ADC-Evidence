@@ -10,6 +10,7 @@ DEFAULT_SEED_PATH = Path(
     os.getenv("ADC_SEED_PATH", str(PROJECT_ROOT / "data" / "sample" / "adcs.csv"))
 )
 PUBLIC_DATABASE_FILENAME = "adc_public_2026-09-30.db"
+PUBLIC_DATABASE_SHA256 = "d28939138a67f1493553a24af49198f8115bc3026591f9a2b97c3e5568ef6482"
 PUBLIC_CATALOG_PATH = PROJECT_ROOT / "data" / "public" / "marketed_adc_catalog.csv"
 DEFAULT_DATABASE_PATH = Path(
     os.getenv(
@@ -19,6 +20,12 @@ DEFAULT_DATABASE_PATH = Path(
 )
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed"
+PUBLIC_DATABASE_ARCHIVE_PATH = Path(
+    os.getenv(
+        "ADC_DATABASE_ARCHIVE_PATH",
+        str(PROCESSED_DATA_PATH / f"{PUBLIC_DATABASE_FILENAME}.zip"),
+    )
+)
 QUALITY_REPORT_PATH = PROCESSED_DATA_PATH / "data_quality_report.json"
 ANNOTATIONS_PATH = PROJECT_ROOT / "data" / "annotations"
 RETRIEVAL_QUESTIONS_PATH = ANNOTATIONS_PATH / "retrieval_questions.jsonl"

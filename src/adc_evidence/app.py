@@ -45,7 +45,7 @@ def ensure_database() -> None:
     if not DEFAULT_DATABASE_PATH.is_file():
         raise FileNotFoundError(
             "The configured public database is missing: "
-            f"{DEFAULT_DATABASE_PATH}. Mount or copy the full public snapshot "
+            f"{DEFAULT_DATABASE_PATH}. Restore the tracked public snapshot archive "
             "before starting the app."
         )
     if DEFAULT_DATABASE_PATH.name == PUBLIC_DATABASE_FILENAME:
