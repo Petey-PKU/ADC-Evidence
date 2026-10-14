@@ -14,8 +14,8 @@ The normal path is now a clone followed by the default launcher:
 python -m adc_evidence.deploy
 ```
 
-If Git LFS cannot be used and the `v0.7.0` release asset is available, run this from the
-repository root:
+If the tracked archive cannot be used and the `v0.7.0` release asset is available, run this
+from the repository root:
 
 ```powershell
 python scripts/install_public_release.py `
